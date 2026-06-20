@@ -30,7 +30,7 @@
 | `document_id` | Уникальный идентификатор документа | string, snake_case | `04_refund_policy` | Да | Документ |
 | `title` | Человекочитаемое название | string | `Политика возвратов` | Да | Документ |
 | `category` | Тематическая категория | string | `refunds`, `delivery`, `faq` | Да | Документ |
-| `document_type` | Тип содержимого | enum | `policy`, `procedure`, `reference`, `faq`, `templates` | Да | Документ |
+| `document_type` | Тип содержимого | enum | `policy`, `procedure`, `reference`, `faq`, `templates`, `guideline` | Да | Документ |
 | `version` | Версия документа | string semver | `1.0.0` | Да | Документ |
 | `status` | Статус жизненного цикла | enum | см. ниже | Да | Документ |
 | `effective_date` | Дата начала действия версии | date `YYYY-MM-DD` | `2026-06-01` | Да | Документ |
@@ -47,8 +47,11 @@
 |----------|----------|
 | `internal_policy` | Внутренняя политика (доставка, возвраты, компенсации и т.д.) |
 | `internal_reference` | Внутренний справочник (обзор сервиса, глоссарий) |
+| `internal_procedure` | Внутренняя процедура обработки обращений (SOP поддержки) |
+| `internal_guideline` | Внутренние руководства по стилю и шаблонам ответов |
+| `internal_faq` | Внутренний FAQ для поддержки и ассистента |
 | `sop` | Стандартная операционная процедура |
-| `faq` | Частые вопросы и ответы |
+| `faq` | Частые вопросы и ответы (устаревшее общее значение; для `10_customer_faq` используется `internal_faq`) |
 | `brand_guide` | Стиль коммуникаций и шаблоны ответов |
 
 ### Канонический словарь `category`
@@ -146,7 +149,7 @@
 | `07_complaint_handling_procedure` | `complaints` | `procedure` | `high` | `internal` |
 | `08_escalation_and_risk_rules` | `escalation` | `policy` | `critical` | `restricted` |
 | `09_response_style_and_templates` | `communication` | `templates` | `high` | `internal` |
-| `10_customer_faq` | `faq` | `faq` | `medium` | `public` |
+| `10_customer_faq` | `faq` | `faq` | `medium` | `internal` |
 
 ---
 
