@@ -1,0 +1,271 @@
+# Схема метаданных документов и чанков
+
+**Дата документа:** 2026-06-20  
+**Проект:** customer-claims-rag-assistant  
+**Компания:** FoodFlow (вымышленная)
+
+---
+
+## Назначение
+
+Документ описывает единую схему метаданных для 10 документов базы знаний и их чанков. Метаданные используются при индексации, retrieval, фильтрации и разрешении конфликтов между источниками.
+
+Внутренний реестр `docs/05_business_rules_registry.md` **не индексируется** в RAG и не использует эту схему для пользовательской базы.
+
+---
+
+## Уровни метаданных
+
+| Уровень | Область | Назначение |
+|---------|---------|------------|
+| Документ | Весь файл в `data/02_clean_markdown/` | Идентификация, версия, статус, аудитория |
+| Чанк | Фрагмент документа для embedding | Точный retrieval, риск, связи между документами |
+
+---
+
+## Обязательные метаданные документа
+
+| Поле | Назначение | Формат | Допустимые значения / пример | Обязательное | Уровень |
+|------|------------|--------|------------------------------|--------------|---------|
+| `document_id` | Уникальный идентификатор документа | string, snake_case | `04_refund_policy` | Да | Документ |
+| `title` | Человекочитаемое название | string | `Политика возвратов` | Да | Документ |
+| `category` | Тематическая категория | string | `refunds`, `delivery`, `faq` | Да | Документ |
+| `document_type` | Тип содержимого | enum | `policy`, `procedure`, `reference`, `faq`, `templates` | Да | Документ |
+| `version` | Версия документа | string semver | `1.0.0` | Да | Документ |
+| `status` | Статус жизненного цикла | enum | см. ниже | Да | Документ |
+| `effective_date` | Дата начала действия версии | date `YYYY-MM-DD` | `2026-06-01` | Да | Документ |
+| `last_updated` | Дата последнего изменения | date `YYYY-MM-DD` | `2026-06-20` | Да | Документ |
+| `audience` | Целевая аудитория | string или list | `support_agent`, `customer_facing` | Да | Документ |
+| `confidentiality` | Уровень конфиденциальности | enum | см. ниже | Да | Документ |
+| `source_type` | Происхождение материала | enum | см. ниже | Да | Документ |
+| `language` | Язык содержимого | enum | `ru` | Да | Документ |
+| `priority` | Приоритет документа при конфликтах | enum | см. ниже | Да | Документ |
+
+### `source_type`
+
+| Значение | Описание |
+|----------|----------|
+| `internal_policy` | Внутренняя политика (доставка, возвраты, компенсации и т.д.) |
+| `internal_reference` | Внутренний справочник (обзор сервиса, глоссарий) |
+| `sop` | Стандартная операционная процедура |
+| `faq` | Частые вопросы и ответы |
+| `brand_guide` | Стиль коммуникаций и шаблоны ответов |
+
+### Канонический словарь `category`
+
+Поле `category` **не является закрытым enum** — допускаются новые значения при расширении базы. Для текущих 10 документов используются:
+
+| Значение | Документы |
+|----------|-----------|
+| `general` | `01_service_overview` |
+| `delivery` | `02_delivery_rules` |
+| `orders` | `03_order_changes_and_cancellations` |
+| `refunds` | `04_refund_policy` |
+| `compensation` | `05_compensation_policy` |
+| `food_quality` | `06_food_quality_and_packaging` |
+| `complaints` | `07_complaint_handling_procedure` |
+| `escalation` | `08_escalation_and_risk_rules` |
+| `communication` | `09_response_style_and_templates` |
+| `faq` | `10_customer_faq` |
+
+---
+
+## Дополнительные метаданные чанка
+
+| Поле | Назначение | Формат | Допустимые значения / пример | Обязательное | Уровень |
+|------|------------|--------|------------------------------|--------------|---------|
+| `chunk_id` | Уникальный ID чанка | string | `04_refund_policy__review_timelines__001` | Да | Чанк |
+| `section` | Заголовок раздела H2 | string | `Сроки рассмотрения` | Да | Чанк |
+| `subsection` | Заголовок подраздела H3 | string | `Стандартный случай` | Нет | Чанк |
+| `topic` | Краткая тема для retrieval | string | `refund_review_5_days` | Да | Чанк |
+| `risk_level` | Уровень риска содержимого | enum | см. ниже | Да | Чанк |
+| `related_documents` | Связанные документы | list[string] | `["07_complaint_handling_procedure"]` | Нет | Чанк |
+| `keywords` | Ключевые слова | list[string] | `["возврат", "5 рабочих дней"]` | Нет | Чанк |
+| `supersedes` | ID предыдущего чанка/версии | string | `04_refund_policy__v0_9__001` | Нет | Чанк |
+| `source_file` | Путь к исходному файлу | string | `data/02_clean_markdown/04_refund_policy.md` | Да | Чанк |
+
+Поля документа (`document_id`, `title`, `status`, `version`, `priority`, `language` и др.) **наследуются** каждым чанком и дублируются в его метаданных для фильтрации без join.
+
+---
+
+## Допустимые значения перечислений
+
+### `status`
+
+| Значение | Описание |
+|----------|----------|
+| `draft` | Черновик, не используется в production-retrieval |
+| `active` | Действующая версия, участвует в retrieval |
+| `superseded` | Заменена новой версией, не используется |
+| `archived` | Архив, не используется |
+
+### `confidentiality`
+
+| Значение | Описание |
+|----------|----------|
+| `public` | Может цитироваться клиенту (FAQ, общее описание сервиса) |
+| `internal` | Для операторов и ассистента (большинство политик и SOP) |
+| `restricted` | Ограниченный доступ (правила эскалации с деталями внутренних процессов) |
+
+### `priority`
+
+| Значение | Описание |
+|----------|----------|
+| `critical` | Высший приоритет при конфликте (возвраты, компенсации, эскалация) |
+| `high` | Важные операционные документы |
+| `medium` | Справочные и процедурные материалы средней критичности |
+| `low` | Общий контекст, второстепенные справки |
+
+### `risk_level`
+
+| Значение | Описание |
+|----------|----------|
+| `low` | Справочная информация без финансовых или safety-последствий |
+| `medium` | Опоздание, частичный возврат, обычная жалоба |
+| `high` | Недоставка, вскрытая упаковка, юридические упоминания |
+| `critical` | Угроза здоровью, посторонний предмет, ухудшение самочувствия |
+
+### `language`
+
+| Значение | Описание |
+|----------|----------|
+| `ru` | Русский язык (единственный поддерживаемый в MVP) |
+
+---
+
+## Рекомендуемые значения по документам
+
+| `document_id` | `category` | `document_type` | `priority` | `confidentiality` |
+|---------------|------------|-----------------|------------|-------------------|
+| `01_service_overview` | `general` | `reference` | `high` | `public` |
+| `02_delivery_rules` | `delivery` | `policy` | `high` | `internal` |
+| `03_order_changes_and_cancellations` | `orders` | `policy` | `high` | `internal` |
+| `04_refund_policy` | `refunds` | `policy` | `critical` | `internal` |
+| `05_compensation_policy` | `compensation` | `policy` | `critical` | `internal` |
+| `06_food_quality_and_packaging` | `food_quality` | `policy` | `high` | `internal` |
+| `07_complaint_handling_procedure` | `complaints` | `procedure` | `high` | `internal` |
+| `08_escalation_and_risk_rules` | `escalation` | `policy` | `critical` | `restricted` |
+| `09_response_style_and_templates` | `communication` | `templates` | `high` | `internal` |
+| `10_customer_faq` | `faq` | `faq` | `medium` | `public` |
+
+---
+
+## Правила разрешения конфликтов источников
+
+При противоречии между retrieved-фрагментами ассистент и retrieval-слой руководствуются следующими правилами:
+
+1. **Только `active`** — в ответе используются только чанки документов со статусом `active`.
+2. **Новая версия** — при конфликте двух `active` (ошибка данных) побеждает более новая `effective_date` / `version`.
+3. **Специализация** — профильная политика (`04_refund_policy`, `05_compensation_policy` и т.д.) имеет приоритет над общим FAQ (`10_customer_faq`).
+4. **Безопасность и эскалация** — `08_escalation_and_risk_rules` и чанки с `risk_level: critical` имеют приоритет над шаблонами из `09_response_style_and_templates`.
+5. **FAQ не создает правила** — если FAQ утверждает правило, которого нет в профильной политике, FAQ **игнорируется**; расхождение фиксируется для исправления контента.
+6. **Неустранимое противоречие** — ассистент **не выбирает** правило самостоятельно; сообщает о недостаточности надежных данных и **передает обращение сотруднику**.
+
+Иерархия согласована с разделом 13 реестра `docs/05_business_rules_registry.md`.
+
+---
+
+## Соглашения об именовании
+
+### `document_id`
+
+**Обязательно** совпадает с именем файла без расширения. Примеры: `01_service_overview`, `04_refund_policy`.
+
+### `version`
+
+Оформляется в формате **SemVer**, например `1.0.0`. Строковые значения вроде `"1.0"` не используются в новых документах.
+
+### `confidentiality` для внутренней базы
+
+- Политики и процедуры для ассистента поддержки обычно имеют `confidentiality: internal`.
+- Справочный клиентский документ без внутренних процедур может иметь `confidentiality: public` (например, `01_service_overview`).
+- Документы с деталями эскалации могут иметь `confidentiality: restricted`.
+
+### `chunk_id`
+
+Формат: `{document_id}__{topic_slug}__{seq}`
+
+Пример: `04_refund_policy__credit_timeline__002`
+
+### `related_documents`
+
+Список `document_id` связанных документов. Для FAQ — обязательно указывать профильные политики. **Markdown-якоря не используются**; связь только через метаданные и текстовые названия разделов в поле `section`.
+
+---
+
+## Пример метаданных документа (YAML)
+
+```yaml
+document_id: 04_refund_policy
+title: Политика возвратов
+category: refunds
+document_type: policy
+version: 1.0.0
+status: active
+effective_date: 2026-06-01
+last_updated: 2026-06-20
+audience:
+  - support_agent
+confidentiality: internal
+source_type: internal_policy
+language: ru
+priority: critical
+```
+
+---
+
+## Пример метаданных чанка (YAML)
+
+```yaml
+chunk_id: 04_refund_policy__review_timeline_standard__001
+document_id: 04_refund_policy
+title: Политика возвратов
+category: refunds
+document_type: policy
+version: 1.0.0
+status: active
+effective_date: 2026-06-01
+last_updated: 2026-06-20
+audience:
+  - support_agent
+confidentiality: internal
+source_type: internal_policy
+language: ru
+priority: critical
+section: Сроки рассмотрения обращения
+subsection: Стандартный случай
+topic: refund_review_5_business_days
+risk_level: medium
+related_documents:
+  - 07_complaint_handling_procedure
+  - 10_customer_faq
+keywords:
+  - возврат
+  - рассмотрение
+  - 5 рабочих дней
+source_file: data/02_clean_markdown/04_refund_policy.md
+```
+
+---
+
+## Использование метаданных в retrieval
+
+| Сценарий | Фильтр / действие |
+|----------|-------------------|
+| Обычный запрос | `status: active`, `language: ru` |
+| Финансовый вопрос | boost `priority: critical`, категории `refunds`, `compensation` |
+| Рискованное обращение | boost `risk_level: high|critical`, документ `08_escalation_and_risk_rules` |
+| FAQ-only hit без политики | понизить confidence; запросить профильный документ |
+| Superseded chunk | исключить из индекса |
+
+---
+
+## Связанные документы
+
+- `docs/03_chunking_strategy.md` — правила формирования чанков
+- `docs/05_business_rules_registry.md` — бизнес-правила и иерархия источников
+- `docs/01_data_inventory.md` — состав базы знаний
+
+---
+
+*Схема относится к учебному проекту. FoodFlow — вымышленная компания.*
