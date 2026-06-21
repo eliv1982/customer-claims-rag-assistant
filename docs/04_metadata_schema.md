@@ -80,12 +80,17 @@
 | `chunk_id` | Уникальный ID чанка | string | `04_refund_policy__review_timelines__001` | Да | Чанк |
 | `section` | Заголовок раздела H2 | string | `Сроки рассмотрения` | Да | Чанк |
 | `subsection` | Заголовок подраздела H3 | string | `Стандартный случай` | Нет | Чанк |
-| `topic` | Краткая тема для retrieval | string | `refund_review_5_days` | Да | Чанк |
-| `risk_level` | Уровень риска содержимого | enum | см. ниже | Да | Чанк |
+| `topic` | Краткая тема для retrieval | string | `refund_review_5_days`, `faq-01`, `template-03` | Нет (рекомендуется) | Чанк |
+| `risk_level` | Уровень риска содержимого чанка | enum | см. ниже | Нет | Чанк |
 | `related_documents` | Связанные документы | list[string] | `["07_complaint_handling_procedure"]` | Нет | Чанк |
 | `keywords` | Ключевые слова | list[string] | `["возврат", "5 рабочих дней"]` | Нет | Чанк |
 | `supersedes` | ID предыдущего чанка/версии | string | `04_refund_policy__v0_9__001` | Нет | Чанк |
-| `source_file` | Путь к исходному файлу | string | `data/02_clean_markdown/04_refund_policy.md` | Да | Чанк |
+| `source_file` | Путь к исходному файлу (относительный POSIX) | string | `data/02_clean_markdown/04_refund_policy.md` | Да | Чанк |
+
+Поля `topic` и `risk_level` на этапе ingestion MVP:
+
+- `topic` — optional, но рекомендуется; заполняется для FAQ (`faq-NN`), templates (`template-NN`), forbidden rows (`forbidden-NN`) и иных chunks с явным semantic ID; для generic `chunk-NNN` может оставаться пустым.
+- `risk_level` — optional; заполняется только при наличии явной канонической chunk-level разметки в источнике; **не вычисляется эвристически** на этапе ingestion; **не является** request risk level, который определяет LLM по сообщению клиента.
 
 Поля документа (`document_id`, `title`, `status`, `version`, `priority`, `language` и др.) **наследуются** каждым чанком и дублируются в его метаданных для фильтрации без join.
 
@@ -148,7 +153,7 @@
 | `06_food_quality_and_packaging` | `food_quality` | `policy` | `high` | `internal` |
 | `07_complaint_handling_procedure` | `complaints` | `procedure` | `high` | `internal` |
 | `08_escalation_and_risk_rules` | `escalation` | `policy` | `critical` | `restricted` |
-| `09_response_style_and_templates` | `communication` | `templates` | `high` | `internal` |
+| `09_response_style_and_templates` | `communication` | `guideline` | `critical` | `internal` |
 | `10_customer_faq` | `faq` | `faq` | `medium` | `internal` |
 
 ---
@@ -186,9 +191,16 @@
 
 ### `chunk_id`
 
-Формат: `{document_id}__{topic_slug}__{seq}`
+Формат ingestion MVP: `{document_id}::{semantic_key}`
 
-Пример: `04_refund_policy__credit_timeline__002`
+Примеры:
+
+- `10_customer_faq::faq-01`
+- `09_response_style_and_templates::template-01`
+- `09_response_style_and_templates::forbidden-03`
+- `02_delivery_rules::chunk-001`
+
+Устаревший пример (не используется ingestion layer): `04_refund_policy__credit_timeline__002`
 
 ### `related_documents`
 
@@ -220,7 +232,7 @@ priority: critical
 ## Пример метаданных чанка (YAML)
 
 ```yaml
-chunk_id: 04_refund_policy__review_timeline_standard__001
+chunk_id: 04_refund_policy::chunk-001
 document_id: 04_refund_policy
 title: Политика возвратов
 category: refunds
@@ -238,7 +250,6 @@ priority: critical
 section: Сроки рассмотрения обращения
 subsection: Стандартный случай
 topic: refund_review_5_business_days
-risk_level: medium
 related_documents:
   - 07_complaint_handling_procedure
   - 10_customer_faq
@@ -248,6 +259,8 @@ keywords:
   - 5 рабочих дней
 source_file: data/02_clean_markdown/04_refund_policy.md
 ```
+
+Поле `risk_level` в примере опущено: на этапе ingestion оно не вычисляется автоматически.
 
 ---
 

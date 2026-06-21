@@ -1,6 +1,16 @@
 .env
 .venv/
-__pycache__/
-*.pyc
 .DS_Store
 Thumbs.db
+
+# Python generated artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Generated chunk artifacts (source of truth: data/02_clean_markdown)
+data/03_chunks/*.jsonl
+data/03_chunks/*.json

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "customer-claims-rag"
+version = "0.1.0"
+description = "RAG ingestion layer for FoodFlow customer claims assistant"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.5,<3",
+    "PyYAML>=6.0,<7",
+    "tiktoken>=0.5,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9",
+    "pytest-cov>=5.0,<6",
+]
+
+[project.scripts]
+build-chunks = "customer_claims_rag.cli.build_chunks:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["customer_claims_rag"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
