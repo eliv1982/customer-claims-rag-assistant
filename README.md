@@ -28,7 +28,9 @@
 
 **Retrieval evaluation (60-case baseline)** — реализованы parser evaluation corpus, baseline retrieval evaluator, retrieval-only metrics, threshold sweep analysis, CLI и committed Markdown reports.
 
-**Еще не реализованы:** LLM answer generation, reranking (source priority / risk-aware), hybrid BM25, query rewriting, production threshold selection, web/Telegram UI.
+**Reranking A/B (stage 2C.1, source-authority-v1)** — baseline retrieval evaluation завершён; A/B candidate принят по quality criteria; stage 2C.1 закрывается repair/audit cycle. Risk-aware/oracle reranking и candidate-pool expansion не реализованы.
+
+**Еще не реализованы:** LLM answer generation, risk-aware reranking, hybrid BM25, query rewriting, production threshold selection, web/Telegram UI.
 
 Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/` и `data/04_index/` содержат только сгенерированные артефакты.
 

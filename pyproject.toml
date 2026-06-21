@@ -28,6 +28,8 @@ build-chunks = "customer_claims_rag.cli.build_chunks:main"
 build-index = "customer_claims_rag.cli.build_index:main"
 search-index = "customer_claims_rag.cli.search_index:main"
 evaluate-retrieval = "customer_claims_rag.cli.evaluate_retrieval:main"
+evaluate-reranking-ab = "customer_claims_rag.cli.evaluate_reranking_ab:main"
+rebuild-reranking-ab-report = "customer_claims_rag.cli.rebuild_reranking_ab_report:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -22,3 +22,4 @@ data/04_index/*
 # Generated evaluation artifacts (source of truth: tests/01 + tests/02 corpus)
 data/05_evaluation/*
 !data/05_evaluation/.gitkeep
+!data/05_evaluation/reranking_ab_source_authority_v1.json
