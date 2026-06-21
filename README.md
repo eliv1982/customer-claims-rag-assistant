@@ -14,6 +14,7 @@
 | `data/02_clean_markdown/` | Очищенные версии документов в Markdown (`.md`) |
 | `data/03_chunks/` | Сгенерированные чанки (JSONL) и статистика; не источник истины |
 | `data/04_index/` | Сгенерированный persistent vector index (Chroma) и `manifest.json` |
+| `data/05_evaluation/` | Сгенерированные JSON-результаты retrieval evaluation; не источник истины |
 | `docs/` | Проектная документация: область проекта, инвентаризация, отчеты, стратегии |
 | `prompts/` | Системный промпт и шаблон RAG-запроса |
 | `tests/` | Тестовые вопросы, ожидаемые ответы, результаты прогонов |
@@ -25,7 +26,9 @@
 
 **Retrieval layer (baseline dense search)** — реализованы framework-isolated embeddings, persistent Chroma index, deterministic fingerprint/manifest, baseline semantic retrieval и CLI для сборки/поиска.
 
-**Еще не реализованы:** LLM answer generation, reranking (source priority / risk-aware), hybrid BM25, query rewriting, formal 60-case evaluation, web/Telegram UI.
+**Retrieval evaluation (60-case baseline)** — реализованы parser evaluation corpus, baseline retrieval evaluator, retrieval-only metrics, threshold sweep analysis, CLI и committed Markdown reports.
+
+**Еще не реализованы:** LLM answer generation, reranking (source priority / risk-aware), hybrid BM25, query rewriting, production threshold selection, web/Telegram UI.
 
 Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/` и `data/04_index/` содержат только сгенерированные артефакты.
 
@@ -267,6 +270,51 @@ Fingerprint зависит от `chunk_id`, `content`, canonical metadata, embed
 
 Human-readable search output показывает rank, similarity, chunk/document IDs, heading, source path и короткий excerpt. JSON mode возвращает structured `SearchResponse` с diagnostics.
 
+## Baseline retrieval evaluation (60 cases)
+
+Formal retrieval-only evaluation на corpus `tests/01_test_questions.md` + `tests/02_expected_answers.md`.
+
+```powershell
+python -m customer_claims_rag.cli.evaluate_retrieval
+```
+
+Явные paths при необходимости:
+
+```powershell
+python -m customer_claims_rag.cli.evaluate_retrieval `
+  --questions tests/01_test_questions.md `
+  --expected tests/02_expected_answers.md `
+  --index-dir data/04_index `
+  --collection customer_claims `
+  --embedding-model text-embedding-3-small `
+  --top-k 12 `
+  --fetch-k 12 `
+  --threshold 0.0 `
+  --output-json data/05_evaluation/retrieval_results.json
+```
+
+Требования:
+
+- существующий index в `data/04_index/` (без rebuild);
+- `OPENAI_API_KEY` для query embeddings в **real run**;
+- automated tests работают **offline** через fake retriever/fixtures.
+
+Outputs:
+
+- `data/05_evaluation/retrieval_results.json` — generated machine-readable JSON (**ignored by Git**);
+- `tests/03_test_results.md` — committed human-readable run summary;
+- `tests/04_improvement_log.md` — committed baseline improvement log.
+
+**Output consistency:** каждый файл записывается атомарно (temp + replace), но набор из трёх файлов **не** является общей транзакцией. Поле `evaluation_result_id` (SHA-256 canonical result) должно совпадать во всех трёх артефактах; расхождение означает partial или mixed run.
+
+**Preflight:** CLI выполняет parser validation до первого embedding call; полный manifest/index preflight (`retriever.validate_index()`) — до цикла по кейсам. Fatal mismatch (`IndexManifestError`, missing manifest/index, embedding model/collection/schema mismatch, missing `OPENAI_API_KEY`) прерывает run с **nonzero exit** без success reports.
+
+**Методология @k:** все метрики `@k` ограничивают **первые k raw chunks**, затем при необходимости дедуплицируют document IDs внутри этого окна. `Supporting source hit@4` считается только по кейсам с непустым `expected_supporting_documents` (denominator явно показывается как `hits/denominator`).
+
+**Run metadata:** `git_commit` + `git_dirty` фиксируются до run; при dirty working tree commit hash не полностью идентифицирует evaluation implementation.
+
+Baseline evaluation использует `threshold=0.0` для измерения raw recall **до** выбора production threshold. Метрики **не** оценивают качество LLM-ответов, risk/handoff classification, answer factuality или Markdown output contract. Reranking и production threshold — только после анализа baseline.
+
 ### Troubleshooting
 
 | Симптом | Действие |
@@ -298,3 +346,11 @@ Human-readable search output показывает rank, similarity, chunk/docume
 - Threshold `0.70` отвергнут smoke-run как слишком высокий для текущего index.
 - Качество retrieval **не считается подтвержденным** до отдельного evaluation stage.
 - Incremental indexing не поддерживается; только full rebuild.
+
+### Retrieval evaluation (baseline)
+
+- Только retrieval metrics; answer/risk/handoff quality не измеряются.
+- Fallback cases (T006, T060) анализируются отдельно от source-recall aggregates.
+- Threshold sweep выполняется post-hoc над сохраненными candidates без повторных embedding calls.
+- Production threshold не выбирается автоматически по одной метрике.
+- Улучшения (reranking, hybrid search) не внедряются до A/B rerun на том же corpus.

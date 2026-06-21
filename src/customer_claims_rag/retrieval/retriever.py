@@ -36,6 +36,19 @@ class BaselineRetriever:
         self.fetch_k = fetch_k
         self.similarity_threshold = similarity_threshold
 
+    def validate_index(self) -> None:
+        """Validate manifest and runtime index compatibility before search."""
+        manifest = load_manifest(self.index_dir)
+        store_count = self.vector_store.count()
+        validate_manifest_against_runtime(
+            manifest,
+            collection_name=self.vector_store.collection_name,
+            embedding_model=self.embedding_provider.model_name,
+            chunk_count=store_count,
+            expected_index_format_version=INDEX_FORMAT_VERSION,
+            expected_metadata_schema_version=METADATA_SCHEMA_VERSION,
+        )
+
     def search(self, query: str) -> SearchResponse:
         cleaned_query = validate_query_text(query)
         manifest = load_manifest(self.index_dir)

@@ -18,3 +18,7 @@ data/03_chunks/*.json
 # Generated vector index (source of truth: data/02_clean_markdown + ingestion)
 data/04_index/*
 !data/04_index/.gitkeep
+
+# Generated evaluation artifacts (source of truth: tests/01 + tests/02 corpus)
+data/05_evaluation/*
+!data/05_evaluation/.gitkeep

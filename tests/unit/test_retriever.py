@@ -258,7 +258,36 @@ def test_manifest_mismatch_model(tmp_path: Path, fake_embedding_provider: FakeEm
         similarity_threshold=0.0,
     )
     with pytest.raises(IndexManifestError, match="embedding model mismatch"):
+        retriever.validate_index()
+    with pytest.raises(IndexManifestError, match="embedding model mismatch"):
         retriever.search("query")
+
+
+def test_validate_index_matches_search_preflight(
+    tmp_path: Path,
+    fake_embedding_provider: FakeEmbeddingProvider,
+    monkeypatch,
+) -> None:
+    index_dir = tmp_path / "index"
+    index_dir.mkdir()
+    store = StubVectorStore([_hit("a::1", 0.9)])
+    _write_manifest(index_dir, chunk_count=1, model_name=fake_embedding_provider.model_name)
+    retriever = BaselineRetriever(
+        embedding_provider=fake_embedding_provider,
+        vector_store=store,
+        index_dir=index_dir,
+        similarity_threshold=0.0,
+    )
+    embed_calls = {"count": 0}
+    original_embed = fake_embedding_provider.embed_query
+
+    def counting_embed(text: str):
+        embed_calls["count"] += 1
+        return original_embed(text)
+
+    monkeypatch.setattr(fake_embedding_provider, "embed_query", counting_embed)
+    retriever.validate_index()
+    assert embed_calls["count"] == 0
 
 
 def test_similarity_ordering_descending(tmp_path: Path, fake_embedding_provider: FakeEmbeddingProvider) -> None:

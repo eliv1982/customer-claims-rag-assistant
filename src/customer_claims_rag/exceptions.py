@@ -58,3 +58,11 @@ class IndexManifestError(RetrievalError):
 
 class SearchError(RetrievalError):
     """Search query validation or execution failure."""
+
+
+class EvaluationCorpusError(Exception):
+    """Evaluation corpus parsing or validation failure."""
+
+
+class EvaluationOutputError(RetrievalError):
+    """Evaluation artifact write failure."""
