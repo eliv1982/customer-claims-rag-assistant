@@ -13,6 +13,7 @@
 | `data/01_raw/` | Исходные тексты документов базы знаний (`.txt`) |
 | `data/02_clean_markdown/` | Очищенные версии документов в Markdown (`.md`) |
 | `data/03_chunks/` | Сгенерированные чанки (JSONL) и статистика; не источник истины |
+| `data/04_index/` | Сгенерированный persistent vector index (Chroma) и `manifest.json` |
 | `docs/` | Проектная документация: область проекта, инвентаризация, отчеты, стратегии |
 | `prompts/` | Системный промпт и шаблон RAG-запроса |
 | `tests/` | Тестовые вопросы, ожидаемые ответы, результаты прогонов |
@@ -20,21 +21,92 @@
 
 ## Текущий статус
 
-**Ingestion layer (hybrid chunking)** — реализованы загрузка clean Markdown, валидация метаданных, гибридный чанкинг и экспорт в JSONL. Embeddings, vector database, semantic retrieval, reranking и LLM-генерация ответов **еще не реализованы**.
+**Ingestion layer (hybrid chunking)** — реализованы загрузка clean Markdown, валидация метаданных, гибридный чанкинг и экспорт в JSONL.
 
-Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталог `data/03_chunks/` содержит только сгенерированные артефакты и не редактируется вручную.
+**Retrieval layer (baseline dense search)** — реализованы framework-isolated embeddings, persistent Chroma index, deterministic fingerprint/manifest, baseline semantic retrieval и CLI для сборки/поиска.
 
-### Установка
+**Еще не реализованы:** LLM answer generation, reranking (source priority / risk-aware), hybrid BM25, query rewriting, formal 60-case evaluation, web/Telegram UI.
+
+Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/` и `data/04_index/` содержат только сгенерированные артефакты.
+
+## Запуск с нуля (Windows / PowerShell)
+
+Самостоятельная инструкция для чистого компьютера. Все зависимости проекта описаны **только** в `pyproject.toml`; отдельные `requirements.txt` / `requirements-dev.txt` намеренно не используются, чтобы не поддерживать второй дублирующий список пакетов.
+
+### Требования
+
+- **Git** — клонирование репозитория;
+- **Python 3.12** — версия зафиксирована в `pyproject.toml` (`requires-python = ">=3.12"`);
+- **OpenAI API** — нужен только для реальной сборки vector index и semantic search с OpenAI embeddings;
+- **Автоматические тесты** работают offline и **не требуют** OpenAI API key.
+
+### Клонирование
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+git clone https://github.com/eliv1982/customer-claims-rag-assistant.git
+cd customer-claims-rag-assistant
 ```
 
-Требуется Python 3.12+.
+### Создание виртуального окружения
 
-### Сборка чанков
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Если активация блокируется политикой выполнения PowerShell:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+### Установка проекта
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+python -m pip check
+```
+
+Кратко:
+
+- `pyproject.toml` — единственный источник runtime- и dev-зависимостей;
+- `-e` устанавливает пакет в **editable mode** (изменения в `src/` сразу доступны);
+- `[dev]` добавляет pytest и pytest-cov для тестов и coverage.
+
+### Настройка environment
+
+Скопируйте шаблон и заполните ключ локально:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Откройте `.env` и задайте:
+
+```env
+OPENAI_API_KEY=
+```
+
+Файл `.env` **не коммитится** (см. `.gitignore`). Шаблон `.env.example` содержит безопасные placeholder-значения без секретов.
+
+Проект автоматически загружает `.env` из корня репозитория при запуске retrieval CLI и чтении `RetrievalSettings`. Уже установленные переменные процесса имеют **приоритет** над значениями из `.env`. Отсутствие `.env` не является ошибкой.
+
+### Тесты
+
+```powershell
+$env:PYTHONDONTWRITEBYTECODE="1"
+python -m pytest -q -p no:cacheprovider
+```
+
+С coverage:
+
+```powershell
+python -m pytest --cov=customer_claims_rag --cov-report=term-missing
+```
+
+### Сборка ingestion chunks
 
 ```powershell
 python -m customer_claims_rag.cli.build_chunks --verbose
@@ -46,19 +118,168 @@ python -m customer_claims_rag.cli.build_chunks --verbose
 - выход: `data/03_chunks/chunks.jsonl`;
 - статистика: `data/03_chunks/chunk_stats.json`.
 
-### Тесты
+OpenAI API key для этой команды **не требуется**.
+
+### Сборка vector index
+
+Требуется заполненный `OPENAI_API_KEY` в `.env` или в environment процесса.
 
 ```powershell
-python -m pytest
+python -m customer_claims_rag.cli.build_index --rebuild
 ```
 
-С coverage:
+Для диагностики ошибок:
 
 ```powershell
-python -m pytest --cov=customer_claims_rag --cov-report=term-missing
+python -m customer_claims_rag.cli.build_index --rebuild --verbose
 ```
 
-## Известные ограничения текущего ingestion MVP
+Флаг `--verbose` выводит полный traceback; без него CLI показывает только краткое сообщение об ошибке.
+
+По умолчанию:
+
+- вход: `data/02_clean_markdown/` (через `CorpusBuilder`);
+- index: `data/04_index/`;
+- collection: `customer_claims`;
+- embedding model: `text-embedding-3-small`.
+
+`--rebuild` обязателен в MVP: выполняется destructive full rebuild.
+
+### Поиск
+
+```powershell
+python -m customer_claims_rag.cli.search_index "Где мой заказ?"
+```
+
+```powershell
+python -m customer_claims_rag.cli.search_index "Сколько времени занимает возврат денег?"
+```
+
+```powershell
+python -m customer_claims_rag.cli.search_index "После еды мне стало плохо"
+```
+
+```powershell
+python -m customer_claims_rag.cli.search_index "Заказ отмечен доставленным, но я его не получил" --json
+```
+
+Дополнительные параметры:
+
+```powershell
+python -m customer_claims_rag.cli.search_index "возврат" --top-k 4 --fetch-k 12 --threshold 0.35
+```
+
+Явный `--threshold` по-прежнему включает filtering; без него используется default из env (см. ниже).
+
+### Generated artifacts
+
+- Chroma index и `manifest.json` создаются в `data/04_index/` **внутри project root**;
+- рекомендуемый путь — `data/04_index`;
+- нельзя направлять `--index-dir` в `data/01_raw/`, `data/02_clean_markdown/` или внутрь `--input-dir`;
+- generated contents **не коммитятся** (см. `.gitignore`);
+- `data/04_index/.gitkeep` сохраняет структуру каталога в git;
+- index можно безопасно пересобрать: `python -m customer_claims_rag.cli.build_index --rebuild`.
+
+### Остановка окружения
+
+```powershell
+deactivate
+```
+
+### Переменные окружения (справочник)
+
+| Переменная | Назначение | Default |
+|------------|------------|---------|
+| `OPENAI_API_KEY` | Ключ OpenAI для embeddings | — |
+| `OPENAI_EMBEDDING_MODEL` | Модель embeddings | `text-embedding-3-small` |
+| `RAG_INDEX_DIR` | Каталог vector index | `data/04_index` |
+| `RAG_COLLECTION_NAME` | Имя Chroma collection | `customer_claims` |
+| `RAG_TOP_K` | Максимум результатов поиска | `4` |
+| `RAG_FETCH_K` | Размер candidate pool | `12` |
+| `RAG_SIMILARITY_THRESHOLD` | Минимальная cosine similarity | `0.0` (baseline: без filtering) |
+| `RAG_EMBEDDING_BATCH_SIZE` | Batch size при индексации | `64` |
+
+CLI-параметры переопределяют env-значения.
+
+### Архитектура retrieval layer
+
+```text
+clean Markdown
+  -> CorpusBuilder (ingestion, framework-independent)
+  -> validated ChunkRecord list
+  -> deterministic ordering + corpus fingerprint
+  -> EmbeddingProvider (OpenAI adapter via langchain-openai)
+  -> VectorStore (Chroma adapter, cosine space)
+  -> manifest.json
+  -> BaselineRetriever (fetch_k -> threshold -> top_k)
+```
+
+Код:
+
+```text
+src/customer_claims_rag/retrieval/
+  models.py            # IndexManifest, SearchResult, SearchResponse
+  ports.py             # EmbeddingProvider, VectorStore protocols
+  fingerprint.py       # deterministic SHA-256 corpus fingerprint
+  metadata_mapper.py   # ChunkRecord -> scalar Chroma metadata
+  manifest.py          # atomic manifest read/write/validation
+  index_builder.py     # full rebuild pipeline
+  retriever.py         # baseline dense retrieval
+  adapters/
+    openai_embeddings.py
+    chroma_store.py
+    fake_embeddings.py # offline tests only
+```
+
+LangChain используется только в `adapters/openai_embeddings.py`. Ingestion core не зависит от LangChain и не меняет свои chunk models.
+
+### Cosine similarity threshold
+
+Chroma collection настроена на cosine space. Adapter преобразует raw distance в similarity централизованно:
+
+```text
+similarity = 1.0 - distance
+```
+
+Baseline retriever:
+
+1. получает до `fetch_k` кандидатов;
+2. при `threshold > 0` отфильтровывает по `similarity >= threshold`;
+3. возвращает не более `top_k` результатов;
+4. сортирует по similarity desc, tie-break по `chunk_id`.
+
+**Default `RAG_SIMILARITY_THRESHOLD=0.0`** означает отсутствие automatic threshold filtering в baseline retrieval. Это диагностический режим для измерения recall и анализа кандидатов, а не production threshold.
+
+Реальный smoke-run показал, что threshold **`0.70` слишком высок** для текущего embedding/index: даже тематически очевидные запросы (например, срок возврата, similarity ≈ 0.66) отсекались. Production threshold **пока не установлен**. Окончательное значение будет выбрано по результатам **60-case evaluation** (`tests/01_test_questions.md`). До калибровки **retrieval quality не считается подтвержденным**.
+
+### Manifest и fingerprint
+
+`data/04_index/manifest.json` генерируется только после успешной индексации (temp + replace). Содержит:
+
+- `index_format_version`, `metadata_schema_version`;
+- `collection_name`, `embedding_model`;
+- `corpus_fingerprint`, `chunk_count`, `document_count`;
+- `vector_dimension`, informational `created_at`.
+
+Fingerprint зависит от `chunk_id`, `content`, canonical metadata, embedding model и index format version. Timestamp и абсолютные пути в fingerprint не входят.
+
+При mismatch manifest vs runtime retriever возвращает понятную ошибку с инструкцией выполнить rebuild. Автоматический rebuild не выполняется.
+
+Human-readable search output показывает rank, similarity, chunk/document IDs, heading, source path и короткий excerpt. JSON mode возвращает structured `SearchResponse` с diagnostics.
+
+### Troubleshooting
+
+| Симптом | Действие |
+|---------|----------|
+| `OPENAI_API_KEY is required` | Заполнить `OPENAI_API_KEY` в `.env` или export в PowerShell |
+| `index manifest not found` | Выполнить `python -m customer_claims_rag.cli.build_index --rebuild` |
+| `embedding model mismatch` | Пересобрать index с тем же `--embedding-model`, что и search CLI |
+| `chunk count mismatch` | Выполнить rebuild после изменения corpus |
+| `No results above threshold` | Проверить явный `--threshold` или `RAG_SIMILARITY_THRESHOLD`; default `0.0` не фильтрует |
+
+## Известные ограничения
+
+### Ingestion MVP
 
 - Generic chunk IDs вида `chunk-NNN` могут сдвинуться при добавлении более раннего раздела в документ.
 - На текущем real corpus overlap не требуется, хотя synthetic tests покрывают механизм overlap.
@@ -66,6 +287,14 @@ python -m pytest --cov=customer_claims_rag --cov-report=term-missing
 - Target token range носит рекомендательный характер; grouping ориентируется на soft/hard limits.
 - Chunk-level `risk_level` не вычисляется эвристически на этапе ingestion.
 - Поле `topic` заполняется только у chunks с явным semantic ID (FAQ, template, forbidden row).
-- Embeddings, vector database и semantic retrieval еще не реализованы.
 - Output и stats должны находиться внутри permitted project root; перезапись source Markdown запрещена.
-- Двухфайловый export (JSONL + stats) записывает оба temp-файла до replace; при сбое второго replace первый файл может уже быть обновлен.
+
+### Retrieval MVP (baseline)
+
+- Только dense cosine retrieval без reranking.
+- Нет source priority bonus и risk-aware reranking.
+- Нет BM25 / hybrid search и query rewriting.
+- Default threshold `0.0` — diagnostic baseline без automatic filtering; production value TBD после 60-case evaluation.
+- Threshold `0.70` отвергнут smoke-run как слишком высокий для текущего index.
+- Качество retrieval **не считается подтвержденным** до отдельного evaluation stage.
+- Incremental indexing не поддерживается; только full rebuild.

@@ -30,6 +30,7 @@ def temp_project(tmp_path: Path, clean_markdown_dir: Path) -> Path:
     for source in sorted(clean_markdown_dir.glob("*.md")):
         shutil.copy(source, clean_dest / source.name)
     (data_dir / "03_chunks").mkdir()
+    (data_dir / "04_index").mkdir()
     return tmp_path
 
 
@@ -42,6 +43,13 @@ def builder(temp_project: Path) -> "CorpusBuilder":
         token_counter=TiktokenCounter(),
         permitted_root=temp_project.resolve(),
     )
+
+
+@pytest.fixture
+def fake_embedding_provider():
+    from customer_claims_rag.retrieval.adapters.fake_embeddings import FakeEmbeddingProvider
+
+    return FakeEmbeddingProvider(model_name="fake-embedding-model", vector_dimension=8)
 
 
 @pytest.fixture

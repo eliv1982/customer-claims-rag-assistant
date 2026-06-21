@@ -274,6 +274,23 @@ source_file: data/02_clean_markdown/04_refund_policy.md
 | FAQ-only hit без политики | понизить confidence; запросить профильный документ |
 | Superseded chunk | исключить из индекса |
 
+### Vector store metadata (retrieval index)
+
+При индексации в Chroma сохраняется scalar-safe подмножество полей чанка. Сложные значения сериализуются детерминированно:
+
+| Поле в index | Источник | Примечание |
+|--------------|----------|------------|
+| `chunk_id` | chunk | document id в Chroma |
+| `document_id` | chunk | фильтрация / diagnostics |
+| `source_path` | chunk | относительный POSIX путь |
+| `chunk_type` | `ChunkRecord.strategy` | policy/faq/templates/... |
+| `topic`, `risk_level` | chunk metadata | optional |
+| `heading`, `section`, `subsection` | chunk | контекст retrieval output |
+| `heading_path` | chunk | JSON list string |
+| `title`, `category`, `document_type`, `status`, `language`, `document_priority` | chunk metadata | scalar filters |
+
+Абсолютные пути, секреты и non-scalar значения в vector metadata не сохраняются. Mapping выполняется отдельным adapter-слоем без изменения исходного `ChunkRecord`.
+
 ---
 
 ## Связанные документы

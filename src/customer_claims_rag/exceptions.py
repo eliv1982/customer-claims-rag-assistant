@@ -34,3 +34,27 @@ class DuplicateDocumentIdError(IngestionError):
 
 class DuplicateChunkIdError(IngestionError):
     """Duplicate chunk_id in generated corpus."""
+
+
+class RetrievalError(Exception):
+    """Base error for retrieval and indexing pipeline."""
+
+
+class EmbeddingError(RetrievalError):
+    """Embedding provider validation or API failure."""
+
+
+class VectorStoreError(RetrievalError):
+    """Vector store operation failure."""
+
+
+class IndexBuildError(RetrievalError):
+    """Index build validation or persistence failure."""
+
+
+class IndexManifestError(RetrievalError):
+    """Index manifest missing, corrupt, or inconsistent."""
+
+
+class SearchError(RetrievalError):
+    """Search query validation or execution failure."""

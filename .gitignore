@@ -14,3 +14,7 @@ htmlcov/
 # Generated chunk artifacts (source of truth: data/02_clean_markdown)
 data/03_chunks/*.jsonl
 data/03_chunks/*.json
+
+# Generated vector index (source of truth: data/02_clean_markdown + ingestion)
+data/04_index/*
+!data/04_index/.gitkeep

@@ -135,3 +135,19 @@ DOCUMENT_TYPE_STRATEGY: dict[str, str] = {
     "templates": "templates",
     "guideline": "templates",
 }
+
+# --- Retrieval / vector index defaults ---
+
+DEFAULT_INDEX_DIR = Path("data/04_index")
+DEFAULT_COLLECTION_NAME = "customer_claims"
+DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
+DEFAULT_TOP_K = 4
+DEFAULT_FETCH_K = 12
+DEFAULT_SIMILARITY_THRESHOLD = 0.0
+DEFAULT_EMBEDDING_BATCH_SIZE = 64
+MIN_SIMILARITY_THRESHOLD = 0.0
+MAX_SIMILARITY_THRESHOLD = 1.0
+
+INDEX_FORMAT_VERSION = "1.0.0"
+METADATA_SCHEMA_VERSION = "1.0.0"
+MANIFEST_FILENAME = "manifest.json"

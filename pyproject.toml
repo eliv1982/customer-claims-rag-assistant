@@ -9,7 +9,10 @@ description = "RAG ingestion layer for FoodFlow customer claims assistant"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "chromadb>=1.5,<2",
+    "langchain-openai>=0.2,<1",
     "pydantic>=2.5,<3",
+    "python-dotenv>=1.0,<2",
     "PyYAML>=6.0,<7",
     "tiktoken>=0.5,<1",
 ]
@@ -22,6 +25,8 @@ dev = [
 
 [project.scripts]
 build-chunks = "customer_claims_rag.cli.build_chunks:main"
+build-index = "customer_claims_rag.cli.build_index:main"
+search-index = "customer_claims_rag.cli.search_index:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
