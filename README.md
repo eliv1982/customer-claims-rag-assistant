@@ -28,9 +28,15 @@
 
 **Retrieval evaluation (60-case baseline)** — реализованы parser evaluation corpus, baseline retrieval evaluator, retrieval-only metrics, threshold sweep analysis, CLI и committed Markdown reports.
 
-**Reranking A/B (stage 2C.1, source-authority-v1)** — baseline retrieval evaluation завершён; A/B candidate принят по quality criteria; stage 2C.1 закрывается repair/audit cycle. Risk-aware/oracle reranking и candidate-pool expansion не реализованы.
+**Reranking A/B (stage 2C.1, source-authority-v1)** — baseline retrieval evaluation завершён; A/B candidate принят по quality criteria; stage 2C.1 закрыт repair/audit cycle.
 
-**Еще не реализованы:** LLM answer generation, risk-aware reranking, hybrid BM25, query rewriting, production threshold selection, web/Telegram UI.
+**Vector pool expansion (stage 2C.2)** — candidate `vector top-24 → source-authority-v1 → final top-12` принят; это **selected retrieval configuration** для MVP.
+
+**Hybrid lexical + vector (stage 2C.3)** — experiment `hybrid-lexical-vector-v1` выполнен; formal guardrails не пройдены (**rejected** для MVP selection). Retrieval experimentation **frozen** после 2C.3. Hybrid v1 **не** production-ready.
+
+**Следующий этап:** grounded generation, risk/handoff classification, citations и fallback handling.
+
+**Еще не реализованы:** LLM answer generation, query rewriting, production threshold selection, web/Telegram UI.
 
 Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/` и `data/04_index/` содержат только сгенерированные артефакты.
 
@@ -341,9 +347,9 @@ Baseline evaluation использует `threshold=0.0` для измерени
 
 ### Retrieval MVP (baseline)
 
-- Только dense cosine retrieval без reranking.
-- Нет source priority bonus и risk-aware reranking.
-- Нет BM25 / hybrid search и query rewriting.
+- Dense cosine retrieval with frozen **2C.2** candidate: `vector top-24 → source-authority-v1 → final top-12`.
+- Stage **2C.3** hybrid BM25+RRF experiment completed and **rejected** for MVP; retrieval stage frozen.
+- Нет query rewriting.
 - Default threshold `0.0` — diagnostic baseline без automatic filtering; production value TBD после 60-case evaluation.
 - Threshold `0.70` отвергнут smoke-run как слишком высокий для текущего index.
 - Качество retrieval **не считается подтвержденным** до отдельного evaluation stage.

@@ -1,0 +1,25 @@
+{
+  "experiment_id": "hybrid-lexical-vector-v1",
+  "version": "1.0.0",
+  "experiment_mode": "production-like",
+  "vector_k": 24,
+  "lexical_k": 24,
+  "fusion_k": 24,
+  "rrf_k": 60,
+  "vector_weight": 1.0,
+  "lexical_weight": 1.0,
+  "final_top_k": 12,
+  "threshold": 0.0,
+  "lexical_algorithm": "BM25",
+  "bm25_k1": 1.5,
+  "bm25_b": 0.75,
+  "reranker_id": "source-authority-v1",
+  "reranker_config_hash": "c39c4608b6ed4f25bae2cda076a305c665e65155680f6778d6152dde01290957",
+  "score_adapter_id": "rrf-base-score-adapter-v1",
+  "tie_breaking": [
+    "rerank_score_desc",
+    "baseline_similarity_desc",
+    "baseline_rank_asc",
+    "chunk_id_asc"
+  ]
+}

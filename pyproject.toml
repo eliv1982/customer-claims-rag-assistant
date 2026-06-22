@@ -31,6 +31,8 @@ evaluate-retrieval = "customer_claims_rag.cli.evaluate_retrieval:main"
 evaluate-reranking-ab = "customer_claims_rag.cli.evaluate_reranking_ab:main"
 rebuild-reranking-ab-report = "customer_claims_rag.cli.rebuild_reranking_ab_report:main"
 evaluate-pool-expansion = "customer_claims_rag.cli.evaluate_pool_expansion:main"
+evaluate-hybrid-ab = "customer_claims_rag.cli.evaluate_hybrid_ab:main"
+rebuild-hybrid-lexical-pools = "customer_claims_rag.cli.rebuild_hybrid_lexical_pools:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
