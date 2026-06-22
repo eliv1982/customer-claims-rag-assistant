@@ -1,0 +1,17 @@
+{
+  "experiment_id": "vector-pool-expansion-v1",
+  "version": "1.0.0",
+  "experiment_mode": "production-like",
+  "baseline_pool_k": 12,
+  "candidate_pool_k": 24,
+  "final_top_k": 12,
+  "threshold": 0.0,
+  "reranker_id": "source-authority-v1",
+  "reranker_config_hash": "c39c4608b6ed4f25bae2cda076a305c665e65155680f6778d6152dde01290957",
+  "tie_breaking": [
+    "rerank_score_desc",
+    "baseline_similarity_desc",
+    "baseline_rank_asc",
+    "chunk_id_asc"
+  ]
+}

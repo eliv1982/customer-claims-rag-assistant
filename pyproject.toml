@@ -30,6 +30,7 @@ search-index = "customer_claims_rag.cli.search_index:main"
 evaluate-retrieval = "customer_claims_rag.cli.evaluate_retrieval:main"
 evaluate-reranking-ab = "customer_claims_rag.cli.evaluate_reranking_ab:main"
 rebuild-reranking-ab-report = "customer_claims_rag.cli.rebuild_reranking_ab_report:main"
+evaluate-pool-expansion = "customer_claims_rag.cli.evaluate_pool_expansion:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
