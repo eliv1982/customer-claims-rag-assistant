@@ -66,3 +66,19 @@ class EvaluationCorpusError(Exception):
 
 class EvaluationOutputError(RetrievalError):
     """Evaluation artifact write failure."""
+
+
+class GenerationError(Exception):
+    """Base error for grounded generation pipeline."""
+
+
+class GenerationParseError(GenerationError):
+    """Failed to parse model output into a generation draft."""
+
+
+class GenerationValidationError(GenerationError):
+    """Generation draft or context failed structural validation."""
+
+
+class LLMCallError(GenerationError):
+    """Chat model invocation failure."""
