@@ -192,6 +192,30 @@ python -m customer_claims_rag.cli.answer_claim --message "Курьер прив�
 
 JSON содержит customer-safe поля: `answer`, `response_mode`, `generation_outcome`, `risk_level`, handoff flags/notice и citations (`key`, `heading`, `document_id`).
 
+### Streamlit MVP (локальный UI)
+
+Установка UI-зависимостей:
+
+```powershell
+python -m pip install -e ".[ui]"
+```
+
+Требования те же, что и для `answer-claim`: заполненный `.env`, собранный vector index в `data/04_index/`, generation env vars из `.env.example`. UI **не пересобирает** индекс и не загружает документы.
+
+Запуск:
+
+```powershell
+python -m streamlit run src/customer_claims_rag/ui/streamlit_app.py
+```
+
+Интерфейс принимает одно обращение, вызывает production pipeline один раз и показывает:
+
+- проект ответа для клиента;
+- уровень риска;
+- уведомление о передаче сотруднику поддержки (если требуется);
+- безопасные метки источников (`[S1] заголовок — document_id`);
+- статус при недостатке контекста или сбое генерации.
+
 Дополнительные параметры:
 
 ```powershell
