@@ -17,6 +17,10 @@ from customer_claims_rag.retrieval.index_builder import IndexBuilder
 from customer_claims_rag.retrieval.manifest import load_manifest, manifest_path
 from customer_claims_rag.token_counter import TiktokenCounter
 
+BASELINE_CHUNK_COUNT = 215
+RELEASE_EXPANSION_DOC11_CHUNK_COUNT = 20
+EXPECTED_CORPUS_CHUNK_COUNT = BASELINE_CHUNK_COUNT + RELEASE_EXPANSION_DOC11_CHUNK_COUNT
+
 
 class ExplodingEmbeddingProvider(FakeEmbeddingProvider):
     def embed_documents(self, texts):
@@ -108,11 +112,11 @@ def test_rebuild_count_matches(temp_project: Path, builder: CorpusBuilder) -> No
     )
     input_dir = temp_project / "data" / "02_clean_markdown"
     first = index_builder.build_from_directory(input_dir, rebuild=True)
-    assert first.chunks == 215
-    assert store.count() == 215
+    assert first.chunks == EXPECTED_CORPUS_CHUNK_COUNT
+    assert store.count() == EXPECTED_CORPUS_CHUNK_COUNT
     second = index_builder.build_from_directory(input_dir, rebuild=True)
-    assert second.chunks == 215
-    assert store.count() == 215
+    assert second.chunks == EXPECTED_CORPUS_CHUNK_COUNT
+    assert store.count() == EXPECTED_CORPUS_CHUNK_COUNT
     assert first.fingerprint == second.fingerprint
 
 

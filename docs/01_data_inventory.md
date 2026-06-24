@@ -8,7 +8,9 @@
 
 ## Общие сведения
 
-База знаний состоит из 10 документов. Исходные файлы размещаются в `data/01_raw/` (формат `.txt`), очищенные версии — в `data/02_clean_markdown/` (формат `.md`).
+База знаний состоит из **10 документов MVP-бaseline** (приняты на 2026-06-20). Исходные файлы размещаются в `data/01_raw/` (формат `.txt`), очищенные версии — в `data/02_clean_markdown/` (формат `.md`).
+
+**Release expansion (stage 4B.1, 2026-06-24):** добавлен документ `11_payment_security_and_dispute_handling`. Индексация и retrieval-benchmark **ещё не пересчитывались** на 11 документов; frozen evaluation по-прежнему относится к 10-документному индексу.
 
 **Статус на 2026-06-20 (финальная приемка, вердикт `PASS WITH MINOR NOTES`):**
 
@@ -39,7 +41,13 @@
 | `09_response_style_and_templates` | `communication` | `guideline` | `internal_guideline` | `internal` |
 | `10_customer_faq` | `faq` | `faq` | `internal_faq` | `internal` |
 
-Поле `document_id` **обязательно совпадает** с именем файла без расширения. Версия документов первой партии: `1.0.0` (SemVer).
+### Release expansion (stage 4B.1)
+
+| `document_id` | Каноническая `category` | `document_type` | `source_type` | `confidentiality` |
+|---------------|-------------------------|-----------------|----------------|-------------------|
+| `11_payment_security_and_dispute_handling` | `payments` | `policy` | `internal_policy` | `internal` |
+
+Поле `document_id` **обязательно совпадает** с именем файла без расширения. Версия документов первой партии: `1.0.0` (SemVer). Документ `11` также использует `1.0.0`.
 
 ---
 
@@ -59,6 +67,12 @@
 | 10 | `10_customer_faq` | Частые вопросы клиентов FoodFlow | **Raw и clean подготовлены; очищен; проверен по реестру; доработан после независимого аудита; source traceability 45 FAQ подтверждена; принят после независимого аудита** | 5000–6200 / 4000–5200 | raw: **5584** слова / **43 062** символа / **75 927** байт; clean: **4692** слова / **37 618** символов / **65 368** байт; **45** FAQ, **45** H2, **0** H3, ~**45** чанков | Один H2 FAQ = один чанк; overlap не применяется | Нет |
 
 Объемы первой партии указаны ориентировочно по подсчету слов; точный подсчет токенов — после выбора embedding-модели (см. `docs/03_chunking_strategy.md`).
+
+### Release expansion (stage 4B.1)
+
+| № | Имя файла | Название | Статус | Целевой объем (raw / clean, слов) | Стратегия чанкинга | Перекрытие |
+|---|-----------|----------|--------|-------------------------------------|--------------------|------------|
+| 11 | `11_payment_security_and_dispute_handling` | Безопасность платежных данных и споры по оплате | **Подготовлен (stage 4B.1); индексация не выполнялась** | 1800–2400 / 1600–2200 | 18 H2; P-01…P-08; матрица доказательств; 7 примеров | Да, 10% |
 
 ---
 
@@ -82,7 +96,7 @@
 | `05_compensation_policy` | 10 H2, 3 H3; запрет фиксированных сумм и авто-компенсации; примеры в одном разделе | 11–13 |
 | `06_food_quality_and_packaging` | 17 H2, 6 H3; уровни риска medium/high/critical; безопасные медицинские рекомендации отдельно от возврата | 17–20 |
 
-`priority` по схеме `docs/04_metadata_schema.md`: **critical** — `04_refund_policy`, `05_compensation_policy`, `08_escalation_and_risk_rules`; **high** — `01–03`, `06_food_quality_and_packaging`, `07_complaint_handling_procedure`, `09_response_style_and_templates`; **medium** — `10_customer_faq`. Поле `priority` документа **не равно** `risk_level` обращения.
+`priority` по схеме `docs/04_metadata_schema.md`: **critical** — `04_refund_policy`, `05_compensation_policy`, `08_escalation_and_risk_rules`, `11_payment_security_and_dispute_handling`; **high** — `01–03`, `06_food_quality_and_packaging`, `07_complaint_handling_procedure`, `09_response_style_and_templates`; **medium** — `10_customer_faq`. Поле `priority` документа **не равно** `risk_level` обращения.
 
 ---
 
@@ -113,6 +127,18 @@
 **Clean `10_customer_faq` (2026-06-20, после доработки по аудиту, финальная приемка):** **4692** слова, **37 618** символов, **65 368** байт; **45** H2, **0** H3; **45** FAQ-блоков.
 
 **Raw `10_customer_faq` (2026-06-20):** **5584** слова, **43 062** символа, **75 927** байт; черновые шапки, `стр.`, редакторские пометки, неравномерная нумерация, дубли вопросов, блоки `УСТАРЕЛО`/`АРХИВ`/`УДАЛИТЬ`.
+
+---
+
+## Примененная стратегия чанкинга (release expansion, документ 11)
+
+| Документ | Принцип | Ожидаемое число качественных чанков |
+|----------|---------|-------------------------------------|
+| `11_payment_security_and_dispute_handling` | **18** H2; правила P-01…P-08 в отдельных разделах; матрица «можно / нельзя запрашивать»; **7** примеров; retrieval-ориентированная лексика (CVV, chargeback, несанкционированное списание) | **18–22** |
+
+`source_type`: `internal_policy`. `category`: `payments`. `priority`: **critical** — документ **первичен** для безопасности платежных данных и споров через банк; не заменяет `04_refund_policy` по суммам и срокам возврата. Индексация и retrieval-benchmark **не пересчитывались**.
+
+**Clean `11_payment_security_and_dispute_handling` (2026-06-24, stage 4B.1):** synthetic internal policy; индексация **не выполнялась**.
 
 ---
 

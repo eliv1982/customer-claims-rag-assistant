@@ -13,6 +13,10 @@ from customer_claims_rag.ingestion.corpus_builder import CorpusBuilder
 ARCHIVE_MARKERS = ("УСТАРЕЛО", "АРХИВ", "УДАЛИТЬ")
 FAQ_PREAMBLE_PHRASE = "не заменяет профильные политики FoodFlow"
 FORBIDDEN_TRAILING_PHRASE = "не должны попадать в retrieval как самостоятельные инструкции"
+BASELINE_DOC_COUNT = 10
+RELEASE_EXPANSION_DOC_COUNT = 1
+EXPECTED_DOC_COUNT = BASELINE_DOC_COUNT + RELEASE_EXPANSION_DOC_COUNT
+
 EXPECTED_DOC_IDS = [
     f"{i:02d}_{name}"
     for i, name in enumerate(
@@ -30,7 +34,7 @@ EXPECTED_DOC_IDS = [
         ],
         start=1,
     )
-]
+] + ["11_payment_security_and_dispute_handling"]
 
 
 @pytest.fixture
@@ -38,9 +42,9 @@ def clean_input(temp_project: Path) -> Path:
     return temp_project / "data" / "02_clean_markdown"
 
 
-def test_loads_ten_active_documents(builder: CorpusBuilder, clean_input: Path) -> None:
+def test_loads_expected_active_documents(builder: CorpusBuilder, clean_input: Path) -> None:
     documents, _ = builder.build_from_directory(clean_input)
-    assert len(documents) == 10
+    assert len(documents) == EXPECTED_DOC_COUNT
 
 
 def test_document_ids_present(builder: CorpusBuilder, clean_input: Path) -> None:
@@ -108,7 +112,7 @@ def test_stats_json_created(builder: CorpusBuilder, clean_input: Path, temp_proj
     stats_path = temp_project / "data" / "03_chunks" / "chunk_stats.json"
     builder.export_stats(stats, stats_path)
     loaded = json.loads(stats_path.read_text(encoding="utf-8"))
-    assert loaded["documents_total"] == 10
+    assert loaded["documents_total"] == EXPECTED_DOC_COUNT
     assert loaded["faq_chunk_count"] == EXPECTED_FAQ_COUNT
     assert "average_tokens" in loaded
 
@@ -154,6 +158,27 @@ def test_required_chunk_fields(builder: CorpusBuilder, clean_input: Path) -> Non
         assert chunk.source_path
         assert chunk.content.strip()
         assert chunk.strategy
+
+
+PAYMENT_SECURITY_TERMS = (
+    "CVV",
+    "CVC",
+    "chargeback",
+    "чарджбэк",
+    "несанкционированное списание",
+    "полный номер карты",
+)
+
+
+def test_payment_security_document_terms(builder: CorpusBuilder, clean_input: Path) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    payment_chunks = [
+        c for c in chunks if c.document_id == "11_payment_security_and_dispute_handling"
+    ]
+    assert payment_chunks
+    combined = "\n".join(c.content for c in payment_chunks)
+    for term in PAYMENT_SECURITY_TERMS:
+        assert term in combined
 
 
 def test_document_priority_not_request_risk(builder: CorpusBuilder, clean_input: Path) -> None:

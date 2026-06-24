@@ -670,3 +670,35 @@ Clean `07` и `08` **не изменялись содержательно** в �
 ---
 
 *Отчет описывает очистку документов 01–10. `prompts/` и `tests/` не обрабатывались.*
+
+---
+
+## Stage 4B.1 — документ `11_payment_security_and_dispute_handling` (2026-06-24)
+
+| Параметр | Значение |
+|----------|----------|
+| Тип источника | Synthetic internal policy (учебный проект) |
+| Raw | `data/01_raw/11_payment_security_and_dispute_handling.txt` — создан |
+| Clean | `data/02_clean_markdown/11_payment_security_and_dispute_handling.md` — создан |
+| Метаданные | `document_type: policy`, `source_type: internal_policy`, `category: payments`, `priority: critical` |
+| Структура clean | **18** H2; правила **P-01…P-08**; матрица доказательств; **7** примеров |
+| Связь с baseline | Не изменяет тексты документов `04`, `07`, `08`, `09`, `10`; дополняет фрагменты из `07` и FAQ-05 |
+| Индексация / retrieval | **Не выполнялась**; frozen 10-document benchmark **не пересчитывался** |
+| Chroma | Production index **не пересобирался** |
+
+### Содержательные принципы clean
+
+- Язык: русский, `е` вместо `ё`.
+- Не воспроизводит банковские/платежные регламенты и не дает юридических гарантий.
+- Явная лексика для retrieval: CVV, CVC, chargeback, несанкционированное списание, двойное списание и др.
+- Иерархия: документ **11** первичен для платежной безопасности; **04** — для сумм/сроков возврата; **07** — процедура; **08** — risk/escalation; **09** — стиль.
+
+### Проверки stage 4B.1
+
+| Проверка | Статус |
+|----------|--------|
+| Парность raw ↔ clean | Подтверждена |
+| Уникальность `document_id` | Подтверждена |
+| Metadata schema | По `docs/04_metadata_schema.md` |
+| Chunker smoke | См. отчет pytest / build-chunks |
+| Frozen T004 / T046 | **Не изменялись** |

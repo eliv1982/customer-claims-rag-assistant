@@ -71,6 +71,12 @@
 | `communication` | `09_response_style_and_templates` |
 | `faq` | `10_customer_faq` |
 
+Release expansion (stage 4B.1):
+
+| Значение | Документы |
+|----------|-----------|
+| `payments` | `11_payment_security_and_dispute_handling` |
+
 ---
 
 ## Дополнительные метаданные чанка
@@ -155,6 +161,12 @@
 | `08_escalation_and_risk_rules` | `escalation` | `policy` | `critical` | `restricted` |
 | `09_response_style_and_templates` | `communication` | `guideline` | `critical` | `internal` |
 | `10_customer_faq` | `faq` | `faq` | `medium` | `internal` |
+
+Release expansion (stage 4B.1):
+
+| `document_id` | `category` | `document_type` | `priority` | `confidentiality` |
+|---------------|------------|-----------------|------------|-------------------|
+| `11_payment_security_and_dispute_handling` | `payments` | `policy` | `critical` | `internal` |
 
 ---
 

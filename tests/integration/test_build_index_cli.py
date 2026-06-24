@@ -21,6 +21,11 @@ def _fake_store_factory(*, index_dir: Path, collection_name: str):
     return ChromaVectorStore(index_dir=index_dir, collection_name=collection_name)
 
 
+BASELINE_CHUNK_COUNT = 215
+RELEASE_EXPANSION_DOC11_CHUNK_COUNT = 20
+EXPECTED_CORPUS_CHUNK_COUNT = BASELINE_CHUNK_COUNT + RELEASE_EXPANSION_DOC11_CHUNK_COUNT
+
+
 def test_cli_successful_build(temp_project: Path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(temp_project)
     code = cli_module.run_build(
@@ -37,9 +42,9 @@ def test_cli_successful_build(temp_project: Path, monkeypatch, capsys) -> None:
     captured = capsys.readouterr()
     assert code == 0
     assert "Status: success" in captured.out
-    assert "Chunks: 215" in captured.out
+    assert f"Chunks: {EXPECTED_CORPUS_CHUNK_COUNT}" in captured.out
     manifest = load_manifest(temp_project / "data" / "04_index")
-    assert manifest.chunk_count == 215
+    assert manifest.chunk_count == EXPECTED_CORPUS_CHUNK_COUNT
 
 
 def test_cli_missing_rebuild_flag(temp_project: Path, monkeypatch, capsys) -> None:
