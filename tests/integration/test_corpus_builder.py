@@ -14,7 +14,7 @@ ARCHIVE_MARKERS = ("УСТАРЕЛО", "АРХИВ", "УДАЛИТЬ")
 FAQ_PREAMBLE_PHRASE = "не заменяет профильные политики FoodFlow"
 FORBIDDEN_TRAILING_PHRASE = "не должны попадать в retrieval как самостоятельные инструкции"
 BASELINE_DOC_COUNT = 10
-RELEASE_EXPANSION_DOC_COUNT = 2
+RELEASE_EXPANSION_DOC_COUNT = 3
 EXPECTED_DOC_COUNT = BASELINE_DOC_COUNT + RELEASE_EXPANSION_DOC_COUNT
 
 EXPECTED_DOC_IDS = [
@@ -36,6 +36,7 @@ EXPECTED_DOC_IDS = [
     )
 ] + [
     "11_payment_security_and_dispute_handling",
+    "12_staff_safety_and_threat_handling",
     "13_physical_hazard_and_foreign_body_protocol",
 ]
 
@@ -227,6 +228,70 @@ def test_physical_hazard_t040_vocabulary_outside_examples(
     combined = "\n".join(c.content for c in policy_chunks).lower()
     for term in T040_VOCABULARY:
         assert term in combined
+
+
+STAFF_SAFETY_TERMS = (
+    "угроза курьеру",
+    "ударю курьера",
+    "найду курьера",
+    "подам в суд",
+    "вы еще пожалеете",
+    "телефон курьера",
+)
+
+STAFF_SAFETY_RULE_MARKERS = tuple(f"S-{index:02d}" for index in range(1, 10))
+
+T047_VOCABULARY = ("угроза курьеру", "физически покажу", "курьеру")
+
+
+def test_staff_safety_document_terms(builder: CorpusBuilder, clean_input: Path) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    staff_chunks = [
+        c for c in chunks if c.document_id == "12_staff_safety_and_threat_handling"
+    ]
+    assert staff_chunks
+    combined = "\n".join(c.content for c in staff_chunks)
+    combined_lower = combined.lower()
+    for term in STAFF_SAFETY_TERMS:
+        assert term in combined_lower
+    for marker in STAFF_SAFETY_RULE_MARKERS:
+        assert marker in combined
+
+
+def test_staff_safety_t047_vocabulary_outside_examples(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    policy_chunks = [
+        c
+        for c in chunks
+        if c.document_id == "12_staff_safety_and_threat_handling"
+        and "Пример" not in (c.heading or "")
+    ]
+    assert policy_chunks
+    combined_lower = "\n".join(c.content for c in policy_chunks).lower()
+    for term in T047_VOCABULARY:
+        assert term in combined_lower
+
+
+def test_staff_safety_legal_vs_physical_threat_sections(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    staff_chunks = [
+        c for c in chunks if c.document_id == "12_staff_safety_and_threat_handling"
+    ]
+    s01_chunks = [c for c in staff_chunks if "S-01" in c.content]
+    s05_chunks = [c for c in staff_chunks if "S-05" in c.content]
+    assert s01_chunks
+    assert s05_chunks
+    s01_text = "\n".join(c.content for c in s01_chunks).lower()
+    s05_text = "\n".join(c.content for c in s05_chunks).lower()
+    assert "ударю курьера" in s01_text or "угроза курьеру" in s01_text
+    assert "подам в суд" in s05_text
+    assert s01_chunks[0].chunk_id != s05_chunks[0].chunk_id
 
 
 def test_document_priority_not_request_risk(builder: CorpusBuilder, clean_input: Path) -> None:

@@ -734,3 +734,36 @@ Clean `07` и `08` **не изменялись содержательно** в �
 | Metadata schema | По `docs/04_metadata_schema.md` |
 | Chunker smoke | См. отчет pytest |
 | Frozen T040 expected primary | **Не изменялся** |
+
+---
+
+## Stage 4B.3 — документ `12_staff_safety_and_threat_handling` (2026-06-24)
+
+| Параметр | Значение |
+|----------|----------|
+| Тип источника | Synthetic internal protocol (учебный проект) |
+| Raw | `data/01_raw/12_staff_safety_and_threat_handling.txt` — создан |
+| Clean | `data/02_clean_markdown/12_staff_safety_and_threat_handling.md` — создан |
+| Метаданные | `document_type: policy`, `source_type: internal_policy`, `category: staff_safety`, `priority: critical` |
+| Структура clean | **23** H2; правила **S-01…S-09**; матрица угроз; **10** примеров |
+| Связь с baseline | Не изменяет тексты `01`–`11`, `13`; дополняет фрагменты из `08` и `09` |
+| Индексация / retrieval | **Не выполнялась**; frozen benchmark **не пересчитывался** |
+| Chroma | Production index **не пересобирался** |
+
+### Содержательные принципы clean
+
+- Язык: русский, `е` вместо `ё`.
+- Не воспроизводит полицейские/охранные регламенты и не дает правовых классификаций.
+- Явная лексика для retrieval: угроза курьеру, ударю курьера, найду курьера, подам в суд, вы еще пожалеете и др.
+- Разделение физической угрозы персоналу и правовой/репутационной эскалации.
+- Иерархия: документ **12** первичен для угроз персоналу; **08** — risk taxonomy; **02** — доставка; **09** — стиль.
+
+### Проверки stage 4B.3
+
+| Проверка | Статус |
+|----------|--------|
+| Парность raw ↔ clean | Подтверждена |
+| Уникальность `document_id` | Подтверждена |
+| Metadata schema | По `docs/04_metadata_schema.md` |
+| Chunker smoke | См. отчет pytest |
+| Frozen T047 expected primary | **Не изменялся** |

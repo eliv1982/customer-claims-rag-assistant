@@ -83,6 +83,12 @@ Release expansion (stage 4B.2):
 |----------|-----------|
 | `physical_hazard` | `13_physical_hazard_and_foreign_body_protocol` |
 
+Release expansion (stage 4B.3):
+
+| Значение | Документы |
+|----------|-----------|
+| `staff_safety` | `12_staff_safety_and_threat_handling` |
+
 ---
 
 ## Дополнительные метаданные чанка
@@ -179,6 +185,12 @@ Release expansion (stage 4B.2):
 | `document_id` | `category` | `document_type` | `priority` | `confidentiality` |
 |---------------|------------|-----------------|------------|-------------------|
 | `13_physical_hazard_and_foreign_body_protocol` | `physical_hazard` | `policy` | `critical` | `internal` |
+
+Release expansion (stage 4B.3):
+
+| `document_id` | `category` | `document_type` | `priority` | `confidentiality` |
+|---------------|------------|-----------------|------------|-------------------|
+| `12_staff_safety_and_threat_handling` | `staff_safety` | `policy` | `critical` | `internal` |
 
 ---
 
