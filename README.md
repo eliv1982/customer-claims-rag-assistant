@@ -34,9 +34,11 @@
 
 **Hybrid lexical + vector (stage 2C.3)** — experiment `hybrid-lexical-vector-v1` выполнен; formal guardrails не пройдены (**rejected** для MVP selection). Retrieval experimentation **frozen** после 2C.3. Hybrid v1 **не** production-ready.
 
-**Следующий этап:** grounded generation, risk/handoff classification, citations и fallback handling.
+**Application layer (functional MVP)** — реализованы grounded generation, deterministic risk/handoff, citations и fallback handling; production composition root (`build_customer_claims_pipeline`), frozen retrieval `vector top-24 → source-authority-v1 → final top-12`, single-shot CLI (`answer-claim`) и локальный Streamlit UI.
 
-**Еще не реализованы:** LLM answer generation, query rewriting, production threshold selection, web/Telegram UI.
+**Functional MVP complete:** production retrieval, grounded generation, deterministic risk/handoff, single-shot CLI и локальный Streamlit interface реализованы и покрыты тестами. Deployment и production operations **не** входят в текущий scope.
+
+**Еще не реализованы:** deployment/operations, authentication, chat history, document upload из UI, feedback collection, query rewriting, production threshold auto-selection.
 
 Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/` и `data/04_index/` содержат только сгенерированные артефакты.
 
@@ -102,7 +104,7 @@ OPENAI_API_KEY=
 
 Файл `.env` **не коммитится** (см. `.gitignore`). Шаблон `.env.example` содержит безопасные placeholder-значения без секретов.
 
-Проект автоматически загружает `.env` из корня репозитория при запуске retrieval CLI и чтении `RetrievalSettings`. Уже установленные переменные процесса имеют **приоритет** над значениями из `.env`. Отсутствие `.env` не является ошибкой.
+Проект автоматически загружает `.env` из корня репозитория при запуске CLI, `answer-claim`, Streamlit UI и чтении `ApplicationSettings` / `RetrievalSettings`. Уже установленные переменные процесса имеют **приоритет** над значениями из `.env`. Отсутствие `.env` не является ошибкой.
 
 ### Тесты
 
@@ -243,14 +245,20 @@ deactivate
 
 | Переменная | Назначение | Default |
 |------------|------------|---------|
-| `OPENAI_API_KEY` | Ключ OpenAI для embeddings | — |
+| `OPENAI_API_KEY` | Ключ OpenAI для embeddings и generation | — |
 | `OPENAI_EMBEDDING_MODEL` | Модель embeddings | `text-embedding-3-small` |
+| `OPENAI_CHAT_MODEL` | Модель chat completion для generation | `gpt-4o-mini` |
 | `RAG_INDEX_DIR` | Каталог vector index | `data/04_index` |
 | `RAG_COLLECTION_NAME` | Имя Chroma collection | `customer_claims` |
-| `RAG_TOP_K` | Максимум результатов поиска | `4` |
-| `RAG_FETCH_K` | Размер candidate pool | `12` |
+| `RAG_TOP_K` | Максимум результатов поиска (retrieval CLI) | `4` |
+| `RAG_FETCH_K` | Размер candidate pool (retrieval CLI) | `12` |
 | `RAG_SIMILARITY_THRESHOLD` | Минимальная cosine similarity | `0.0` (baseline: без filtering) |
 | `RAG_EMBEDDING_BATCH_SIZE` | Batch size при индексации | `64` |
+| `GENERATION_TEMPERATURE` | Temperature для grounded generation | `0.0` |
+| `GENERATION_TIMEOUT_SECONDS` | Timeout chat completion (сек.) | `60` |
+| `GENERATION_MAX_RETRIES` | Retries chat completion | `2` |
+| `GENERATION_MAX_OUTPUT_TOKENS` | Max output tokens | `1024` |
+| `GENERATION_PROMPT_PATH` | Путь к prompt-файлу | `prompts/grounded_answer_v1.md` |
 
 CLI-параметры переопределяют env-значения.
 
