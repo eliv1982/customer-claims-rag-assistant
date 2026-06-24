@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 _CITATION_KEY_PATTERN = re.compile(r"^S[1-9][0-9]*$")
 ResponseMode = Literal["grounded_answer", "insufficient_context"]
@@ -119,3 +119,13 @@ class GroundedGenerationResult(BaseModel):
     response_mode: ResponseMode
     customer_response: str
     citations: list[Citation] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_response_mode_citations(self) -> Self:
+        if self.response_mode == "grounded_answer":
+            if not self.citations:
+                raise ValueError("grounded_answer requires at least one citation")
+        elif self.response_mode == "insufficient_context":
+            if self.citations:
+                raise ValueError("insufficient_context requires empty citations")
+        return self
