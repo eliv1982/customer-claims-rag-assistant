@@ -24,6 +24,7 @@ dev = [
 ]
 
 [project.scripts]
+answer-claim = "customer_claims_rag.cli.answer_claim:main"
 build-chunks = "customer_claims_rag.cli.build_chunks:main"
 build-index = "customer_claims_rag.cli.build_index:main"
 search-index = "customer_claims_rag.cli.search_index:main"

@@ -174,6 +174,24 @@ python -m customer_claims_rag.cli.search_index "После еды мне ста�
 python -m customer_claims_rag.cli.search_index "Заказ отмечен доставленным, но я его не получил" --json
 ```
 
+### Production claim answer (single-shot)
+
+Требуется собранный vector index (`data/04_index/`), заполненный `OPENAI_API_KEY` и настроенные generation env vars (см. `.env.example`).
+
+Команда принимает одно обращение, выполняет production pipeline один раз и печатает стабильный JSON в stdout:
+
+```powershell
+answer-claim --message "Курьер привез вскрытый контейнер"
+```
+
+Эквивалент через модуль:
+
+```powershell
+python -m customer_claims_rag.cli.answer_claim --message "Курьер привез вскрытый контейнер"
+```
+
+JSON содержит customer-safe поля: `answer`, `response_mode`, `generation_outcome`, `risk_level`, handoff flags/notice и citations (`key`, `heading`, `document_id`).
+
 Дополнительные параметры:
 
 ```powershell
