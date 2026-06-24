@@ -14,7 +14,7 @@ ARCHIVE_MARKERS = ("УСТАРЕЛО", "АРХИВ", "УДАЛИТЬ")
 FAQ_PREAMBLE_PHRASE = "не заменяет профильные политики FoodFlow"
 FORBIDDEN_TRAILING_PHRASE = "не должны попадать в retrieval как самостоятельные инструкции"
 BASELINE_DOC_COUNT = 10
-RELEASE_EXPANSION_DOC_COUNT = 3
+RELEASE_EXPANSION_DOC_COUNT = 4
 EXPECTED_DOC_COUNT = BASELINE_DOC_COUNT + RELEASE_EXPANSION_DOC_COUNT
 
 EXPECTED_DOC_IDS = [
@@ -38,6 +38,7 @@ EXPECTED_DOC_IDS = [
     "11_payment_security_and_dispute_handling",
     "12_staff_safety_and_threat_handling",
     "13_physical_hazard_and_foreign_body_protocol",
+    "14_evidence_standards_and_incomplete_information",
 ]
 
 
@@ -292,6 +293,105 @@ def test_staff_safety_legal_vs_physical_threat_sections(
     assert "ударю курьера" in s01_text or "угроза курьеру" in s01_text
     assert "подам в суд" in s05_text
     assert s01_chunks[0].chunk_id != s05_chunks[0].chunk_id
+
+
+EVIDENCE_TERMS = (
+    "нет номера заказа",
+    "нет фото",
+    "спорный статус доставки",
+    "курьер говорит одно, клиент другое",
+    "жалобу нельзя отклонять автоматически",
+    "нельзя снижать риск из-за отсутствия фото",
+    "неполные сведения",
+    "противоречивые сведения",
+)
+
+EVIDENCE_RULE_MARKERS = tuple(f"E-{index:02d}" for index in range(1, 11))
+
+T055_VOCABULARY = ("нет номера заказа", "нет фото", "неполные сведения", "вскрыт")
+
+
+def test_evidence_standards_document_terms(builder: CorpusBuilder, clean_input: Path) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    evidence_chunks = [
+        c for c in chunks if c.document_id == "14_evidence_standards_and_incomplete_information"
+    ]
+    assert len(evidence_chunks) == 25
+    combined = "\n".join(c.content for c in evidence_chunks)
+    combined_lower = combined.lower()
+    for term in EVIDENCE_TERMS:
+        assert term in combined_lower
+    for marker in EVIDENCE_RULE_MARKERS:
+        assert marker in combined
+
+
+def test_evidence_t055_vocabulary_outside_examples(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    policy_chunks = [
+        c
+        for c in chunks
+        if c.document_id == "14_evidence_standards_and_incomplete_information"
+        and "Пример" not in (c.heading or "")
+    ]
+    assert policy_chunks
+    combined_lower = "\n".join(c.content for c in policy_chunks).lower()
+    for term in T055_VOCABULARY:
+        assert term in combined_lower
+
+
+def test_evidence_disputed_delivery_vs_payment_sections(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    evidence_chunks = [
+        c for c in chunks if c.document_id == "14_evidence_standards_and_incomplete_information"
+    ]
+    delivery_chunks = [c for c in evidence_chunks if "E-05" in c.content]
+    payment_chunks = [
+        c
+        for c in evidence_chunks
+        if "CVV" in c.content or "несанкционирован" in c.content.lower()
+    ]
+    assert delivery_chunks
+    assert payment_chunks
+    delivery_text = "\n".join(c.content for c in delivery_chunks).lower()
+    assert "заказ отмечен доставленным" in delivery_text
+    assert delivery_chunks[0].chunk_id != payment_chunks[0].chunk_id
+
+
+def test_evidence_no_auto_reject_and_no_risk_lowering(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    evidence_chunks = [
+        c for c in chunks if c.document_id == "14_evidence_standards_and_incomplete_information"
+    ]
+    combined_lower = "\n".join(c.content for c in evidence_chunks).lower()
+    assert "жалобу нельзя отклонять автоматически" in combined_lower
+    assert "нельзя снижать риск из-за отсутствия фото" in combined_lower
+
+
+def test_evidence_safe_vs_prohibited_evidence(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    e08_chunks = [
+        c
+        for c in chunks
+        if c.document_id == "14_evidence_standards_and_incomplete_information"
+        and "E-08" in c.content
+    ]
+    assert e08_chunks
+    e08_text = "\n".join(c.content for c in e08_chunks).lower()
+    assert "cvv" in e08_text
+    assert "полный номер карты" in e08_text
+    assert "замаскирован" in e08_text or "маскирован" in e08_text
 
 
 def test_document_priority_not_request_risk(builder: CorpusBuilder, clean_input: Path) -> None:

@@ -89,6 +89,12 @@ Release expansion (stage 4B.3):
 |----------|-----------|
 | `staff_safety` | `12_staff_safety_and_threat_handling` |
 
+Release expansion (stage 4B.4):
+
+| Значение | Документы |
+|----------|-----------|
+| `evidence` | `14_evidence_standards_and_incomplete_information` |
+
 ---
 
 ## Дополнительные метаданные чанка
@@ -191,6 +197,12 @@ Release expansion (stage 4B.3):
 | `document_id` | `category` | `document_type` | `priority` | `confidentiality` |
 |---------------|------------|-----------------|------------|-------------------|
 | `12_staff_safety_and_threat_handling` | `staff_safety` | `policy` | `critical` | `internal` |
+
+Release expansion (stage 4B.4):
+
+| `document_id` | `category` | `document_type` | `priority` | `confidentiality` |
+|---------------|------------|-----------------|------------|-------------------|
+| `14_evidence_standards_and_incomplete_information` | `evidence` | `procedure` | `high` | `internal` |
 
 ---
 

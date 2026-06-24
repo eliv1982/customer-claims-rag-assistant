@@ -767,3 +767,36 @@ Clean `07` и `08` **не изменялись содержательно** в �
 | Metadata schema | По `docs/04_metadata_schema.md` |
 | Chunker smoke | См. отчет pytest |
 | Frozen T047 expected primary | **Не изменялся** |
+
+---
+
+## Stage 4B.4 — документ `14_evidence_standards_and_incomplete_information` (2026-06-24)
+
+| Параметр | Значение |
+|----------|----------|
+| Тип источника | Synthetic internal procedure (учебный проект) |
+| Raw | `data/01_raw/14_evidence_standards_and_incomplete_information.txt` — создан |
+| Clean | `data/02_clean_markdown/14_evidence_standards_and_incomplete_information.md` — создан |
+| Метаданные | `document_type: procedure`, `source_type: internal_procedure`, `category: evidence`, `priority: high` |
+| Структура clean | **25** H2; правила **E-01…E-10**; матрица доказательств; **12** примеров |
+| Связь с baseline | Не изменяет тексты `01`–`13`; дополняет фрагменты из `02`, `06`, `07`, `08`, `11`, `12`, `13` |
+| Индексация / retrieval | **Не выполнялась**; frozen benchmark **не пересчитывался** |
+| Chroma | Production index **не пересобирался** |
+
+### Содержательные принципы clean
+
+- Язык: русский, `е` вместо `ё`.
+- Не воспроизводит судебные стандарты доказывания, полицейские или форензические процедуры.
+- Явная лексика для retrieval: нет номера заказа, нет фото, спорный статус доставки, курьер говорит одно клиент другое, нельзя снижать риск из-за отсутствия фото, жалобу нельзя отклонять автоматически и др.
+- Разделение споров о доставке, платежных доказательств и неполноты по качеству.
+- Иерархия: документ **14** первичен для стандартов доказательств и неполных сведений; **07** — общая регистрация; **08** — risk taxonomy.
+
+### Проверки stage 4B.4
+
+| Проверка | Статус |
+|----------|--------|
+| Парность raw ↔ clean | Подтверждена |
+| Уникальность `document_id` | Подтверждена |
+| Metadata schema | По `docs/04_metadata_schema.md` |
+| Chunker smoke | См. отчет pytest |
+| Frozen T055 expected primary | **Не изменялся** |
