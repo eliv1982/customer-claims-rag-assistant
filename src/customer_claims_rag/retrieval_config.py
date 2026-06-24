@@ -60,6 +60,20 @@ class RetrievalSettings:
     embedding_batch_size: int
     openai_api_key: str | None = None
 
+    def __repr__(self) -> str:
+        api_key_state = "set" if self.openai_api_key else "unset"
+        return (
+            "RetrievalSettings("
+            f"index_dir={self.index_dir!r}, "
+            f"collection_name={self.collection_name!r}, "
+            f"embedding_model={self.embedding_model!r}, "
+            f"top_k={self.top_k}, "
+            f"fetch_k={self.fetch_k}, "
+            f"similarity_threshold={self.similarity_threshold}, "
+            f"embedding_batch_size={self.embedding_batch_size}, "
+            f"openai_api_key={api_key_state!r})"
+        )
+
     @classmethod
     def from_env(cls) -> RetrievalSettings:
         load_project_env()
