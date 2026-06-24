@@ -77,6 +77,12 @@ Release expansion (stage 4B.1):
 |----------|-----------|
 | `payments` | `11_payment_security_and_dispute_handling` |
 
+Release expansion (stage 4B.2):
+
+| Значение | Документы |
+|----------|-----------|
+| `physical_hazard` | `13_physical_hazard_and_foreign_body_protocol` |
+
 ---
 
 ## Дополнительные метаданные чанка
@@ -167,6 +173,12 @@ Release expansion (stage 4B.1):
 | `document_id` | `category` | `document_type` | `priority` | `confidentiality` |
 |---------------|------------|-----------------|------------|-------------------|
 | `11_payment_security_and_dispute_handling` | `payments` | `policy` | `critical` | `internal` |
+
+Release expansion (stage 4B.2):
+
+| `document_id` | `category` | `document_type` | `priority` | `confidentiality` |
+|---------------|------------|-----------------|------------|-------------------|
+| `13_physical_hazard_and_foreign_body_protocol` | `physical_hazard` | `policy` | `critical` | `internal` |
 
 ---
 

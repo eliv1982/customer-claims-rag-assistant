@@ -14,7 +14,7 @@ ARCHIVE_MARKERS = ("УСТАРЕЛО", "АРХИВ", "УДАЛИТЬ")
 FAQ_PREAMBLE_PHRASE = "не заменяет профильные политики FoodFlow"
 FORBIDDEN_TRAILING_PHRASE = "не должны попадать в retrieval как самостоятельные инструкции"
 BASELINE_DOC_COUNT = 10
-RELEASE_EXPANSION_DOC_COUNT = 1
+RELEASE_EXPANSION_DOC_COUNT = 2
 EXPECTED_DOC_COUNT = BASELINE_DOC_COUNT + RELEASE_EXPANSION_DOC_COUNT
 
 EXPECTED_DOC_IDS = [
@@ -34,7 +34,10 @@ EXPECTED_DOC_IDS = [
         ],
         start=1,
     )
-] + ["11_payment_security_and_dispute_handling"]
+] + [
+    "11_payment_security_and_dispute_handling",
+    "13_physical_hazard_and_foreign_body_protocol",
+]
 
 
 @pytest.fixture
@@ -178,6 +181,51 @@ def test_payment_security_document_terms(builder: CorpusBuilder, clean_input: Pa
     assert payment_chunks
     combined = "\n".join(c.content for c in payment_chunks)
     for term in PAYMENT_SECURITY_TERMS:
+        assert term in combined
+
+
+PHYSICAL_HAZARD_TERMS = (
+    "металлический осколок",
+    "осколок стекла",
+    "острый пластик",
+    "инородный предмет в еде",
+    "поврежденный зуб",
+    "опасный предмет в блюде",
+)
+
+PHYSICAL_HAZARD_RULE_MARKERS = tuple(f"H-{index:02d}" for index in range(1, 9))
+
+T040_VOCABULARY = ("металлический осколок", "кусок металла", "острый")
+
+
+def test_physical_hazard_document_terms(builder: CorpusBuilder, clean_input: Path) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    hazard_chunks = [
+        c for c in chunks if c.document_id == "13_physical_hazard_and_foreign_body_protocol"
+    ]
+    assert hazard_chunks
+    combined = "\n".join(c.content for c in hazard_chunks)
+    combined_lower = combined.lower()
+    for term in PHYSICAL_HAZARD_TERMS:
+        assert term in combined_lower
+    for marker in PHYSICAL_HAZARD_RULE_MARKERS:
+        assert marker in combined
+
+
+def test_physical_hazard_t040_vocabulary_outside_examples(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    policy_chunks = [
+        c
+        for c in chunks
+        if c.document_id == "13_physical_hazard_and_foreign_body_protocol"
+        and "Пример" not in (c.heading or "")
+    ]
+    assert policy_chunks
+    combined = "\n".join(c.content for c in policy_chunks).lower()
+    for term in T040_VOCABULARY:
         assert term in combined
 
 

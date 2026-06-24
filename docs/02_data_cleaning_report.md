@@ -702,3 +702,35 @@ Clean `07` и `08` **не изменялись содержательно** в �
 | Metadata schema | По `docs/04_metadata_schema.md` |
 | Chunker smoke | См. отчет pytest / build-chunks |
 | Frozen T004 / T046 | **Не изменялись** |
+
+---
+
+## Stage 4B.2 — документ `13_physical_hazard_and_foreign_body_protocol` (2026-06-24)
+
+| Параметр | Значение |
+|----------|----------|
+| Тип источника | Synthetic internal protocol (учебный проект) |
+| Raw | `data/01_raw/13_physical_hazard_and_foreign_body_protocol.txt` — создан |
+| Clean | `data/02_clean_markdown/13_physical_hazard_and_foreign_body_protocol.md` — создан |
+| Метаданные | `document_type: policy`, `source_type: internal_policy`, `category: physical_hazard`, `priority: critical` |
+| Структура clean | **22** H2; правила **H-01…H-08**; матрица классификации; **9** примеров |
+| Связь с baseline | Не изменяет тексты `04`–`11`; дополняет фрагменты из `06` и `08` |
+| Индексация / retrieval | **Не выполнялась**; frozen benchmark **не пересчитывался** |
+| Chroma | Production index **не пересобирался** |
+
+### Содержательные принципы clean
+
+- Язык: русский, `е` вместо `ё`.
+- Не воспроизводит санитарные нормы, медицинские протоколы или процедуры отзыва.
+- Явная лексика для retrieval: металлический осколок, стекло, острый пластик, инородный предмет в еде, порез, поврежденный зуб и др.
+- Иерархия: документ **13** первичен для физических опасностей; **06** — общее качество; **08** — risk/escalation; **04/05** — финансовые меры.
+
+### Проверки stage 4B.2
+
+| Проверка | Статус |
+|----------|--------|
+| Парность raw ↔ clean | Подтверждена |
+| Уникальность `document_id` | Подтверждена |
+| Metadata schema | По `docs/04_metadata_schema.md` |
+| Chunker smoke | См. отчет pytest |
+| Frozen T040 expected primary | **Не изменялся** |

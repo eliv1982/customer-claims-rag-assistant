@@ -10,7 +10,7 @@
 
 База знаний состоит из **10 документов MVP-бaseline** (приняты на 2026-06-20). Исходные файлы размещаются в `data/01_raw/` (формат `.txt`), очищенные версии — в `data/02_clean_markdown/` (формат `.md`).
 
-**Release expansion (stage 4B.1, 2026-06-24):** добавлен документ `11_payment_security_and_dispute_handling`. Индексация и retrieval-benchmark **ещё не пересчитывались** на 11 документов; frozen evaluation по-прежнему относится к 10-документному индексу.
+**Release expansion (stage 4B.1, 2026-06-24):** добавлен документ `11_payment_security_and_dispute_handling`. **Release expansion (stage 4B.2, 2026-06-24):** добавлен документ `13_physical_hazard_and_foreign_body_protocol`. Индексация и retrieval-benchmark **ещё не пересчитывались** на расширенный корпус; frozen evaluation по-прежнему относится к 10-документному индексу.
 
 **Статус на 2026-06-20 (финальная приемка, вердикт `PASS WITH MINOR NOTES`):**
 
@@ -47,7 +47,13 @@
 |---------------|-------------------------|-----------------|----------------|-------------------|
 | `11_payment_security_and_dispute_handling` | `payments` | `policy` | `internal_policy` | `internal` |
 
-Поле `document_id` **обязательно совпадает** с именем файла без расширения. Версия документов первой партии: `1.0.0` (SemVer). Документ `11` также использует `1.0.0`.
+### Release expansion (stage 4B.2)
+
+| `document_id` | Каноническая `category` | `document_type` | `source_type` | `confidentiality` |
+|---------------|-------------------------|-----------------|----------------|-------------------|
+| `13_physical_hazard_and_foreign_body_protocol` | `physical_hazard` | `policy` | `internal_policy` | `internal` |
+
+Поле `document_id` **обязательно совпадает** с именем файла без расширения. Версия документов первой партии: `1.0.0` (SemVer). Документы `11` и `13` также используют `1.0.0`.
 
 ---
 
@@ -74,6 +80,12 @@
 |---|-----------|----------|--------|-------------------------------------|--------------------|------------|
 | 11 | `11_payment_security_and_dispute_handling` | Безопасность платежных данных и споры по оплате | **Подготовлен (stage 4B.1); индексация не выполнялась** | 1800–2400 / 1600–2200 | 18 H2; P-01…P-08; матрица доказательств; 7 примеров | Да, 10% |
 
+### Release expansion (stage 4B.2)
+
+| № | Имя файла | Название | Статус | Целевой объем (raw / clean, слов) | Стратегия чанкинга | Перекрытие |
+|---|-----------|----------|--------|-------------------------------------|--------------------|------------|
+| 13 | `13_physical_hazard_and_foreign_body_protocol` | Протокол физических опасностей и инородных предметов | **Подготовлен (stage 4B.2); индексация не выполнялась** | 1600–2200 / 1800–2600 | 22 H2; H-01…H-08; матрица классификации; 9 примеров | Да, 10% |
+
 ---
 
 ## Примененная стратегия чанкинга (документы 01–03)
@@ -96,7 +108,7 @@
 | `05_compensation_policy` | 10 H2, 3 H3; запрет фиксированных сумм и авто-компенсации; примеры в одном разделе | 11–13 |
 | `06_food_quality_and_packaging` | 17 H2, 6 H3; уровни риска medium/high/critical; безопасные медицинские рекомендации отдельно от возврата | 17–20 |
 
-`priority` по схеме `docs/04_metadata_schema.md`: **critical** — `04_refund_policy`, `05_compensation_policy`, `08_escalation_and_risk_rules`, `11_payment_security_and_dispute_handling`; **high** — `01–03`, `06_food_quality_and_packaging`, `07_complaint_handling_procedure`, `09_response_style_and_templates`; **medium** — `10_customer_faq`. Поле `priority` документа **не равно** `risk_level` обращения.
+`priority` по схеме `docs/04_metadata_schema.md`: **critical** — `04_refund_policy`, `05_compensation_policy`, `08_escalation_and_risk_rules`, `11_payment_security_and_dispute_handling`, `13_physical_hazard_and_foreign_body_protocol`; **high** — `01–03`, `06_food_quality_and_packaging`, `07_complaint_handling_procedure`, `09_response_style_and_templates`; **medium** — `10_customer_faq`. Поле `priority` документа **не равно** `risk_level` обращения.
 
 ---
 
@@ -139,6 +151,18 @@
 `source_type`: `internal_policy`. `category`: `payments`. `priority`: **critical** — документ **первичен** для безопасности платежных данных и споров через банк; не заменяет `04_refund_policy` по суммам и срокам возврата. Индексация и retrieval-benchmark **не пересчитывались**.
 
 **Clean `11_payment_security_and_dispute_handling` (2026-06-24, stage 4B.1):** synthetic internal policy; индексация **не выполнялась**.
+
+---
+
+## Примененная стратегия чанкинга (release expansion, документ 13)
+
+| Документ | Принцип | Ожидаемое число качественных чанков |
+|----------|---------|-------------------------------------|
+| `13_physical_hazard_and_foreign_body_protocol` | **22** H2; правила H-01…H-08; матрица физических опасностей; **9** примеров; retrieval-лексика (металлический осколок, стекло, острый пластик, инородный предмет в еде) | **20–24** |
+
+`source_type`: `internal_policy`. `category`: `physical_hazard`. `priority`: **critical** — документ **первичен** для опасных инородных предметов и травм; не заменяет `06_food_quality_and_packaging` по порче и обычному качеству. Индексация и retrieval-benchmark **не пересчитывались**.
+
+**Clean `13_physical_hazard_and_foreign_body_protocol` (2026-06-24, stage 4B.2):** synthetic internal protocol; индексация **не выполнялась**.
 
 ---
 
