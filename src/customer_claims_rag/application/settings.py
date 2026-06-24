@@ -1,0 +1,122 @@
+"""Application-owned frozen retrieval configuration."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Self
+
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+from customer_claims_rag.retrieval_config import (
+    validate_fetch_k,
+    validate_similarity_threshold,
+    validate_top_k,
+)
+
+_KNOWN_FROZEN_RETRIEVAL_CONFIG_KEYS = frozenset(
+    {
+        "experiment_id",
+        "version",
+        "experiment_mode",
+        "baseline_pool_k",
+        "candidate_pool_k",
+        "final_top_k",
+        "threshold",
+        "reranker_id",
+        "reranker_config_hash",
+        "tie_breaking",
+    },
+)
+
+
+class _FrozenRetrievalConfigFile(BaseModel):
+    """Exact on-disk schema for the frozen retrieval JSON artifact."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    experiment_id: str
+    version: str
+    experiment_mode: str
+    baseline_pool_k: int
+    candidate_pool_k: int
+    final_top_k: int
+    threshold: float
+    reranker_id: str
+    reranker_config_hash: str
+    tie_breaking: list[str]
+
+    @field_validator("experiment_id", "version", "reranker_id")
+    @classmethod
+    def validate_non_empty_string(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("field must be a non-empty string")
+        return value
+
+
+class FrozenRetrievalConfig(BaseModel):
+    """Normalized frozen retrieval policy for production application wiring."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    config_id: str
+    version: str
+    vector_top_k: int
+    vector_fetch_k: int
+    similarity_threshold: float
+    candidate_pool_k: int
+    final_top_k: int
+    reranker_id: str
+
+    @field_validator("config_id", "version", "reranker_id")
+    @classmethod
+    def validate_non_empty_string(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("field must be a non-empty string")
+        return value
+
+    @model_validator(mode="after")
+    def validate_invariants(self) -> Self:
+        validate_top_k(self.vector_top_k)
+        validate_fetch_k(self.vector_fetch_k, self.vector_top_k)
+        validate_similarity_threshold(self.similarity_threshold)
+
+        if self.candidate_pool_k < 1:
+            raise ValueError("candidate_pool_k must be >= 1")
+        if self.final_top_k < 1:
+            raise ValueError("final_top_k must be >= 1")
+        if self.final_top_k > self.candidate_pool_k:
+            raise ValueError("final_top_k must be <= candidate_pool_k")
+        if self.candidate_pool_k > self.vector_top_k:
+            raise ValueError("candidate_pool_k must be <= vector_top_k")
+        if self.vector_top_k != self.candidate_pool_k:
+            raise ValueError("vector_top_k must equal candidate_pool_k")
+        if self.vector_fetch_k != self.candidate_pool_k:
+            raise ValueError("vector_fetch_k must equal candidate_pool_k")
+
+        return self
+
+
+def load_frozen_retrieval_config(path: Path) -> FrozenRetrievalConfig:
+    """Load and normalize the frozen retrieval JSON config from disk."""
+    raw_payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw_payload, dict):
+        raise ValueError("frozen retrieval config must be a JSON object")
+
+    unknown_keys = set(raw_payload) - _KNOWN_FROZEN_RETRIEVAL_CONFIG_KEYS
+    if unknown_keys:
+        unknown = ", ".join(sorted(unknown_keys))
+        raise ValueError(f"unknown top-level frozen retrieval config keys: {unknown}")
+
+    parsed = _FrozenRetrievalConfigFile.model_validate(raw_payload)
+    pool_k = parsed.candidate_pool_k
+    return FrozenRetrievalConfig(
+        config_id=parsed.experiment_id,
+        version=parsed.version,
+        vector_top_k=pool_k,
+        vector_fetch_k=pool_k,
+        similarity_threshold=parsed.threshold,
+        candidate_pool_k=pool_k,
+        final_top_k=parsed.final_top_k,
+        reranker_id=parsed.reranker_id,
+    )
