@@ -92,6 +92,25 @@ FoodFlow предоставляет:
 | **E-09** | Поздние доказательства: к существующему кейсу; не дублировать; не оправдывать ранний необоснованный вывод о вине |
 | **E-10** | Эскалация при неразрешенном споре, high/critical, конфликте записей или неясном приоритете документов |
 
+**Release expansion (stage 4B.5):** правила R-01…R-14, матрица приоритетов и сценарии составных обращений вынесены в **`15_conflicting_rules_and_remedy_priority`**. Раздел §2 реестра остается базовым согласованием; документ `15` **первичен** только для conflict resolution, sequencing и multi-issue decomposition.
+
+| Правило | Краткое содержание |
+|---------|-------------------|
+| **R-01** | Декомпозиция составного обращения; primary document на каждую проблему; не терять safety за refund |
+| **R-02** | Глобальная последовательность: safety → risk → registration → evidence → verification → remedy → communication |
+| **R-03** | Safety/security overrides remedy discussion; финансовый запрос сохраняется, не отклоняется автоматически |
+| **R-04** | Refund vs replacement — разные меры; не обещать оба автоматически |
+| **R-05** | Refund ≠ compensation; отдельная регистрация; компенсация не замена refund review |
+| **R-06** | Late cancel/change (03) + compensation (05) — раздельно; denied change ≠ auto compensation |
+| **R-07** | Payment dispute (11) + internal refund (04); без противоречивых параллельных обещаний |
+| **R-08** | Physical hazard (13) + money — safety first; финансы после handoff |
+| **R-09** | Staff threat (12) + service complaint — threat first; no employee data exchange |
+| **R-10** | Disputed delivery + incomplete evidence — 14 neutral, 02 delivery, no fault assignment |
+| **R-11** | Partial delivery + outage — разделить fulfilled/undelivered; не delay registration |
+| **R-12** | Repeated failures — preserve IDs; 15 sequence + 08 risk; no auto compensation |
+| **R-13** | Unclear policy conflict — no new rule; specialist handoff; no definitive promises |
+| **R-14** | No contradictory promises (refund+replacement, refund+bank guarantee, etc.) |
+
 ---
 
 ## 3. Доставка
@@ -301,11 +320,12 @@ FoodFlow предоставляет:
 3. **Безопасность персонала и угрозы сотрудникам** (`12_staff_safety_and_threat_handling`) — *release expansion, stage 4B.3; первичен для угроз курьеру/сотруднику и защиты данных работников*
 4. **Физические опасности и инородные предметы** (`13_physical_hazard_and_foreign_body_protocol`) — *release expansion, stage 4B.2; первичен для металла, стекла, острых предметов, травм и группового загрязнения*
 5. **Стандарты доказательств и неполные сведения** (`14_evidence_standards_and_incomplete_information`) — *release expansion, stage 4B.4; первичен для отсутствия фото/номера заказа, спорных фактов и сбора доказательств*
-6. **Действующая специализированная политика** (02–06, 04, 05)
-7. **Действующая процедура** (`07_complaint_handling_procedure`) — *общая регистрация обращения*
-8. **Описание сервиса** (`01_service_overview`)
-9. **FAQ** (`10_customer_faq`)
-10. **Шаблоны ответов** (`09_response_style_and_templates`)
+6. **Конфликтующие правила и приоритет мер** (`15_conflicting_rules_and_remedy_priority`) — *release expansion, stage 4B.5; первичен только для conflict resolution, sequencing и multi-issue decomposition*
+7. **Действующая специализированная политика** (02–06, 04, 05)
+8. **Действующая процедура** (`07_complaint_handling_procedure`) — *общая регистрация обращения*
+9. **Описание сервиса** (`01_service_overview`)
+10. **FAQ** (`10_customer_faq`)
+11. **Шаблоны ответов** (`09_response_style_and_templates`)
 
 **FAQ и шаблоны не могут изменять** правила профильных политик.
 
@@ -352,6 +372,7 @@ FoodFlow предоставляет:
 | `13_physical_hazard_and_foreign_body_protocol` | §6 (release expansion), H-01…H-08; первичен для физических опасностей и опасных инородных предметов |
 | `12_staff_safety_and_threat_handling` | §11 (release expansion), S-01…S-09; первичен для угроз персоналу и защиты данных сотрудников |
 | `14_evidence_standards_and_incomplete_information` | §2 (release expansion), E-01…E-10; первичен для стандартов доказательств и неполных сведений |
+| `15_conflicting_rules_and_remedy_priority` | §2 (release expansion), R-01…R-14; первичен для conflict resolution, sequencing и multi-issue decomposition |
 
 ---
 

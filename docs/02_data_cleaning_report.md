@@ -800,3 +800,37 @@ Clean `07` и `08` **не изменялись содержательно** в �
 | Metadata schema | По `docs/04_metadata_schema.md` |
 | Chunker smoke | См. отчет pytest |
 | Frozen T055 expected primary | **Не изменялся** |
+
+---
+
+## Stage 4B.5 — документ `15_conflicting_rules_and_remedy_priority` (2026-06-24)
+
+| Параметр | Значение |
+|----------|----------|
+| Тип источника | Synthetic internal cross-policy instruction (учебный проект) |
+| Raw | `data/01_raw/15_conflicting_rules_and_remedy_priority.txt` — создан |
+| Clean | `data/02_clean_markdown/15_conflicting_rules_and_remedy_priority.md` — создан |
+| Метаданные | `document_type: policy`, `source_type: internal_policy`, `category: remedy_priority`, `priority: high` |
+| Структура clean | **28** H2; правила **R-01…R-14**; матрица приоритетов; **14** примеров |
+| Связь с baseline | Не изменяет тексты `01`–`14`; консолидирует cross-policy sequence из `02`–`14` |
+| Индексация / retrieval | **Не выполнялась**; frozen benchmark **не пересчитывался** |
+| Chroma | Production index **не пересобирался** |
+| Статус expansion | **Source corpus expansion complete: 15 documents; production index not yet rebuilt; release validation pending** |
+
+### Содержательные принципы clean
+
+- Язык: русский, `е` вместо `ё`.
+- Не воспроизводит закон, банковские процедуры, card-network rules или реальные практики FoodFlow.
+- Явная лексика для retrieval: несколько проблем в одном обращении, конфликтующие правила, возврат и компенсация, чарджбэк и возврат, третий сбой подряд, нельзя обещать одновременно и др.
+- Разделение refund/replacement/compensation; safety-first sequence; primary vs supporting documents.
+- Иерархия: документ **15** первичен только для conflict/sequence; **08** — risk; domain docs — remedies.
+
+### Проверки stage 4B.5
+
+| Проверка | Статус |
+|----------|--------|
+| Парность raw ↔ clean | Подтверждена |
+| Уникальность `document_id` | Подтверждена |
+| Metadata schema | По `docs/04_metadata_schema.md` |
+| Chunker smoke | См. отчет pytest |
+| Frozen T023/T027/T053 expected primary | **Не изменялись** |

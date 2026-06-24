@@ -95,6 +95,12 @@ Release expansion (stage 4B.4):
 |----------|-----------|
 | `evidence` | `14_evidence_standards_and_incomplete_information` |
 
+Release expansion (stage 4B.5):
+
+| Значение | Документы |
+|----------|-----------|
+| `remedy_priority` | `15_conflicting_rules_and_remedy_priority` |
+
 ---
 
 ## Дополнительные метаданные чанка
@@ -203,6 +209,12 @@ Release expansion (stage 4B.4):
 | `document_id` | `category` | `document_type` | `priority` | `confidentiality` |
 |---------------|------------|-----------------|------------|-------------------|
 | `14_evidence_standards_and_incomplete_information` | `evidence` | `procedure` | `high` | `internal` |
+
+Release expansion (stage 4B.5):
+
+| `document_id` | `category` | `document_type` | `priority` | `confidentiality` |
+|---------------|------------|-----------------|------------|-------------------|
+| `15_conflicting_rules_and_remedy_priority` | `remedy_priority` | `policy` | `high` | `internal` |
 
 ---
 

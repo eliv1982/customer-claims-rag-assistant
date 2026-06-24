@@ -1,0 +1,58 @@
+FOODFLOW — ВНУТРЕННЯЯ ПОЛИТИКА
+Документ: 15_conflicting_rules_and_remedy_priority
+Версия: 1.0.0
+Статус: действует
+Дата: 2026-06-24
+
+КОНФЛИКТУЮЩИЕ ПРАВИЛА И ПРИОРИТЕТ МЕР УРЕГУЛИРОВАНИЯ
+
+1. НАЗНАЧЕНИЕ
+Политика определяет, как first-line support обрабатывает одно обращение, когда одновременно применимы несколько правил FoodFlow: безопасность, риск, доказательства, доставка, возврат, компенсация, отмена, платежный спор, угроза персоналу, физическая опасность. Учебный документ; не воспроизводит закон, банковские процедуры или реальные практики FoodFlow.
+
+2. ПРАВИЛА R-01 — R-14 (кратко)
+R-01: составное обращение — выделить каждую проблему; не сводить к одной категории; сохранить максимальный риск; связать в одной регистрации где допустимо; первичный документ на каждую проблему; не терять safety за refund.
+R-02: порядок — immediate safety/security → risk/handoff (08) → регистрация → безопасные доказательства (14) → проверка → domain remedy (02–06) → коммуникация (09).
+R-03: safety/security (13,11,12,08, tampering high) — сначала регистрация и handoff; не обещать refund/comp/replacement до review; финансовый запрос сохранить; не отклонять финансы только из-за приоритета safety.
+R-04: refund vs replacement — разные меры; предпочтение клиента учитывается; не обещать оба автоматически; domain policy; handoff при неясности.
+R-05: refund ≠ compensation; 04 и 05 отдельно; оба запроса не означают оба доступны; компенсация не замена refund review.
+R-06: late change/cancel (03) + compensation (05) — раздельно; denied late change ≠ auto compensation; T023 pattern.
+R-07: internal refund + chargeback/bank (11 first); без противоречивых параллельных обещаний; 04 для refund policy.
+R-08: hazard (13) + money — 13/08 first; evidence 13/14; финансы 04/05 later; не торговаться до safety handoff.
+R-09: staff threat (12) + service — 12/08 first; защита данных; service complaint register; no employee data exchange.
+R-10: disputed delivery + incomplete evidence — 14 neutral; 02 delivery; no fault; escalate; no refund promise before verification.
+R-11: partial delivery + outage — разделить fulfilled vs undelivered; 02/03/04; не считать outage proof of permanent impossibility; register; escalate repeats via 08.
+R-12: repeated failures — count/sequence; preserve IDs; 08 escalation; don't merge incidents; no auto compensation; 15 sequence + 08 risk.
+R-13: unclear conflict — no new rule; name docs; register facts; highest risk route; specialist; no definitive promises.
+R-14: no contradictory promises — refund+replacement unconfirmed; refund+bank guarantee; compensation+denial; immediate+investigation; employee data+safety; reject+collect evidence.
+
+3. МАТРИЦА
+Опасный предмет + refund: 13+08, 14, 04/05
+Unauthorized + refund: 11+08, 14, 04
+Threat + delivery: 12+08, 02/14, 02/04/05
+Tampering + no photo: 06/08, 14, 04
+Delivered disputed: 14, 02, 04
+Late cancel + compensation: 03, 05
+Partial plan + outage: 02, 03/14/08, 04/05
+Repeated + refund: 08/15, 02/14, 04/05
+
+4. ПЕРВИЧНЫЙ И ВСПОМОГАТЕЛЬНЫЙ ДОКУМЕНТ
+15 — primary только для sequence/conflict; domain docs остаются primary для своих решений.
+
+5. ПРИМЕРЫ (14)
+1) tampered + refund + no photo
+2) metal + compensation
+3) tooth + refund
+4) unauthorized + undelivered
+5) chargeback + refund
+6) threat + compensation
+7) courier address demand
+8) late cancel + compensation
+9) partial + outage
+10) third failure + refund
+11) delivered + no screenshot
+12) courier vs customer conflict
+13) spoiled + discarded packaging
+14) multiple unclear priority
+
+6. ИЕРАРХИЯ
+15 — conflict/sequence only; 08 risk; 14 evidence; 11 payments; 12 staff; 13 hazard; 02–06 domain; 07 registration; 09 style.

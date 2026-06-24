@@ -10,7 +10,7 @@
 
 База знаний состоит из **10 документов MVP-бaseline** (приняты на 2026-06-20). Исходные файлы размещаются в `data/01_raw/` (формат `.txt`), очищенные версии — в `data/02_clean_markdown/` (формат `.md`).
 
-**Release expansion (stage 4B.1, 2026-06-24):** добавлен документ `11_payment_security_and_dispute_handling`. **Release expansion (stage 4B.2, 2026-06-24):** добавлен документ `13_physical_hazard_and_foreign_body_protocol`. **Release expansion (stage 4B.3, 2026-06-24):** добавлен документ `12_staff_safety_and_threat_handling`. **Release expansion (stage 4B.4, 2026-06-24):** добавлен документ `14_evidence_standards_and_incomplete_information`. Индексация и retrieval-benchmark **ещё не пересчитывались** на расширенный корпус; frozen evaluation по-прежнему относится к 10-документному индексу.
+**Release expansion (stage 4B.1, 2026-06-24):** добавлен документ `11_payment_security_and_dispute_handling`. **Release expansion (stage 4B.2, 2026-06-24):** добавлен документ `13_physical_hazard_and_foreign_body_protocol`. **Release expansion (stage 4B.3, 2026-06-24):** добавлен документ `12_staff_safety_and_threat_handling`. **Release expansion (stage 4B.4, 2026-06-24):** добавлен документ `14_evidence_standards_and_incomplete_information`. **Release expansion (stage 4B.5, 2026-06-24):** добавлен документ `15_conflicting_rules_and_remedy_priority`. **Source corpus expansion complete: 15 documents.** Индексация и retrieval-benchmark **ещё не пересчитывались** на расширенный корпус; **production index not yet rebuilt**; **release validation pending**; frozen evaluation по-прежнему относится к 10-документному индексу.
 
 **Статус на 2026-06-20 (финальная приемка, вердикт `PASS WITH MINOR NOTES`):**
 
@@ -65,7 +65,13 @@
 |---------------|-------------------------|-----------------|----------------|-------------------|
 | `14_evidence_standards_and_incomplete_information` | `evidence` | `procedure` | `internal_procedure` | `internal` |
 
-Поле `document_id` **обязательно совпадает** с именем файла без расширения. Версия документов первой партии: `1.0.0` (SemVer). Документы `11`–`14` также используют `1.0.0`.
+### Release expansion (stage 4B.5)
+
+| `document_id` | Каноническая `category` | `document_type` | `source_type` | `confidentiality` |
+|---------------|-------------------------|-----------------|----------------|-------------------|
+| `15_conflicting_rules_and_remedy_priority` | `remedy_priority` | `policy` | `internal_policy` | `internal` |
+
+Поле `document_id` **обязательно совпадает** с именем файла без расширения. Версия документов первой партии: `1.0.0` (SemVer). Документы `11`–`15` также используют `1.0.0`.
 
 ---
 
@@ -110,6 +116,12 @@
 |---|-----------|----------|--------|-------------------------------------|--------------------|------------|
 | 14 | `14_evidence_standards_and_incomplete_information` | Стандарты доказательств и работа с неполными сведениями | **Подготовлен (stage 4B.4); индексация не выполнялась** | 1500–2200 / 2000–2800 | 25 H2; E-01…E-10; матрица доказательств; 12 примеров | Да, 10% |
 
+### Release expansion (stage 4B.5)
+
+| № | Имя файла | Название | Статус | Целевой объем (raw / clean, слов) | Стратегия чанкинга | Перекрытие |
+|---|-----------|----------|--------|-------------------------------------|--------------------|------------|
+| 15 | `15_conflicting_rules_and_remedy_priority` | Конфликтующие правила и приоритет мер урегулирования | **Подготовлен (stage 4B.5); индексация не выполнялась** | 1400–2000 / 2200–3000 | 28 H2; R-01…R-14; матрица приоритетов; 14 примеров | Да, 10% |
+
 ---
 
 ## Примененная стратегия чанкинга (документы 01–03)
@@ -132,7 +144,7 @@
 | `05_compensation_policy` | 10 H2, 3 H3; запрет фиксированных сумм и авто-компенсации; примеры в одном разделе | 11–13 |
 | `06_food_quality_and_packaging` | 17 H2, 6 H3; уровни риска medium/high/critical; безопасные медицинские рекомендации отдельно от возврата | 17–20 |
 
-`priority` по схеме `docs/04_metadata_schema.md`: **critical** — `04_refund_policy`, `05_compensation_policy`, `08_escalation_and_risk_rules`, `11_payment_security_and_dispute_handling`, `12_staff_safety_and_threat_handling`, `13_physical_hazard_and_foreign_body_protocol`; **high** — `01–03`, `06_food_quality_and_packaging`, `07_complaint_handling_procedure`, `09_response_style_and_templates`, `14_evidence_standards_and_incomplete_information`; **medium** — `10_customer_faq`. Поле `priority` документа **не равно** `risk_level` обращения.
+`priority` по схеме `docs/04_metadata_schema.md`: **critical** — `04_refund_policy`, `05_compensation_policy`, `08_escalation_and_risk_rules`, `11_payment_security_and_dispute_handling`, `12_staff_safety_and_threat_handling`, `13_physical_hazard_and_foreign_body_protocol`; **high** — `01–03`, `06_food_quality_and_packaging`, `07_complaint_handling_procedure`, `09_response_style_and_templates`, `14_evidence_standards_and_incomplete_information`, `15_conflicting_rules_and_remedy_priority`; **medium** — `10_customer_faq`. Поле `priority` документа **не равно** `risk_level` обращения.
 
 ---
 
@@ -211,6 +223,18 @@
 `source_type`: `internal_procedure`. `category`: `evidence`. `priority`: **high** — документ **первичен** для стандартов доказательств и неполных сведений; не заменяет `07` по общей регистрации. Индексация **не выполнялась**.
 
 **Clean `14_evidence_standards_and_incomplete_information` (2026-06-24, stage 4B.4):** synthetic internal procedure; индексация **не выполнялась**.
+
+---
+
+## Примененная стратегия чанкинга (release expansion, документ 15)
+
+| Документ | Принцип | Ожидаемое число качественных чанков |
+|----------|---------|-------------------------------------|
+| `15_conflicting_rules_and_remedy_priority` | **28** H2; правила R-01…R-14; матрица приоритетов; **14** примеров; retrieval-лексика (несколько проблем в одном обращении, конфликтующие правила, возврат и компенсация, чарджбэк и возврат) | **25–29** |
+
+`source_type`: `internal_policy`. `category`: `remedy_priority`. `priority`: **high** — документ **первичен** только для conflict resolution, sequencing и multi-issue decomposition; не заменяет domain policies. Индексация **не выполнялась**. **Source corpus expansion complete: 15 documents; production index not yet rebuilt; release validation pending.**
+
+**Clean `15_conflicting_rules_and_remedy_priority` (2026-06-24, stage 4B.5):** synthetic internal cross-policy instruction; индексация **не выполнялась**.
 
 ---
 

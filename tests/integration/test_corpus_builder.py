@@ -14,7 +14,7 @@ ARCHIVE_MARKERS = ("УСТАРЕЛО", "АРХИВ", "УДАЛИТЬ")
 FAQ_PREAMBLE_PHRASE = "не заменяет профильные политики FoodFlow"
 FORBIDDEN_TRAILING_PHRASE = "не должны попадать в retrieval как самостоятельные инструкции"
 BASELINE_DOC_COUNT = 10
-RELEASE_EXPANSION_DOC_COUNT = 4
+RELEASE_EXPANSION_DOC_COUNT = 5
 EXPECTED_DOC_COUNT = BASELINE_DOC_COUNT + RELEASE_EXPANSION_DOC_COUNT
 
 EXPECTED_DOC_IDS = [
@@ -39,6 +39,7 @@ EXPECTED_DOC_IDS = [
     "12_staff_safety_and_threat_handling",
     "13_physical_hazard_and_foreign_body_protocol",
     "14_evidence_standards_and_incomplete_information",
+    "15_conflicting_rules_and_remedy_priority",
 ]
 
 
@@ -392,6 +393,158 @@ def test_evidence_safe_vs_prohibited_evidence(
     assert "cvv" in e08_text
     assert "полный номер карты" in e08_text
     assert "замаскирован" in e08_text or "маскирован" in e08_text
+
+
+REMEDY_PRIORITY_TERMS = (
+    "несколько проблем в одном обращении",
+    "конфликтующие правила",
+    "возврат и компенсация",
+    "чарджбэк и возврат",
+    "нельзя обещать одновременно",
+    "приоритет мер",
+    "третий сбой подряд",
+    "угроза курьеру и жалоба на доставку",
+)
+
+REMEDY_PRIORITY_RULE_MARKERS = tuple(f"R-{index:02d}" for index in range(1, 15))
+
+MULTI_ISSUE_VOCABULARY = (
+    "поздн",
+    "компенсация не предоставляется автоматически",
+    "вскрыт",
+    "повторные нарушения",
+)
+
+
+def test_remedy_priority_document_terms(builder: CorpusBuilder, clean_input: Path) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    remedy_chunks = [
+        c for c in chunks if c.document_id == "15_conflicting_rules_and_remedy_priority"
+    ]
+    assert len(remedy_chunks) == 28
+    combined = "\n".join(c.content for c in remedy_chunks)
+    combined_lower = combined.lower()
+    for term in REMEDY_PRIORITY_TERMS:
+        assert term in combined_lower
+    for marker in REMEDY_PRIORITY_RULE_MARKERS:
+        assert marker in combined
+
+
+def test_remedy_priority_multi_issue_vocabulary_outside_examples(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    policy_chunks = [
+        c
+        for c in chunks
+        if c.document_id == "15_conflicting_rules_and_remedy_priority"
+        and "Пример" not in (c.heading or "")
+    ]
+    assert policy_chunks
+    combined_lower = "\n".join(c.content for c in policy_chunks).lower()
+    for term in MULTI_ISSUE_VOCABULARY:
+        assert term in combined_lower
+
+
+def test_remedy_priority_safety_first_sequence(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    remedy_chunks = [
+        c for c in chunks if c.document_id == "15_conflicting_rules_and_remedy_priority"
+    ]
+    r02_chunks = [c for c in remedy_chunks if "R-02" in c.content]
+    r03_chunks = [c for c in remedy_chunks if "R-03" in c.content]
+    assert r02_chunks
+    assert r03_chunks
+    r02_text = "\n".join(c.content for c in r02_chunks).lower()
+    assert "безопасность" in r02_text or "security" in r02_text
+    assert "risk" in r02_text or "риск" in r02_text
+
+
+def test_remedy_priority_refund_vs_compensation_distinction(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    r05_chunks = [
+        c
+        for c in chunks
+        if c.document_id == "15_conflicting_rules_and_remedy_priority"
+        and "R-05" in c.content
+    ]
+    assert r05_chunks
+    r05_text = "\n".join(c.content for c in r05_chunks).lower()
+    assert "refund" in r05_text or "возврат" in r05_text
+    assert "compensation" in r05_text or "компенсац" in r05_text
+
+
+def test_remedy_priority_payment_dispute_vs_internal_refund(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    r07_chunks = [
+        c
+        for c in chunks
+        if c.document_id == "15_conflicting_rules_and_remedy_priority"
+        and "R-07" in c.content
+    ]
+    assert r07_chunks
+    r07_text = "\n".join(c.content for c in r07_chunks).lower()
+    assert "чарджбэк" in r07_text or "chargeback" in r07_text
+    assert "04" in r07_text or "refund" in r07_text or "возврат" in r07_text
+
+
+def test_remedy_priority_threat_plus_ordinary_complaint(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    r09_chunks = [
+        c
+        for c in chunks
+        if c.document_id == "15_conflicting_rules_and_remedy_priority"
+        and "R-09" in c.content
+    ]
+    assert r09_chunks
+    r09_text = "\n".join(c.content for c in r09_chunks).lower()
+    assert "12" in r09_text or "угроз" in r09_text
+
+
+def test_remedy_priority_primary_vs_supporting_documents(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    remedy_chunks = [
+        c for c in chunks if c.document_id == "15_conflicting_rules_and_remedy_priority"
+    ]
+    primary_chunks = [
+        c for c in remedy_chunks if "первичн" in c.content.lower() or "primary" in c.content.lower()
+    ]
+    assert primary_chunks
+    combined = "\n".join(c.content for c in primary_chunks).lower()
+    assert "13" in combined or "опасн" in combined
+    assert "15" in combined or "sequence" in combined or "порядок" in combined
+
+
+def test_remedy_priority_no_contradictory_promises(
+    builder: CorpusBuilder,
+    clean_input: Path,
+) -> None:
+    _, chunks = builder.build_from_directory(clean_input)
+    r14_chunks = [
+        c
+        for c in chunks
+        if c.document_id == "15_conflicting_rules_and_remedy_priority"
+        and "R-14" in c.content
+    ]
+    assert r14_chunks
+    r14_text = "\n".join(c.content for c in r14_chunks).lower()
+    assert "нельзя обещать одновременно" in r14_text
 
 
 def test_document_priority_not_request_risk(builder: CorpusBuilder, clean_input: Path) -> None:
