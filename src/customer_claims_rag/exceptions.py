@@ -82,3 +82,11 @@ class GenerationValidationError(GenerationError):
 
 class LLMCallError(GenerationError):
     """Chat model invocation failure."""
+
+
+class RiskAssessmentError(Exception):
+    """Base error for deterministic risk assessment pipeline."""
+
+
+class RiskValidationError(RiskAssessmentError):
+    """Deterministic risk result failed cross-field validation."""

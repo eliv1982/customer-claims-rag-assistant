@@ -5,6 +5,7 @@ Thumbs.db
 
 # Python generated artifacts
 __pycache__/
+build/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
