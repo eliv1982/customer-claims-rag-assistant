@@ -107,6 +107,14 @@ def validate_manifest_against_runtime(
             f"embedding model mismatch: manifest has {manifest.embedding_model!r}, "
             f"runtime expects {embedding_model!r}; rebuild the index"
         )
+    if manifest.chunk_count < 1:
+        raise IndexManifestError(
+            "index manifest declares an empty index: chunk_count must be at least 1"
+        )
+    if chunk_count < 1:
+        raise IndexManifestError(
+            "vector store collection is empty: expected at least 1 indexed chunk"
+        )
     if manifest.chunk_count != chunk_count:
         raise IndexManifestError(
             f"chunk count mismatch: manifest has {manifest.chunk_count}, "

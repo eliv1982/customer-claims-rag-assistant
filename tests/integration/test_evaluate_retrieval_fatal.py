@@ -119,9 +119,20 @@ def test_metadata_schema_mismatch_fatal(temp_project: Path, capsys) -> None:
 
 
 def test_chunk_count_mismatch_fatal(temp_project: Path, capsys) -> None:
+    from tests.retrieval_helpers import make_chunk_record
+
     index_dir = temp_project / "data" / "04_index"
+    provider = FakeEmbeddingProvider(model_name="fake-embedding-model", vector_dimension=8)
     store = ChromaVectorStore(index_dir=index_dir, collection_name="customer_claims")
     try:
+        chunks = [
+            make_chunk_record(chunk_id="a::1"),
+            make_chunk_record(chunk_id="b::1"),
+        ]
+        vectors = provider.embed_documents([chunk.content for chunk in chunks])
+        store.recreate_collection(embedding_dimension=8)
+        store.add_chunks(chunks, vectors)
+        assert store.count() == 2
         _write_manifest(index_dir, chunk_count=999)
     finally:
         store.close()

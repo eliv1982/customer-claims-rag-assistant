@@ -3,16 +3,63 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
+from customer_claims_rag import env_bootstrap
+from customer_claims_rag.generation_config import GenerationSettings
 from customer_claims_rag.retrieval_config import (
+    RetrievalSettings,
     validate_fetch_k,
     validate_similarity_threshold,
     validate_top_k,
 )
+
+DEFAULT_FROZEN_RETRIEVAL_CONFIG_RELATIVE = Path("configs") / "retrieval" / "vector_pool_expansion_v1.json"
+DEFAULT_RERANKER_CONFIG_RELATIVE = Path("configs") / "reranking" / "source_authority_v1.json"
+DEFAULT_FROZEN_RETRIEVAL_CONFIG_PATH = (
+    env_bootstrap.project_root() / DEFAULT_FROZEN_RETRIEVAL_CONFIG_RELATIVE
+)
+DEFAULT_RERANKER_CONFIG_PATH = (
+    env_bootstrap.project_root() / DEFAULT_RERANKER_CONFIG_RELATIVE
+)
+
+
+@dataclass(frozen=True)
+class ApplicationSettings:
+    """Aggregate application settings for production pipeline wiring."""
+
+    retrieval: RetrievalSettings
+    generation: GenerationSettings
+    frozen_retrieval_config_path: Path
+    reranker_config_path: Path
+
+    def __repr__(self) -> str:
+        api_key_state = "set" if self.retrieval.openai_api_key else "unset"
+        return (
+            "ApplicationSettings("
+            f"retrieval_index_dir={self.retrieval.index_dir!r}, "
+            f"retrieval_collection_name={self.retrieval.collection_name!r}, "
+            f"retrieval_embedding_model={self.retrieval.embedding_model!r}, "
+            f"openai_api_key={api_key_state!r}, "
+            f"generation_model_name={self.generation.model_name!r}, "
+            f"frozen_retrieval_config_path={self.frozen_retrieval_config_path!r}, "
+            f"reranker_config_path={self.reranker_config_path!r})"
+        )
+
+    @classmethod
+    def from_env(cls) -> ApplicationSettings:
+        root = env_bootstrap.project_root()
+        return cls(
+            retrieval=RetrievalSettings.from_env(),
+            generation=GenerationSettings.from_env(),
+            frozen_retrieval_config_path=root / DEFAULT_FROZEN_RETRIEVAL_CONFIG_RELATIVE,
+            reranker_config_path=root / DEFAULT_RERANKER_CONFIG_RELATIVE,
+        )
+
 
 _KNOWN_FROZEN_RETRIEVAL_CONFIG_KEYS = frozenset(
     {
