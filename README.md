@@ -36,6 +36,10 @@
 
 **Application layer (functional MVP)** — реализованы grounded generation, deterministic risk/handoff, citations и fallback handling; production composition root (`build_customer_claims_pipeline`), frozen retrieval `vector top-24 → source-authority-v1 → final top-12`, single-shot CLI (`answer-claim`) и локальный Streamlit UI.
 
+**Expanded corpus index (stage 4C.1)** — production index пересобран на 15 документов / 333 chunks; historical 10-document backup сохранён локально.
+
+**Expanded corpus frozen regression (stage 4C.2)** — frozen 60-question regression выполнен для historical 10-document и production 15-document index arms; артефакт `expanded_corpus_frozen_regression_v1`. **Retrieval release validation (stage 4C.3) ещё не выполнен.** Extension-set coverage для новых policy documents остаётся pending.
+
 **Functional MVP complete:** production retrieval, grounded generation, deterministic risk/handoff, single-shot CLI и локальный Streamlit interface реализованы и покрыты тестами. Deployment и production operations **не** входят в текущий scope.
 
 **Еще не реализованы:** deployment/operations, authentication, chat history, document upload из UI, feedback collection, query rewriting, production threshold auto-selection.
