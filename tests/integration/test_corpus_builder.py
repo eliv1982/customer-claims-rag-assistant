@@ -123,6 +123,41 @@ def test_stats_json_created(builder: CorpusBuilder, clean_input: Path, temp_proj
     assert "average_tokens" in loaded
 
 
+def _repo_chunk_artifact_paths(project_root: Path) -> dict[str, Path]:
+    chunks_dir = project_root / "data" / "03_chunks"
+    return {
+        "chunks.jsonl": chunks_dir / "chunks.jsonl",
+        "chunk_stats.json": chunks_dir / "chunk_stats.json",
+    }
+
+
+def _snapshot_repo_chunk_artifacts(project_root: Path) -> dict[str, tuple[bool, bytes | None]]:
+    snapshot: dict[str, tuple[bool, bytes | None]] = {}
+    for name, path in _repo_chunk_artifact_paths(project_root).items():
+        if path.exists():
+            snapshot[name] = (True, path.read_bytes())
+        else:
+            snapshot[name] = (False, None)
+    return snapshot
+
+
+def _assert_repo_chunk_artifacts_unchanged(
+    project_root: Path,
+    before: dict[str, tuple[bool, bytes | None]],
+) -> None:
+    for name, path in _repo_chunk_artifact_paths(project_root).items():
+        existed_before, content_before = before[name]
+        exists_after = path.exists()
+        assert exists_after == existed_before, (
+            f"repo-root artifact {name} existence changed: "
+            f"before={existed_before}, after={exists_after}"
+        )
+        if existed_before:
+            assert path.read_bytes() == content_before, (
+                f"repo-root artifact {name} contents changed"
+            )
+
+
 def test_does_not_write_to_project_data_dir(
     builder: CorpusBuilder,
     clean_input: Path,
@@ -131,8 +166,54 @@ def test_does_not_write_to_project_data_dir(
 ) -> None:
     out = temp_project / "data" / "03_chunks" / "chunks.jsonl"
     stats = temp_project / "data" / "03_chunks" / "chunk_stats.json"
+    before = _snapshot_repo_chunk_artifacts(project_root)
+    documents, chunks, exported_stats = builder.build_and_export(clean_input, out, stats)
+    assert out.is_file()
+    assert stats.is_file()
+    assert len(documents) == EXPECTED_DOC_COUNT
+    assert len(chunks) > 0
+    assert exported_stats.chunks_total == len(chunks)
+    _assert_repo_chunk_artifacts_unchanged(project_root, before)
+
+
+def test_does_not_modify_existing_repo_chunk_artifacts(
+    builder: CorpusBuilder,
+    clean_input: Path,
+    temp_project: Path,
+    project_root: Path,
+) -> None:
+    repo_paths = _repo_chunk_artifact_paths(project_root)
+    if not repo_paths["chunks.jsonl"].exists():
+        pytest.skip("repo-root chunks.jsonl absent; immutability covered when present")
+    before = _snapshot_repo_chunk_artifacts(project_root)
+    out = temp_project / "data" / "03_chunks" / "chunks.jsonl"
+    stats = temp_project / "data" / "03_chunks" / "chunk_stats.json"
     builder.build_and_export(clean_input, out, stats)
-    assert not (project_root / "data" / "03_chunks" / "chunks.jsonl").exists()
+    assert out.is_file()
+    _assert_repo_chunk_artifacts_unchanged(project_root, before)
+
+
+def test_assertion_detects_repo_chunk_content_change(project_root: Path) -> None:
+    paths = _repo_chunk_artifact_paths(project_root)
+    if not paths["chunks.jsonl"].exists():
+        pytest.skip("requires existing repo-root chunks.jsonl")
+    before = _snapshot_repo_chunk_artifacts(project_root)
+    original = paths["chunks.jsonl"].read_bytes()
+    try:
+        paths["chunks.jsonl"].write_bytes(b"CORPUS_BUILDER_ISOLATION_TEST_SENTINEL\n")
+        with pytest.raises(AssertionError, match="contents changed"):
+            _assert_repo_chunk_artifacts_unchanged(project_root, before)
+    finally:
+        paths["chunks.jsonl"].write_bytes(original)
+
+
+def test_assertion_detects_new_repo_chunk_file(tmp_path: Path) -> None:
+    before = _snapshot_repo_chunk_artifacts(tmp_path)
+    chunks_path = tmp_path / "data" / "03_chunks" / "chunks.jsonl"
+    chunks_path.parent.mkdir(parents=True)
+    chunks_path.write_bytes(b"new")
+    with pytest.raises(AssertionError, match="existence changed"):
+        _assert_repo_chunk_artifacts_unchanged(tmp_path, before)
 
 
 def test_source_files_unchanged(builder: CorpusBuilder, clean_input: Path) -> None:

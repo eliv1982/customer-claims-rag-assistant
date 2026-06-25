@@ -10,8 +10,6 @@ import chromadb
 from customer_claims_rag.exceptions import DuplicateChunkIdError, IndexManifestError, VectorStoreError
 from customer_claims_rag.retrieval.manifest import load_manifest
 
-EXPECTED_CHUNK_COUNT = 215
-
 
 @dataclass(frozen=True)
 class LexicalChunk:
@@ -34,10 +32,8 @@ def load_lexical_corpus_from_chroma(
 ) -> list[LexicalChunk]:
     """Load and validate all chunks from a persistent Chroma collection."""
     manifest = load_manifest(index_dir)
-    if manifest.chunk_count != EXPECTED_CHUNK_COUNT:
-        raise IndexManifestError(
-            f"expected {EXPECTED_CHUNK_COUNT} chunks, manifest reports {manifest.chunk_count}"
-        )
+    if manifest.chunk_count < 1:
+        raise IndexManifestError("manifest declares an empty index")
     if expected_fingerprint is not None and manifest.corpus_fingerprint != expected_fingerprint:
         raise IndexManifestError("corpus fingerprint mismatch between manifest and experiment")
 
@@ -48,8 +44,10 @@ def load_lexical_corpus_from_chroma(
         raise VectorStoreError(f"failed to open Chroma collection: {exc}") from exc
 
     count = int(collection.count())
-    if count != EXPECTED_CHUNK_COUNT:
-        raise IndexManifestError(f"expected {EXPECTED_CHUNK_COUNT} chunks, Chroma has {count}")
+    if count != manifest.chunk_count:
+        raise IndexManifestError(
+            f"chunk count mismatch: manifest has {manifest.chunk_count}, Chroma has {count}"
+        )
 
     try:
         result = collection.get(include=["documents", "metadatas"])

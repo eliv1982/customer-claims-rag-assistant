@@ -15,10 +15,7 @@ from customer_claims_rag.evaluation.hybrid_metrics import (
 from customer_claims_rag.evaluation.hybrid_models import HybridEvaluationRun
 from customer_claims_rag.exceptions import EvaluationOutputError, IndexManifestError
 from customer_claims_rag.retrieval.lexical.bm25 import BM25Index, LexicalHit
-from customer_claims_rag.retrieval.lexical.corpus_loader import (
-    EXPECTED_CHUNK_COUNT,
-    load_lexical_corpus_from_chroma,
-)
+from customer_claims_rag.retrieval.lexical.corpus_loader import load_lexical_corpus_from_chroma
 from customer_claims_rag.retrieval.lexical.preprocessor import TOKENIZER_VERSION
 from customer_claims_rag.retrieval.lexical.retriever import LexicalRetriever
 
@@ -33,11 +30,20 @@ def validate_lexical_replay_invariants(run: HybridEvaluationRun) -> None:
         raise LexicalReplayInvariantError(
             f"hybrid config hash mismatch: {run.experiment.config_hash}"
         )
+    shared = run.shared_context
     lexical = run.lexical_index
-    if lexical.chunk_count != EXPECTED_CHUNK_COUNT:
+    if shared.chunk_count is None or shared.chunk_count < 1:
+        raise LexicalReplayInvariantError("shared_context.chunk_count must be >= 1")
+    if lexical.chunk_count < 1:
+        raise LexicalReplayInvariantError("lexical_index.chunk_count must be >= 1")
+    if shared.chunk_count != lexical.chunk_count:
         raise LexicalReplayInvariantError(
-            f"expected chunk_count={EXPECTED_CHUNK_COUNT}, got {lexical.chunk_count}"
+            "artifact chunk count mismatch: "
+            f"shared_context has {shared.chunk_count}, "
+            f"lexical_index has {lexical.chunk_count}"
         )
+    if shared.document_count is not None and shared.document_count < 1:
+        raise LexicalReplayInvariantError("shared_context.document_count must be >= 1")
     if lexical.tokenizer_version != TOKENIZER_VERSION:
         raise LexicalReplayInvariantError(
             f"tokenizer version mismatch: {lexical.tokenizer_version}"
@@ -57,18 +63,32 @@ def build_frozen_lexical_retriever(
     index_dir: Path,
     collection_name: str,
     expected_corpus_fingerprint: str,
+    expected_chunk_count: int,
     bm25_k1: float,
     bm25_b: float,
     expected_lexical_index_fingerprint: str,
+    expected_document_count: int | None = None,
 ) -> LexicalRetriever:
     """Build BM25 index from Chroma corpus without embeddings or vector search."""
+    if expected_chunk_count < 1:
+        raise IndexManifestError("expected_chunk_count must be >= 1")
     chunks = load_lexical_corpus_from_chroma(
         index_dir=index_dir,
         collection_name=collection_name,
         expected_fingerprint=expected_corpus_fingerprint,
     )
-    if len(chunks) != EXPECTED_CHUNK_COUNT:
-        raise IndexManifestError(f"expected {EXPECTED_CHUNK_COUNT} chunks, loaded {len(chunks)}")
+    if len(chunks) != expected_chunk_count:
+        raise IndexManifestError(
+            "artifact replay corpus count mismatch: "
+            f"expected {expected_chunk_count}, loaded {len(chunks)}"
+        )
+    if expected_document_count is not None:
+        loaded_document_count = len({chunk.document_id for chunk in chunks})
+        if loaded_document_count != expected_document_count:
+            raise IndexManifestError(
+                "artifact replay document count mismatch: "
+                f"expected {expected_document_count}, loaded {loaded_document_count}"
+            )
     index = BM25Index(chunks, k1=bm25_k1, b=bm25_b)
     fingerprint = index.compute_fingerprint(corpus_fingerprint=expected_corpus_fingerprint)
     if fingerprint != expected_lexical_index_fingerprint:
@@ -136,9 +156,11 @@ def run_exact_lexical_pool_reconstruction(
         index_dir=index_dir,
         collection_name=resolved_collection,
         expected_corpus_fingerprint=run.lexical_index.corpus_fingerprint,
+        expected_chunk_count=run.lexical_index.chunk_count,
         bm25_k1=run.lexical_index.bm25_k1,
         bm25_b=run.lexical_index.bm25_b,
         expected_lexical_index_fingerprint=run.lexical_index.lexical_index_fingerprint,
+        expected_document_count=run.shared_context.document_count,
     )
     pools = replay_exact_lexical_pools(run, retriever)
     updated = apply_exact_lexical_pools_to_run(run, pools)

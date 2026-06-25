@@ -24,9 +24,11 @@ from customer_claims_rag.evaluation.hybrid_metrics import (
 )
 from customer_claims_rag.evaluation.hybrid_models import HybridEvaluationRun
 from customer_claims_rag.evaluation.hybrid_reporting import rebuild_report_from_artifact
+from customer_claims_rag.exceptions import IndexManifestError
 from customer_claims_rag.retrieval.lexical.bm25 import LexicalHit
 from customer_claims_rag.retrieval.lexical.corpus_loader import LexicalChunk
 from customer_claims_rag.retrieval.lexical.preprocessor import TOKENIZER_VERSION
+from customer_claims_rag.retrieval.manifest import load_manifest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT = PROJECT_ROOT / "data" / "05_evaluation" / "hybrid_lexical_vector_v1.json"
@@ -87,6 +89,83 @@ def test_validate_rejects_bm25_mismatch(frozen_run: HybridEvaluationRun) -> None
     )
     with pytest.raises(LexicalReplayInvariantError, match="BM25"):
         validate_lexical_replay_invariants(bad)
+
+
+def test_validate_accepts_frozen_artifact_metadata(frozen_run: HybridEvaluationRun) -> None:
+    validate_lexical_replay_invariants(frozen_run)
+    assert frozen_run.shared_context.chunk_count == frozen_run.lexical_index.chunk_count
+    assert frozen_run.shared_context.chunk_count == 215
+    assert frozen_run.shared_context.document_count == 10
+
+
+def test_validate_rejects_zero_shared_chunk_count(frozen_run: HybridEvaluationRun) -> None:
+    bad = frozen_run.model_copy(
+        update={
+            "shared_context": frozen_run.shared_context.model_copy(update={"chunk_count": 0})
+        }
+    )
+    with pytest.raises(LexicalReplayInvariantError, match="shared_context.chunk_count"):
+        validate_lexical_replay_invariants(bad)
+
+
+def test_validate_rejects_zero_lexical_chunk_count(frozen_run: HybridEvaluationRun) -> None:
+    bad = frozen_run.model_copy(
+        update={
+            "lexical_index": frozen_run.lexical_index.model_copy(update={"chunk_count": 0})
+        }
+    )
+    with pytest.raises(LexicalReplayInvariantError, match="lexical_index.chunk_count"):
+        validate_lexical_replay_invariants(bad)
+
+
+def test_validate_rejects_mismatched_artifact_chunk_counts(
+    frozen_run: HybridEvaluationRun,
+) -> None:
+    bad = frozen_run.model_copy(
+        update={
+            "lexical_index": frozen_run.lexical_index.model_copy(update={"chunk_count": 216})
+        }
+    )
+    with pytest.raises(LexicalReplayInvariantError, match="artifact chunk count mismatch"):
+        validate_lexical_replay_invariants(bad)
+
+
+def test_build_rejects_loaded_replay_count_mismatch(frozen_run: HybridEvaluationRun) -> None:
+    short_corpus = [_chunk("doc::chunk-001")]
+    with patch(
+        "customer_claims_rag.evaluation.hybrid_lexical_replay.load_lexical_corpus_from_chroma",
+        return_value=short_corpus,
+    ):
+        with pytest.raises(IndexManifestError, match="artifact replay corpus count mismatch"):
+            build_frozen_lexical_retriever(
+                index_dir=INDEX_DIR,
+                collection_name="customer_claims",
+                expected_corpus_fingerprint=frozen_run.lexical_index.corpus_fingerprint,
+                expected_chunk_count=frozen_run.lexical_index.chunk_count,
+                bm25_k1=1.5,
+                bm25_b=0.75,
+                expected_lexical_index_fingerprint=frozen_run.lexical_index.lexical_index_fingerprint,
+                expected_document_count=frozen_run.shared_context.document_count,
+            )
+
+
+def test_build_rejects_loaded_document_count_mismatch(frozen_run: HybridEvaluationRun) -> None:
+    corpus = [_chunk(f"doc-{index}::chunk-001") for index in range(frozen_run.lexical_index.chunk_count)]
+    with patch(
+        "customer_claims_rag.evaluation.hybrid_lexical_replay.load_lexical_corpus_from_chroma",
+        return_value=corpus,
+    ):
+        with pytest.raises(IndexManifestError, match="artifact replay document count mismatch"):
+            build_frozen_lexical_retriever(
+                index_dir=INDEX_DIR,
+                collection_name="customer_claims",
+                expected_corpus_fingerprint=frozen_run.lexical_index.corpus_fingerprint,
+                expected_chunk_count=frozen_run.lexical_index.chunk_count,
+                bm25_k1=1.5,
+                bm25_b=0.75,
+                expected_lexical_index_fingerprint=frozen_run.lexical_index.lexical_index_fingerprint,
+                expected_document_count=frozen_run.shared_context.document_count,
+            )
 
 
 def test_lexical_top24_length_and_order_deterministic() -> None:
@@ -151,9 +230,11 @@ def test_corpus_fingerprint_mismatch_rejects_replay(frozen_run: HybridEvaluation
                 index_dir=INDEX_DIR,
                 collection_name="customer_claims",
                 expected_corpus_fingerprint=frozen_run.lexical_index.corpus_fingerprint,
+                expected_chunk_count=frozen_run.lexical_index.chunk_count,
                 bm25_k1=1.5,
                 bm25_b=0.75,
                 expected_lexical_index_fingerprint=frozen_run.lexical_index.lexical_index_fingerprint,
+                expected_document_count=frozen_run.shared_context.document_count,
             )
 
 
@@ -161,6 +242,14 @@ def test_corpus_fingerprint_mismatch_rejects_replay(frozen_run: HybridEvaluation
 def test_run_exact_lexical_pool_reconstruction_live(frozen_run: HybridEvaluationRun) -> None:
     if frozen_run.experiment.config_hash != FROZEN_HYBRID_CONFIG_HASH:
         pytest.skip("artifact config hash mismatch")
+    if not INDEX_DIR.exists():
+        pytest.skip("local Chroma index required")
+    manifest = load_manifest(INDEX_DIR)
+    if manifest.corpus_fingerprint != frozen_run.lexical_index.corpus_fingerprint:
+        pytest.skip(
+            "exact replay requires the frozen hybrid artifact corpus fingerprint; "
+            "production index differs"
+        )
     updated, before, after = run_exact_lexical_pool_reconstruction(
         artifact_path=ARTIFACT,
         index_dir=INDEX_DIR,
