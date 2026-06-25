@@ -15,9 +15,11 @@ from customer_claims_rag.evaluation.diversity_metrics import (
     load_vector_pool_cap_config,
 )
 from customer_claims_rag.evaluation.diversity_models import (
+    ArmReachabilityConsistency,
     CapPoolDiagnostics,
     DiversityCaseResult,
     PoolArmSnapshot,
+    ReachabilityConsistencySummary,
 )
 from customer_claims_rag.evaluation.diversity_pool import apply_per_document_cap
 from customer_claims_rag.evaluation.models import AggregateMetrics
@@ -158,6 +160,30 @@ def _reachability(
     )
 
 
+def _consistency_summary(
+    reachability: ReachabilityComparison,
+    *,
+    baseline_unreachable: list[str] | None = None,
+    candidate_unreachable: list[str] | None = None,
+) -> ReachabilityConsistencySummary:
+    baseline_unreachable = baseline_unreachable or []
+    candidate_unreachable = candidate_unreachable or []
+    return ReachabilityConsistencySummary(
+        baseline=ArmReachabilityConsistency(
+            primary_reachable_count=reachability.baseline_primary_reachable,
+            primary_denominator=reachability.baseline_primary_total,
+            primary_unreachable_case_ids=sorted(baseline_unreachable),
+            fully_unreachable_case_ids=reachability.baseline_fully_unreachable_cases,
+        ),
+        candidate=ArmReachabilityConsistency(
+            primary_reachable_count=reachability.candidate_primary_reachable,
+            primary_denominator=reachability.candidate_primary_total,
+            primary_unreachable_case_ids=sorted(candidate_unreachable),
+            fully_unreachable_case_ids=reachability.candidate_fully_unreachable_cases,
+        ),
+    )
+
+
 def test_config_loads_and_reranker_hash_matches() -> None:
     config = load_vector_pool_cap_config(CONFIG)
     assert config.experiment_id == "vector-pool-36-cap4-v1"
@@ -167,10 +193,15 @@ def test_config_loads_and_reranker_hash_matches() -> None:
 
 
 def test_acceptance_rejected_when_any_criterion_fails() -> None:
+    reachability = _reachability()
     checks, hard, verdict, _ = evaluate_diversity_acceptance(
         baseline_metrics=_aggregate(),
         candidate_metrics=_aggregate(primary_hit4=0.60),
-        reachability=_reachability(),
+        reachability=reachability,
+        reachability_consistency=_consistency_summary(
+            reachability,
+            candidate_unreachable=["T044", "T047"],
+        ),
         faq_comparison=MagicMock(candidate_questions_with_faq_in_top4=36),
         case_results=[],
         reranker_config_hash=FROZEN_RERANKER_CONFIG_HASH,
@@ -181,10 +212,18 @@ def test_acceptance_rejected_when_any_criterion_fails() -> None:
 
 
 def test_unreachable_guardrail_checked_explicitly() -> None:
+    reachability = _reachability(
+        candidate_primary=54,
+        candidate_unreachable=["T044", "T047", "T099"],
+    )
     checks, hard, _, _ = evaluate_diversity_acceptance(
         baseline_metrics=_aggregate(),
         candidate_metrics=_aggregate(primary_hit4=0.63, mrr=0.65),
-        reachability=_reachability(candidate_unreachable=["T044", "T047", "T099"]),
+        reachability=reachability,
+        reachability_consistency=_consistency_summary(
+            reachability,
+            candidate_unreachable=["T044", "T047", "T099"],
+        ),
         faq_comparison=MagicMock(candidate_questions_with_faq_in_top4=30),
         case_results=[],
         reranker_config_hash=FROZEN_RERANKER_CONFIG_HASH,
@@ -196,10 +235,15 @@ def test_unreachable_guardrail_checked_explicitly() -> None:
 
 
 def test_faq_hard_regression_flagged() -> None:
+    reachability = _reachability()
     _, hard, _, _ = evaluate_diversity_acceptance(
         baseline_metrics=_aggregate(),
         candidate_metrics=_aggregate(primary_hit4=0.63, mrr=0.65),
-        reachability=_reachability(),
+        reachability=reachability,
+        reachability_consistency=_consistency_summary(
+            reachability,
+            candidate_unreachable=["T044", "T047"],
+        ),
         faq_comparison=MagicMock(candidate_questions_with_faq_in_top4=41),
         case_results=[],
         reranker_config_hash=FROZEN_RERANKER_CONFIG_HASH,

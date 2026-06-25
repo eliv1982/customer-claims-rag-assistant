@@ -1,9 +1,9 @@
 # Vector pool cap A/B: vector-pool-36-cap4-v1
 
-**Timestamp:** 2026-06-25T18:57:51.327371+00:00
+**Timestamp:** 2026-06-25T19:13:18.805226+00:00
 **Experiment ID:** `vector-pool-36-cap4-v1`
 **Version:** `1.0.0`
-**Git commit:** `b69efee4973e71e1f037a2c3b666328f5d54fe89`
+**Git commit:** `d97b4dffacba42c638907ee70dc53bfac2a66283`
 **Config hash:** `dddf35dd503598a3987e24545c83b0964604638b027922fe6c300529d34fc083`
 **Verdict:** `ACCEPTED AS PARTIAL CANDIDATE-GENERATION REPAIR`
 
@@ -15,6 +15,7 @@ Controlled candidate-generation experiment comparing production retrieval (`fetc
 - Candidate primary hit@4: **0.621**
 - Baseline MRR: **0.643** | Candidate MRR: **0.646**
 - Primary pool reach: **51/57** -> **55/57**
+- Candidate primary-unreachable cases: **T044, T047**
 
 ## 2. Repository and artifact identity
 
@@ -77,21 +78,23 @@ Controlled candidate-generation experiment comparing production retrieval (`fetc
 ## 6. Reachability table
 
 - Primary reachable: 51/57 -> 55/57
+- Primary unreachable (expected primary absent from pool): ['T004', 'T016', 'T040', 'T044', 'T046', 'T047'] -> ['T044', 'T047']
+- Fully unreachable (no primary or supporting in pool): ['T004', 'T040', 'T044', 'T046', 'T047'] -> ['T047']
+- Legacy fully_unreachable field in reachability_comparison: ['T004', 'T040', 'T044', 'T046', 'T047'] -> ['T047']
+
 - High-risk primary reachable: 14/15 -> 14/15
 - Critical primary reachable: 5/8 -> 7/8
-- Baseline fully unreachable: ['T004', 'T040', 'T044', 'T046', 'T047']
-- Candidate fully unreachable: ['T047']
 
 ## 7. Saturation/diversity table
 
 | Metric | Baseline | Candidate |
 |--------|--------:|----------:|
-| Avg unique documents in pool | 7.40 | 10.45 |
+| Avg unique documents in pool | 7.42 | 10.43 |
 | Avg max chunks from one document | 8.32 | 4.00 |
 | Questions with doc count >= cap | 0 | 60 |
 | Questions where cap removed chunk | 0 | 60 |
-| Total removed by cap | 0 | 1201 |
-| Avg pool size | 24.00 | 27.95 |
+| Total removed by cap | 0 | 1202 |
+| Avg pool size | 24.00 | 27.93 |
 | Pools shorter than target | 0 | 58 |
 
 ## 8. FAQ comparison
@@ -107,7 +110,7 @@ Controlled candidate-generation experiment comparing production retrieval (`fetc
 | `11_payment_security_and_dispute_handling` | 28 | 18 |
 | `12_staff_safety_and_threat_handling` | 27 | 12 |
 | `13_physical_hazard_and_foreign_body_protocol` | 34 | 22 |
-| `14_evidence_standards_and_incomplete_information` | 40 | 19 |
+| `14_evidence_standards_and_incomplete_information` | 39 | 19 |
 | `15_conflicting_rules_and_remedy_priority` | 50 | 31 |
 
 ## 10. Required per-case analysis
@@ -116,9 +119,9 @@ Controlled candidate-generation experiment comparing production retrieval (`fetc
 
 - Expected primary: ['07_complaint_handling_procedure']
 - Baseline vector ranks: {'11_payment_security_and_dispute_handling': [1, 2, 4, 7, 13, 15, 23], '14_evidence_standards_and_incomplete_information': [3, 12], '04_refund_policy': [5, 6, 9, 10, 22], '10_customer_faq': [8, 11, 14, 16, 17, 19, 20], '03_order_changes_and_cancellations': [18, 21], '09_response_style_and_templates': [24]}
-- Candidate vector ranks: {'11_payment_security_and_dispute_handling': [1, 2, 4, 7, 13, 15, 23, 26], '14_evidence_standards_and_incomplete_information': [3, 12, 25, 45], '04_refund_policy': [5, 6, 9, 10, 22, 30, 32, 34, 36, 38, 41, 43], '10_customer_faq': [8, 11, 14, 16, 17, 19, 20, 31, 35, 40, 42, 48], '03_order_changes_and_cancellations': [18, 21, 29, 37], '09_response_style_and_templates': [24, 47], '02_delivery_rules': [27], '15_conflicting_rules_and_remedy_priority': [28, 39, 46], '06_food_quality_and_packaging': [33], '07_complaint_handling_procedure': [44]}
+- Candidate vector ranks: {'11_payment_security_and_dispute_handling': [1, 2, 4, 7, 13, 15, 23, 26], '14_evidence_standards_and_incomplete_information': [3, 12, 25, 44], '04_refund_policy': [5, 6, 9, 10, 22, 30, 32, 34, 36, 38, 41, 43], '10_customer_faq': [8, 11, 14, 16, 17, 19, 20, 31, 35, 40, 42, 48], '03_order_changes_and_cancellations': [18, 21, 29, 37], '09_response_style_and_templates': [24, 47], '02_delivery_rules': [27], '15_conflicting_rules_and_remedy_priority': [28, 39, 46], '06_food_quality_and_packaging': [33], '07_complaint_handling_procedure': [45]}
 - Baseline pool ranks: {'11_payment_security_and_dispute_handling': [1, 2, 4, 7, 13, 15, 23], '14_evidence_standards_and_incomplete_information': [3, 12], '04_refund_policy': [5, 6, 9, 10, 22], '10_customer_faq': [8, 11, 14, 16, 17, 19, 20], '03_order_changes_and_cancellations': [18, 21], '09_response_style_and_templates': [24]}
-- Candidate pool ranks: {'11_payment_security_and_dispute_handling': [1, 2, 4, 7], '14_evidence_standards_and_incomplete_information': [3, 12, 18, 26], '04_refund_policy': [5, 6, 9, 10], '10_customer_faq': [8, 11, 13, 14], '03_order_changes_and_cancellations': [15, 16, 21, 23], '09_response_style_and_templates': [17, 28], '02_delivery_rules': [19], '15_conflicting_rules_and_remedy_priority': [20, 24, 27], '06_food_quality_and_packaging': [22], '07_complaint_handling_procedure': [25]}
+- Candidate pool ranks: {'11_payment_security_and_dispute_handling': [1, 2, 4, 7], '14_evidence_standards_and_incomplete_information': [3, 12, 18, 25], '04_refund_policy': [5, 6, 9, 10], '10_customer_faq': [8, 11, 13, 14], '03_order_changes_and_cancellations': [15, 16, 21, 23], '09_response_style_and_templates': [17, 28], '02_delivery_rules': [19], '15_conflicting_rules_and_remedy_priority': [20, 24, 27], '06_food_quality_and_packaging': [22], '07_complaint_handling_procedure': [26]}
 - Candidate pool document counts: {'11_payment_security_and_dispute_handling': 4, '14_evidence_standards_and_incomplete_information': 4, '04_refund_policy': 4, '10_customer_faq': 4, '03_order_changes_and_cancellations': 4, '09_response_style_and_templates': 2, '02_delivery_rules': 1, '15_conflicting_rules_and_remedy_priority': 3, '06_food_quality_and_packaging': 1, '07_complaint_handling_procedure': 1}
 - Baseline final ranks: {'11_payment_security_and_dispute_handling': [1, 2, 4, 7, 10, 11], '14_evidence_standards_and_incomplete_information': [3, 12], '04_refund_policy': [5, 6, 8, 9]}
 - Candidate final ranks: {'11_payment_security_and_dispute_handling': [1, 2, 4, 7], '14_evidence_standards_and_incomplete_information': [3, 10], '04_refund_policy': [5, 6, 8, 9], '03_order_changes_and_cancellations': [11, 12]}
@@ -191,16 +194,16 @@ Controlled candidate-generation experiment comparing production retrieval (`fetc
 
 - Expected primary: ['08_escalation_and_risk_rules']
 - Baseline vector ranks: {'11_payment_security_and_dispute_handling': [1, 4, 5, 9, 10, 14, 19, 22], '14_evidence_standards_and_incomplete_information': [2, 3, 6, 7, 8, 11, 12, 13, 15, 16], '07_complaint_handling_procedure': [17, 21], '10_customer_faq': [18], '12_staff_safety_and_threat_handling': [20], '13_physical_hazard_and_foreign_body_protocol': [23, 24]}
-- Candidate vector ranks: {'11_payment_security_and_dispute_handling': [1, 4, 5, 8, 10, 13, 18, 20, 22, 26, 34, 37], '14_evidence_standards_and_incomplete_information': [2, 3, 6, 7, 9, 11, 12, 14, 15, 16, 29, 30, 32, 38, 43, 48], '07_complaint_handling_procedure': [17, 23, 27, 45, 47], '10_customer_faq': [19, 39, 40], '12_staff_safety_and_threat_handling': [21, 31], '13_physical_hazard_and_foreign_body_protocol': [24, 25], '05_compensation_policy': [28], '08_escalation_and_risk_rules': [33, 46], '02_delivery_rules': [35, 42], '01_service_overview': [36, 41], '15_conflicting_rules_and_remedy_priority': [44]}
+- Candidate vector ranks: {'11_payment_security_and_dispute_handling': [1, 4, 5, 9, 10, 14, 19, 22, 25, 26, 36, 37], '14_evidence_standards_and_incomplete_information': [2, 3, 6, 7, 8, 11, 12, 13, 15, 16, 28, 31, 32, 38, 43], '07_complaint_handling_procedure': [17, 21, 27, 46, 47], '10_customer_faq': [18, 39, 40], '12_staff_safety_and_threat_handling': [20, 30, 48], '13_physical_hazard_and_foreign_body_protocol': [23, 24], '05_compensation_policy': [29], '08_escalation_and_risk_rules': [33, 44], '01_service_overview': [34, 41], '02_delivery_rules': [35, 42], '15_conflicting_rules_and_remedy_priority': [45]}
 - Baseline pool ranks: {'11_payment_security_and_dispute_handling': [1, 4, 5, 9, 10, 14, 19, 22], '14_evidence_standards_and_incomplete_information': [2, 3, 6, 7, 8, 11, 12, 13, 15, 16], '07_complaint_handling_procedure': [17, 21], '10_customer_faq': [18], '12_staff_safety_and_threat_handling': [20], '13_physical_hazard_and_foreign_body_protocol': [23, 24]}
-- Candidate pool ranks: {'11_payment_security_and_dispute_handling': [1, 4, 5, 8], '14_evidence_standards_and_incomplete_information': [2, 3, 6, 7], '07_complaint_handling_procedure': [9, 12, 15, 26], '10_customer_faq': [10, 21, 22], '12_staff_safety_and_threat_handling': [11, 17], '13_physical_hazard_and_foreign_body_protocol': [13, 14], '05_compensation_policy': [16], '08_escalation_and_risk_rules': [18, 27], '02_delivery_rules': [19, 24], '01_service_overview': [20, 23], '15_conflicting_rules_and_remedy_priority': [25]}
-- Candidate pool document counts: {'11_payment_security_and_dispute_handling': 4, '14_evidence_standards_and_incomplete_information': 4, '07_complaint_handling_procedure': 4, '10_customer_faq': 3, '12_staff_safety_and_threat_handling': 2, '13_physical_hazard_and_foreign_body_protocol': 2, '05_compensation_policy': 1, '08_escalation_and_risk_rules': 2, '02_delivery_rules': 2, '01_service_overview': 2, '15_conflicting_rules_and_remedy_priority': 1}
+- Candidate pool ranks: {'11_payment_security_and_dispute_handling': [1, 4, 5, 8], '14_evidence_standards_and_incomplete_information': [2, 3, 6, 7], '07_complaint_handling_procedure': [9, 12, 15, 27], '10_customer_faq': [10, 21, 22], '12_staff_safety_and_threat_handling': [11, 17, 28], '13_physical_hazard_and_foreign_body_protocol': [13, 14], '05_compensation_policy': [16], '08_escalation_and_risk_rules': [18, 25], '01_service_overview': [19, 23], '02_delivery_rules': [20, 24], '15_conflicting_rules_and_remedy_priority': [26]}
+- Candidate pool document counts: {'11_payment_security_and_dispute_handling': 4, '14_evidence_standards_and_incomplete_information': 4, '07_complaint_handling_procedure': 4, '10_customer_faq': 3, '12_staff_safety_and_threat_handling': 3, '13_physical_hazard_and_foreign_body_protocol': 2, '05_compensation_policy': 1, '08_escalation_and_risk_rules': 2, '01_service_overview': 2, '02_delivery_rules': 2, '15_conflicting_rules_and_remedy_priority': 1}
 - Baseline final ranks: {'11_payment_security_and_dispute_handling': [1, 3, 4, 8, 9], '14_evidence_standards_and_incomplete_information': [2, 5, 6, 7, 10, 11, 12]}
 - Candidate final ranks: {'11_payment_security_and_dispute_handling': [1, 3, 4, 8], '14_evidence_standards_and_incomplete_information': [2, 5, 6, 7], '07_complaint_handling_procedure': [9], '12_staff_safety_and_threat_handling': [10], '13_physical_hazard_and_foreign_body_protocol': [11, 12]}
 - Primary hit@4: False -> False
 - Primary hit@12: False -> False
 - Primary reachable: False -> True
-- Change: primary reachability False -> True; cap removed 21 chunks
+- Change: primary reachability False -> True; cap removed 20 chunks
 
 ### T047
 
@@ -241,7 +244,7 @@ Controlled candidate-generation experiment comparing production retrieval (`fetc
 - [PASS] `high_risk_pool_reach`: High-risk pool reach >= 14/15 (baseline=None, candidate=14/15)
 - [PASS] `critical_pool_reach`: Critical pool reach >= 7/8 (baseline=None, candidate=7/8)
 - [PASS] `faq_top4_count`: FAQ top-4 count <= 36 (baseline=36, candidate=36)
-- [PASS] `unreachable_subset`: Unreachable primaries subset of {T044, T047} (baseline=None, candidate=['T047'])
+- [PASS] `unreachable_subset`: Unreachable primaries subset of {T044, T047} (baseline=None, candidate=['T044', 'T047'])
 - [PASS] `reachability_T004`: T004 must become reachable (baseline=None, candidate=True)
 - [PASS] `reachability_T016`: T016 must become reachable (baseline=None, candidate=True)
 - [PASS] `reachability_T040`: T040 must become reachable (baseline=None, candidate=True)
@@ -262,7 +265,9 @@ Current production retrieval config (`vector-pool-expansion-v1`, fetch@24, pool@
 
 ## 14. Remaining T044/T047 backlog
 
-Unresolved cases explicitly allowed to remain unreachable: ['T044', 'T047']
+Candidate primary-unreachable cases (expected primary absent from pool): ['T044', 'T047']
+Fully unreachable cases where neither primary nor supporting appears in pool: ['T047']
+T044 remains primary-unreachable but has supporting source in pool; T047 is both primary-unreachable and fully unreachable.
 
 ## 15. Recommended next stage
 
@@ -274,4 +279,4 @@ Stage 4C.3C ranking/metadata refinement or targeted corpus repair (not implement
 - Candidate is not release-ready and receives no automatic production promotion.
 - Primary hit@4 restoration to historical Arm A levels is not achieved.
 
-_Informational total evaluation latency: 25.5s_
+_Informational total evaluation latency: 27.3s_

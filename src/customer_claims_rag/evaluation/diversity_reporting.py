@@ -8,7 +8,7 @@ from pathlib import Path
 
 from customer_claims_rag.evaluation.diversity_metrics import (
     STAGE_4C2_BASELINE_TARGETS,
-    compute_primary_hit_rate_at_12_from_cases,
+    validate_reachability_consistency,
 )
 from customer_claims_rag.evaluation.diversity_models import DiversityEvaluationRun
 from customer_claims_rag.exceptions import EvaluationOutputError
@@ -42,6 +42,11 @@ def write_diversity_outputs(
     _ensure_not_protected(markdown_path, project_root=project_root)
 
     json_content = json.dumps(run.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n"
+    validate_reachability_consistency(
+        run.reachability_consistency,
+        run.case_results,
+        reachability_comparison=run.reachability_comparison,
+    )
     markdown_content = render_diversity_markdown(run)
 
     temp_paths: list[Path] = []
@@ -63,8 +68,11 @@ def render_diversity_markdown(run: DiversityEvaluationRun) -> str:
     baseline = run.baseline_ranking.aggregate_metrics
     candidate = run.candidate_ranking.aggregate_metrics
     reach = run.reachability_comparison
+    consistency = run.reachability_consistency
     faq = run.faq_comparison
     boundary = run.interpretation_boundary
+    candidate_primary_unreachable = consistency.candidate.primary_unreachable_case_ids
+    baseline_primary_unreachable = consistency.baseline.primary_unreachable_case_ids
 
     baseline_primary_hit12 = baseline.hit_rate_at_12
     candidate_primary_hit12 = candidate.hit_rate_at_12
@@ -92,6 +100,7 @@ def render_diversity_markdown(run: DiversityEvaluationRun) -> str:
         f"- Baseline MRR: **{baseline.mrr:.3f}** | Candidate MRR: **{candidate.mrr:.3f}**",
         f"- Primary pool reach: **{reach.baseline_primary_reachable}/{reach.baseline_primary_total}** "
         f"-> **{reach.candidate_primary_reachable}/{reach.candidate_primary_total}**",
+        f"- Candidate primary-unreachable cases: **{', '.join(candidate_primary_unreachable) or 'none'}**",
         "",
         "## 2. Repository and artifact identity",
         "",
@@ -170,14 +179,20 @@ def render_diversity_markdown(run: DiversityEvaluationRun) -> str:
         "",
         f"- Primary reachable: {reach.baseline_primary_reachable}/{reach.baseline_primary_total} "
         f"-> {reach.candidate_primary_reachable}/{reach.candidate_primary_total}",
+        f"- Primary unreachable (expected primary absent from pool): "
+        f"{baseline_primary_unreachable} -> {candidate_primary_unreachable}",
+        f"- Fully unreachable (no primary or supporting in pool): "
+        f"{consistency.baseline.fully_unreachable_case_ids} -> "
+        f"{consistency.candidate.fully_unreachable_case_ids}",
+        f"- Legacy fully_unreachable field in reachability_comparison: "
+        f"{reach.baseline_fully_unreachable_cases} -> {reach.candidate_fully_unreachable_cases}",
+        "",
         f"- High-risk primary reachable: {reach.high_baseline_primary_reachable}/"
         f"{reach.high_primary_total} -> {reach.high_candidate_primary_reachable}/"
         f"{reach.high_primary_total}",
         f"- Critical primary reachable: {reach.critical_baseline_primary_reachable}/"
         f"{reach.critical_primary_total} -> {reach.critical_candidate_primary_reachable}/"
         f"{reach.critical_primary_total}",
-        f"- Baseline fully unreachable: {reach.baseline_fully_unreachable_cases}",
-        f"- Candidate fully unreachable: {reach.candidate_fully_unreachable_cases}",
         "",
         "## 7. Saturation/diversity table",
         "",
@@ -270,7 +285,18 @@ def render_diversity_markdown(run: DiversityEvaluationRun) -> str:
             "",
             "## 14. Remaining T044/T047 backlog",
             "",
-            f"Unresolved cases explicitly allowed to remain unreachable: {boundary.unresolved_cases}",
+            (
+                "Candidate primary-unreachable cases (expected primary absent from pool): "
+                f"{boundary.primary_unreachable_cases}"
+            ),
+            (
+                "Fully unreachable cases where neither primary nor supporting appears in pool: "
+                f"{boundary.fully_unreachable_cases}"
+            ),
+            (
+                "T044 remains primary-unreachable but has supporting source in pool; "
+                "T047 is both primary-unreachable and fully unreachable."
+            ),
             "",
             "## 15. Recommended next stage",
             "",

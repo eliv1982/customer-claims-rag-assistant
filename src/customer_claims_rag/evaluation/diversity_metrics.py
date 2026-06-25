@@ -8,12 +8,14 @@ from pathlib import Path
 
 from customer_claims_rag.evaluation.diversity_models import (
     AcceptanceCheck,
+    ArmReachabilityConsistency,
     DiversityCaseResult,
     DiversityVerdict,
     FaqComparison,
     HardRegressionFlags,
     InterpretationBoundary,
     NewDocumentFootprint,
+    ReachabilityConsistencySummary,
     RequiredCaseDiagnostic,
     SaturationMetrics,
     VectorPoolCapExperimentConfig,
@@ -53,6 +55,115 @@ STAGE_4C2_BASELINE_TARGETS = {
     "critical_reach": (5, 8),
     "faq_top4_count": 36,
 }
+
+
+class ReachabilityConsistencyError(ValueError):
+    """Raised when reachability aggregates disagree with case-level records."""
+
+
+def build_reachability_consistency_summary(
+    case_results: list[DiversityCaseResult],
+) -> ReachabilityConsistencySummary:
+    """Derive canonical primary reach counts and unreachable sets from case records."""
+    return ReachabilityConsistencySummary(
+        baseline=_arm_reachability_consistency(case_results, arm="baseline"),
+        candidate=_arm_reachability_consistency(case_results, arm="candidate"),
+    )
+
+
+def validate_reachability_consistency(
+    summary: ReachabilityConsistencySummary,
+    case_results: list[DiversityCaseResult],
+    *,
+    reachability_comparison: ReachabilityComparison | None = None,
+) -> None:
+    """Validate arithmetic and set invariants for reachability reporting."""
+    for arm_name, arm_summary in (
+        ("baseline", summary.baseline),
+        ("candidate", summary.candidate),
+    ):
+        if (
+            arm_summary.primary_reachable_count
+            + len(arm_summary.primary_unreachable_case_ids)
+            != arm_summary.primary_denominator
+        ):
+            raise ReachabilityConsistencyError(
+                f"{arm_name} primary reach arithmetic failed: "
+                f"{arm_summary.primary_reachable_count} + "
+                f"{len(arm_summary.primary_unreachable_case_ids)} != "
+                f"{arm_summary.primary_denominator}"
+            )
+
+        expected_unreachable = _primary_unreachable_case_ids(case_results, arm=arm_name)
+        if set(arm_summary.primary_unreachable_case_ids) != expected_unreachable:
+            raise ReachabilityConsistencyError(
+                f"{arm_name} primary unreachable set mismatch: "
+                f"{arm_summary.primary_unreachable_case_ids} != {sorted(expected_unreachable)}"
+            )
+
+    if reachability_comparison is not None:
+        if summary.baseline.primary_reachable_count != reachability_comparison.baseline_primary_reachable:
+            raise ReachabilityConsistencyError(
+                "baseline primary reach numerator disagrees with reachability_comparison"
+            )
+        if summary.candidate.primary_reachable_count != reachability_comparison.candidate_primary_reachable:
+            raise ReachabilityConsistencyError(
+                "candidate primary reach numerator disagrees with reachability_comparison"
+            )
+        if summary.baseline.primary_denominator != reachability_comparison.baseline_primary_total:
+            raise ReachabilityConsistencyError(
+                "baseline primary reach denominator disagrees with reachability_comparison"
+            )
+        if summary.candidate.primary_denominator != reachability_comparison.candidate_primary_total:
+            raise ReachabilityConsistencyError(
+                "candidate primary reach denominator disagrees with reachability_comparison"
+            )
+
+
+def _arm_reachability_consistency(
+    case_results: list[DiversityCaseResult],
+    *,
+    arm: str,
+) -> ArmReachabilityConsistency:
+    primary_denominator = 0
+    primary_reachable_count = 0
+    primary_unreachable_case_ids: list[str] = []
+    fully_unreachable_case_ids: list[str] = []
+
+    for case in case_results:
+        if case.fallback_expected:
+            continue
+        pool = case.baseline_pool if arm == "baseline" else case.candidate_pool
+        if case.expected_primary_documents:
+            primary_denominator += 1
+            if pool.reachability.primary_reachable:
+                primary_reachable_count += 1
+            else:
+                primary_unreachable_case_ids.append(case.case_id)
+        if pool.reachability.fully_unreachable:
+            fully_unreachable_case_ids.append(case.case_id)
+
+    return ArmReachabilityConsistency(
+        primary_reachable_count=primary_reachable_count,
+        primary_denominator=primary_denominator,
+        primary_unreachable_case_ids=sorted(primary_unreachable_case_ids),
+        fully_unreachable_case_ids=sorted(fully_unreachable_case_ids),
+    )
+
+
+def _primary_unreachable_case_ids(
+    case_results: list[DiversityCaseResult],
+    *,
+    arm: str,
+) -> set[str]:
+    unreachable: set[str] = set()
+    for case in case_results:
+        if case.fallback_expected or not case.expected_primary_documents:
+            continue
+        pool = case.baseline_pool if arm == "baseline" else case.candidate_pool
+        if not pool.reachability.primary_reachable:
+            unreachable.add(case.case_id)
+    return unreachable
 
 
 def load_vector_pool_cap_config(path: Path) -> VectorPoolCapExperimentConfig:
@@ -269,12 +380,21 @@ def evaluate_diversity_acceptance(
     baseline_metrics,
     candidate_metrics,
     reachability: ReachabilityComparison,
+    reachability_consistency: ReachabilityConsistencySummary,
     faq_comparison: FaqComparison,
     case_results: list[DiversityCaseResult],
     reranker_config_hash: str,
     technical_errors_zero: bool,
 ) -> tuple[list[AcceptanceCheck], HardRegressionFlags, DiversityVerdict, InterpretationBoundary]:
     """Evaluate acceptance criteria and derive verdict."""
+    if case_results:
+        validate_reachability_consistency(
+            reachability_consistency,
+            case_results,
+            reachability_comparison=reachability,
+        )
+    candidate_unreachable = reachability_consistency.candidate.primary_unreachable_case_ids
+    baseline_unreachable = reachability_consistency.baseline.primary_unreachable_case_ids
     baseline_primary_hit4 = baseline_metrics.primary_source_hit_rate_at_4
     candidate_primary_hit4 = candidate_metrics.primary_source_hit_rate_at_4
     baseline_mrr = baseline_metrics.mrr
@@ -286,8 +406,9 @@ def evaluate_diversity_acceptance(
         mrr_below_floor=candidate_mrr < 0.643,
         critical_pool_reach_below_floor=reachability.critical_candidate_primary_reachable < 7,
         faq_top4_above_ceiling=faq_comparison.candidate_questions_with_faq_in_top4 > 40,
-        new_unreachable_primary_outside_allowed=_new_unreachable_outside_allowed(
-            reachability,
+        new_unreachable_primary_outside_allowed=_new_unreachable_primary_outside_allowed(
+            baseline_unreachable,
+            candidate_unreachable,
         ),
     )
 
@@ -365,14 +486,12 @@ def evaluate_diversity_acceptance(
         hard_regression=hard.faq_top4_above_ceiling,
     )
 
-    unreachable_subset_ok = set(reachability.candidate_fully_unreachable_cases).issubset(
-        ALLOWED_UNREACHABLE_CASES,
-    )
+    unreachable_subset_ok = set(candidate_unreachable).issubset(ALLOWED_UNREACHABLE_CASES)
     add_check(
         "unreachable_subset",
         "Unreachable primaries subset of {T044, T047}",
         unreachable_subset_ok,
-        candidate_value=str(sorted(reachability.candidate_fully_unreachable_cases)),
+        candidate_value=str(candidate_unreachable),
         hard_regression=hard.new_unreachable_primary_outside_allowed,
     )
 
@@ -421,7 +540,9 @@ def evaluate_diversity_acceptance(
     )
 
     boundary = InterpretationBoundary(
-        unresolved_cases=sorted(ALLOWED_UNREACHABLE_CASES),
+        unresolved_cases=sorted(candidate_unreachable),
+        primary_unreachable_cases=candidate_unreachable,
+        fully_unreachable_cases=reachability_consistency.candidate.fully_unreachable_case_ids,
     )
     return checks, hard, verdict, boundary
 
@@ -442,10 +563,11 @@ def faq_flags_for_final(
     return faq_in_top4, faq_without_primary
 
 
-def _new_unreachable_outside_allowed(reachability: ReachabilityComparison) -> bool:
-    baseline_unreachable = set(reachability.baseline_fully_unreachable_cases)
-    candidate_unreachable = set(reachability.candidate_fully_unreachable_cases)
-    newly_unreachable = candidate_unreachable - baseline_unreachable
+def _new_unreachable_primary_outside_allowed(
+    baseline_unreachable: list[str],
+    candidate_unreachable: list[str],
+) -> bool:
+    newly_unreachable = set(candidate_unreachable) - set(baseline_unreachable)
     return bool(newly_unreachable - ALLOWED_UNREACHABLE_CASES)
 
 
@@ -519,6 +641,9 @@ __all__ = [
     "FAQ_DOCUMENT_ID",
     "MUST_BECOME_REACHABLE_CASES",
     "REQUIRED_CASE_IDS",
+    "ReachabilityConsistencyError",
+    "build_reachability_consistency_summary",
+    "validate_reachability_consistency",
     "STAGE_4C2_BASELINE_TARGETS",
     "build_faq_comparison",
     "build_new_document_footprint",

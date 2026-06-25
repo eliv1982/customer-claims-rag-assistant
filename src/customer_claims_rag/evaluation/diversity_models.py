@@ -250,10 +250,32 @@ class InterpretationBoundary(BaseModel):
     no_automatic_production_promotion: bool = True
     production_config_unchanged: bool = True
     unresolved_cases: list[str] = Field(default_factory=list)
+    primary_unreachable_cases: list[str] = Field(default_factory=list)
+    fully_unreachable_cases: list[str] = Field(default_factory=list)
     primary_hit_at_4_not_restored_to_arm_a: bool = True
     next_stage_required: str = (
         "Stage 4C.3C ranking/metadata refinement or targeted corpus repair"
     )
+
+
+class ArmReachabilityConsistency(BaseModel):
+    """Single-arm primary reachability summary derived from case-level records."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    primary_reachable_count: int
+    primary_denominator: int
+    primary_unreachable_case_ids: list[str] = Field(default_factory=list)
+    fully_unreachable_case_ids: list[str] = Field(default_factory=list)
+
+
+class ReachabilityConsistencySummary(BaseModel):
+    """Canonical reachability counts and unreachable sets for both arms."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    baseline: ArmReachabilityConsistency
+    candidate: ArmReachabilityConsistency
 
 
 class DiversityEvaluationRun(BaseModel):
@@ -267,6 +289,7 @@ class DiversityEvaluationRun(BaseModel):
     baseline_ranking: EvaluationRun
     candidate_ranking: EvaluationRun
     reachability_comparison: ReachabilityComparison
+    reachability_consistency: ReachabilityConsistencySummary
     baseline_saturation: SaturationMetrics
     candidate_saturation: SaturationMetrics
     faq_comparison: FaqComparison

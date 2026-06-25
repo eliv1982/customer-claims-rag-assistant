@@ -10,6 +10,7 @@ from pathlib import Path
 from customer_claims_rag.evaluation.diversity_metrics import (
     build_faq_comparison,
     build_new_document_footprint,
+    build_reachability_consistency_summary,
     build_required_case_diagnostics,
     build_saturation_metrics,
     evaluate_diversity_acceptance,
@@ -161,6 +162,7 @@ class VectorPoolCapAbEvaluator:
         candidate_ranking_run = self._build_evaluation_run(candidate_ranking_cases, run_metadata_base)
 
         reachability = build_reachability_comparison(pool_expansion_cases)
+        reachability_consistency = build_reachability_consistency_summary(case_results)
         ranking = build_ranking_comparison(
             baseline_cases=baseline_ranking_cases,
             candidate_cases=candidate_ranking_cases,
@@ -172,6 +174,7 @@ class VectorPoolCapAbEvaluator:
             baseline_metrics=baseline_ranking_run.aggregate_metrics,
             candidate_metrics=candidate_ranking_run.aggregate_metrics,
             reachability=reachability,
+            reachability_consistency=reachability_consistency,
             faq_comparison=build_faq_comparison(case_results),
             case_results=case_results,
             reranker_config_hash=compute_config_hash(self.reranker.config),
@@ -224,6 +227,7 @@ class VectorPoolCapAbEvaluator:
             baseline_ranking=baseline_ranking_run,
             candidate_ranking=candidate_ranking_run,
             reachability_comparison=reachability,
+            reachability_consistency=reachability_consistency,
             baseline_saturation=build_saturation_metrics(
                 case_results,
                 arm="baseline",
