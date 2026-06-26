@@ -191,8 +191,9 @@ class Doc12ThreatAtomicAbEvaluator:
     def evaluate(self) -> Doc12ThreatAtomicEvaluationRun:
         started = time.perf_counter()
         execution_ts = datetime.now(timezone.utc)
-        self.baseline_retriever.validate_index()
-        self.candidate_retriever.validate_index()
+        if not self._uses_exact_backend():
+            self.baseline_retriever.validate_index()
+            self.candidate_retriever.validate_index()
 
         baseline_manifest = load_manifest(self.baseline_index_dir)
         candidate_manifest = load_manifest(self.candidate_index_dir)
@@ -653,9 +654,33 @@ class Doc12ThreatAtomicAbEvaluator:
 
     def with_ann_backend(self) -> Doc12ThreatAtomicAbEvaluator:
         """Return a shallow copy that evaluates through Chroma ANN (diagnostics only)."""
+        baseline_store = create_vector_store(
+            index_dir=self.baseline_index_dir,
+            collection_name=self.collection_name,
+        )
+        candidate_store = create_vector_store(
+            index_dir=self.candidate_index_dir,
+            collection_name=self.collection_name,
+        )
+        baseline_retriever = BaselineRetriever(
+            embedding_provider=self.baseline_retriever.embedding_provider,
+            vector_store=baseline_store,
+            index_dir=self.baseline_index_dir,
+            top_k=self.fetch_k,
+            fetch_k=self.fetch_k,
+            similarity_threshold=self.threshold,
+        )
+        candidate_retriever = BaselineRetriever(
+            embedding_provider=self.candidate_retriever.embedding_provider,
+            vector_store=candidate_store,
+            index_dir=self.candidate_index_dir,
+            top_k=self.fetch_k,
+            fetch_k=self.fetch_k,
+            similarity_threshold=self.threshold,
+        )
         clone = Doc12ThreatAtomicAbEvaluator(
-            baseline_retriever=self.baseline_retriever,
-            candidate_retriever=self.candidate_retriever,
+            baseline_retriever=baseline_retriever,
+            candidate_retriever=candidate_retriever,
             reranker=self.reranker,
             fetch_k=self.fetch_k,
             pool_k=self.pool_k,
