@@ -8,7 +8,11 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from customer_claims_rag.evaluation.models import AggregateMetrics, CaseResult
-from customer_claims_rag.evaluation.pool_expansion_models import PoolReachability, RankingArmResult
+from customer_claims_rag.evaluation.pool_expansion_models import (
+    PoolReachability,
+    RankingArmResult,
+    ReachabilityComparison,
+)
 from customer_claims_rag.ingestion.corpus_overlay import Doc08ChunkDiff
 
 
@@ -59,6 +63,57 @@ class RetrievalArmMetadata(BaseModel):
     reranker_config_hash: str
     collection: str
     embedding_model: str
+    benchmark_fingerprint: str | None = None
+    execution_timestamp: datetime | None = None
+
+
+class FrozenReachabilitySnapshot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    primary_reachable: int
+    primary_denominator: int
+    primary_unreachable_case_ids: list[str] = Field(default_factory=list)
+    high_risk_reachable: int
+    high_risk_denominator: int
+    critical_reachable: int
+    critical_denominator: int
+    fully_unreachable_case_ids: list[str] = Field(default_factory=list)
+
+
+class BaselineReproductionResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reference_experiment_id: str
+    reference_arm: str
+    reference_artifact_path: str
+    passed: bool
+    checks: list["AcceptanceCheck"] = Field(default_factory=list)
+
+
+class ExtensionCaseDiagnostic(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    query_preview: str
+    expected_primary: list[str] = Field(default_factory=list)
+    expected_supporting: list[str] = Field(default_factory=list)
+    baseline_vector_ranks_doc08: list[int] = Field(default_factory=list)
+    candidate_vector_ranks_doc08: list[int] = Field(default_factory=list)
+    baseline_vector_ranks_doc12: list[int] = Field(default_factory=list)
+    candidate_vector_ranks_doc12: list[int] = Field(default_factory=list)
+    baseline_pool_rank_doc08: int | None = None
+    candidate_pool_rank_doc08: int | None = None
+    baseline_pool_rank_doc12: int | None = None
+    candidate_pool_rank_doc12: int | None = None
+    baseline_final_rank_doc08: int | None = None
+    candidate_final_rank_doc08: int | None = None
+    baseline_final_rank_doc12: int | None = None
+    candidate_final_rank_doc12: int | None = None
+    baseline_primary_hit_at_4: bool = False
+    candidate_primary_hit_at_4: bool = False
+    baseline_primary_hit_at_12: bool = False
+    candidate_primary_hit_at_12: bool = False
+    delta_classification: str
 
 
 class Doc08CaseDiagnostic(BaseModel):
@@ -132,6 +187,7 @@ class ExtensionEvaluationResult(BaseModel):
     fingerprint: str
     baseline: ExtensionArmMetrics
     candidate: ExtensionArmMetrics
+    case_diagnostics: list[ExtensionCaseDiagnostic] = Field(default_factory=list)
     verdict: Doc08Verdict
     acceptance_checks: list[AcceptanceCheck] = Field(default_factory=list)
 
@@ -158,7 +214,12 @@ class Doc08AtomicEvaluationRun(BaseModel):
     timestamp: datetime
     experiment_id: str
     source_commit: str | None = None
+    source_dirty: bool = False
     artifact_commit: str | None = None
+    reference_experiment_id: str
+    reference_arm: str
+    reference_artifact_path: str
+    baseline_reproduction: BaselineReproductionResult
     baseline_arm: RetrievalArmMetadata
     candidate_arm: RetrievalArmMetadata
     frozen_benchmark_fingerprint: str
@@ -167,6 +228,13 @@ class Doc08AtomicEvaluationRun(BaseModel):
     chunk_diff: Doc08ChunkDiffModel
     frozen_baseline_metrics: AggregateMetrics
     frozen_candidate_metrics: AggregateMetrics
+    frozen_baseline_primary_hit_at_12: float
+    frozen_candidate_primary_hit_at_12: float
+    frozen_reachability: ReachabilityComparison
+    frozen_reachability_baseline: FrozenReachabilitySnapshot
+    frozen_reachability_candidate: FrozenReachabilitySnapshot
+    faq_top4_baseline: int
+    faq_top4_candidate: int
     case_results: list[Doc08AtomicCaseResult] = Field(default_factory=list)
     required_diagnostics: list[Doc08CaseDiagnostic] = Field(default_factory=list)
     doc08_footprint_baseline: Doc08Footprint

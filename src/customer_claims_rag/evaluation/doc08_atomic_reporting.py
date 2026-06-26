@@ -17,8 +17,15 @@ def render_doc08_markdown(run: Doc08AtomicEvaluationRun) -> str:
         "",
         f"**Timestamp:** {run.timestamp.isoformat()}",
         f"**Source commit:** `{run.source_commit or 'unknown'}`",
+        f"**Source dirty:** `{run.source_dirty}`",
         f"**Artifact commit:** `{run.artifact_commit or 'pending'}`",
+        f"**Reference:** `{run.reference_experiment_id}` / `{run.reference_arm}`",
         f"**Verdict:** `{run.verdict}`",
+        "",
+        "## Baseline reproduction",
+        "",
+        f"- Passed: **{run.baseline_reproduction.passed}**",
+        f"- Reference artifact: `{run.baseline_reproduction.reference_artifact_path}`",
         "",
         "## Retrieval arms",
         "",
@@ -35,15 +42,29 @@ def render_doc08_markdown(run: Doc08AtomicEvaluationRun) -> str:
         "",
         "| Metric | Baseline | Candidate |",
         "|--------|----------|-----------|",
-        f"| Primary hit@4 | {run.frozen_baseline_metrics.primary_source_hit_rate_at_4:.3f} | "
-        f"{run.frozen_candidate_metrics.primary_source_hit_rate_at_4:.3f} |",
-        f"| Primary hit@12 | {run.frozen_baseline_metrics.hit_rate_at_12:.3f} | "
-        f"{run.frozen_candidate_metrics.hit_rate_at_12:.3f} |",
-        f"| MRR | {run.frozen_baseline_metrics.mrr:.3f} | "
-        f"{run.frozen_candidate_metrics.mrr:.3f} |",
+        f"| Primary hit@4 | {run.frozen_baseline_metrics.primary_source_hit_rate_at_4:.6f} | "
+        f"{run.frozen_candidate_metrics.primary_source_hit_rate_at_4:.6f} |",
+        f"| Primary hit@12 | {run.frozen_baseline_primary_hit_at_12:.6f} | "
+        f"{run.frozen_candidate_primary_hit_at_12:.6f} |",
+        f"| MRR | {run.frozen_baseline_metrics.mrr:.6f} | "
+        f"{run.frozen_candidate_metrics.mrr:.6f} |",
+        f"| Primary reach | {run.frozen_reachability_baseline.primary_reachable}/"
+        f"{run.frozen_reachability_baseline.primary_denominator} | "
+        f"{run.frozen_reachability_candidate.primary_reachable}/"
+        f"{run.frozen_reachability_candidate.primary_denominator} |",
+        f"| High-risk reach | {run.frozen_reachability_baseline.high_risk_reachable}/"
+        f"{run.frozen_reachability_baseline.high_risk_denominator} | "
+        f"{run.frozen_reachability_candidate.high_risk_reachable}/"
+        f"{run.frozen_reachability_candidate.high_risk_denominator} |",
+        f"| Critical reach | {run.frozen_reachability_baseline.critical_reachable}/"
+        f"{run.frozen_reachability_baseline.critical_denominator} | "
+        f"{run.frozen_reachability_candidate.critical_reachable}/"
+        f"{run.frozen_reachability_candidate.critical_denominator} |",
+        f"| FAQ top-4 | {run.faq_top4_baseline} | {run.faq_top4_candidate} |",
         "",
         f"- Primary unreachable baseline: {run.primary_unreachable_baseline}",
         f"- Primary unreachable candidate: {run.primary_unreachable_candidate}",
+        f"- Fully unreachable baseline: {run.fully_unreachable_baseline}",
         f"- Fully unreachable candidate: {run.fully_unreachable_candidate}",
         "",
         "## Doc08 chunk diff",
@@ -55,15 +76,33 @@ def render_doc08_markdown(run: Doc08AtomicEvaluationRun) -> str:
         f"- Changed: {len(run.chunk_diff.changed_chunk_ids)}",
         f"- Non-doc08 byte-identical: {run.chunk_diff.non_doc08_byte_identical}",
         "",
-        "## Doc08 footprint (candidate)",
+        "## Extension metrics",
         "",
-        f"- Pool: {run.doc08_footprint_candidate.pool_appearances}",
-        f"- Top-12: {run.doc08_footprint_candidate.top12_appearances}",
-        f"- Top-4: {run.doc08_footprint_candidate.top4_appearances}",
+        "| Metric | Baseline | Candidate |",
+        "|--------|----------|-----------|",
+        f"| Privacy hit@4 | {run.extension.baseline.privacy_hit_at_4}/4 | "
+        f"{run.extension.candidate.privacy_hit_at_4}/4 |",
+        f"| Privacy hit@12 | {run.extension.baseline.privacy_hit_at_12}/4 | "
+        f"{run.extension.candidate.privacy_hit_at_12}/4 |",
+        f"| Threat doc12 hit@4 | {run.extension.baseline.threat_doc12_hit_at_4}/4 | "
+        f"{run.extension.candidate.threat_doc12_hit_at_4}/4 |",
+        f"| Threat doc12 in top-4 | {run.extension.baseline.threat_doc12_in_top4}/4 | "
+        f"{run.extension.candidate.threat_doc12_in_top4}/4 |",
+        f"| Negative domain hit@4 | {run.extension.baseline.negative_domain_hit_at_4}/4 | "
+        f"{run.extension.candidate.negative_domain_hit_at_4}/4 |",
         "",
-        "## T044 / T047 diagnostics",
+        "## Extension case diagnostics",
         "",
+        "| Case | Baseline hit@4 | Candidate hit@4 | Delta |",
+        "|------|----------------|-----------------|-------|",
     ]
+    for diag in run.extension.case_diagnostics:
+        lines.append(
+            f"| {diag.case_id} | {diag.baseline_primary_hit_at_4} | "
+            f"{diag.candidate_primary_hit_at_4} | {diag.delta_classification} |"
+        )
+
+    lines.extend(["", "## T044 / T047 diagnostics", ""])
     for diag in run.required_diagnostics:
         if diag.case_id not in {"T044", "T047"}:
             continue
@@ -85,18 +124,7 @@ def render_doc08_markdown(run: Doc08AtomicEvaluationRun) -> str:
             ]
         )
 
-    lines.extend(
-        [
-            "## Extension metrics (candidate)",
-            "",
-            f"- Privacy hit@4: {run.extension.candidate.privacy_hit_at_4}/4",
-            f"- Threat doc12 in top-4: {run.extension.candidate.threat_doc12_in_top4}/4",
-            f"- Negative doc08 top-1: {run.extension.candidate.negative_doc08_top1}",
-            "",
-            "## Acceptance checklist",
-            "",
-        ]
-    )
+    lines.extend(["", "## Acceptance checklist", ""])
     for check in run.acceptance_checks:
         mark = "PASS" if check.passed else "FAIL"
         lines.append(

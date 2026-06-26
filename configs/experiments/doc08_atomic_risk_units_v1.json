@@ -31,11 +31,6 @@
   },
   "baseline_index_dir": "data/04_index",
   "candidate_index_dir": "data/04_index_experiments/doc08_atomic_risk_units_v1",
-  "baseline_targets": {
-    "primary_hit_at_4": 0.6206896551724138,
-    "primary_hit_at_12": 0.9137931034482759,
-    "mrr": 0.6456896551724138,
-    "primary_pool_reach": "55/57",
-    "faq_top4": 36
-  }
+  "reference_artifact": "data/05_evaluation/vector_pool_36_cap4_v1.json",
+  "reference_arm": "candidate"
 }

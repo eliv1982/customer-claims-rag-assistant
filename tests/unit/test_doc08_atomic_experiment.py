@@ -19,6 +19,8 @@ from customer_claims_rag.ingestion.corpus_overlay import (
     build_baseline_and_overlay_chunks,
     cleanup_overlay_temp_dir,
     compute_doc08_chunk_diff,
+    compute_overlay_corpus_fingerprint,
+    logical_source_path,
 )
 from customer_claims_rag.retrieval.manifest import load_manifest
 
@@ -137,6 +139,16 @@ def test_production_index_fingerprint_unchanged() -> None:
     assert manifest.corpus_fingerprint == "b9526128dad23e71e812fbd8f26452b8d6efa29e4faac898fa11f279b310e827"
 
 
+def test_overlay_doc08_uses_logical_source_path(overlay_build) -> None:
+    doc08_paths = {chunk.source_path for chunk in overlay_build.candidate_doc08_chunks}
+    assert doc08_paths == {logical_source_path(DOC08_DOCUMENT_ID)}
+
+
+def test_overlay_corpus_fingerprint_deterministic(overlay_build) -> None:
+    fp = compute_overlay_corpus_fingerprint(overlay_build.candidate_chunks)
+    assert len(fp) == 64
+
+
 @pytest.mark.skipif(not CANDIDATE_INDEX.joinpath("manifest.json").exists(), reason="candidate index missing")
 def test_candidate_index_separate_from_production() -> None:
     prod = load_manifest(PRODUCTION_INDEX)
@@ -157,7 +169,11 @@ def test_artifact_has_per_arm_metadata() -> None:
     assert payload["baseline_arm"]["fetch_k"] == 48
     assert payload["candidate_arm"]["fetch_k"] == 48
     assert payload["source_commit"]
+    if "source_dirty" in payload:
+        assert payload["source_dirty"] is False
     assert payload["artifact_commit"] is None
+    if "reference_experiment_id" in payload:
+        assert payload["reference_experiment_id"] == "vector-pool-36-cap4-v1"
 
 
 @pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")

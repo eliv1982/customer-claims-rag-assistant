@@ -9,6 +9,11 @@ from pathlib import Path
 
 from customer_claims_rag.config import DEFAULT_INPUT_DIR
 from customer_claims_rag.env_bootstrap import load_project_env, project_root
+from customer_claims_rag.evaluation.doc08_atomic_contract import (
+    BaselineReproductionError,
+    DEFAULT_REFERENCE_ARTIFACT,
+    DirtySourceTreeError,
+)
 from customer_claims_rag.evaluation.doc08_atomic_evaluator import (
     Doc08AtomicAbEvaluator,
     prepare_chunk_diff_and_fingerprints,
@@ -105,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
         embedding_provider=emb,
         vector_store=baseline_vs,
         index_dir=baseline_index,
-        top_k=final_top_k,
+        top_k=fetch_k,
         fetch_k=fetch_k,
         similarity_threshold=threshold,
     )
@@ -113,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
         embedding_provider=emb,
         vector_store=candidate_vs,
         index_dir=candidate_index,
-        top_k=final_top_k,
+        top_k=fetch_k,
         fetch_k=fetch_k,
         similarity_threshold=threshold,
     )
@@ -121,6 +126,8 @@ def main(argv: list[str] | None = None) -> int:
     reranker_cfg_path = root / retrieval["reranker_config"]
     reranker = SourceAuthorityV1Reranker(load_reranker_config(reranker_cfg_path))
     pool_cfg = load_vector_pool_cap_config(root / "configs/retrieval/vector_pool_36_cap4_v1.json")
+
+    reference_artifact = root / config.get("reference_artifact", DEFAULT_REFERENCE_ARTIFACT)
 
     evaluator = Doc08AtomicAbEvaluator(
         baseline_retriever=baseline_retriever,
@@ -152,6 +159,7 @@ def main(argv: list[str] | None = None) -> int:
             benchmark_id=config["extension_benchmark"]["benchmark_id"],
         ),
         production_retrieval_config_hash=compute_vector_pool_cap_config_hash(pool_cfg),
+        reference_artifact_path=reference_artifact,
         project_root=root,
     )
 
@@ -168,6 +176,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"primary_hit@4={run.frozen_candidate_metrics.primary_source_hit_rate_at_4:.3f}")
         print(f"T044_reachable={next((d.candidate_primary_reachable for d in run.required_diagnostics if d.case_id=='T044'), None)}")
         return 0 if run.verdict == "ACCEPTED AS TARGETED CORPUS REPAIR" else 2
+    except (BaselineReproductionError, DirtySourceTreeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 3
     finally:
         baseline_vs.close()
         candidate_vs.close()

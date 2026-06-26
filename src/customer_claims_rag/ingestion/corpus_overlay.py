@@ -11,9 +11,12 @@ from pathlib import Path
 
 from customer_claims_rag.exceptions import IngestionError
 from customer_claims_rag.ingestion.corpus_builder import CorpusBuilder
+from customer_claims_rag.ingestion.path_helpers import CLEAN_MARKDOWN_DIRNAME
 from customer_claims_rag.models import ChunkRecord
+from customer_claims_rag.retrieval.fingerprint import compute_corpus_fingerprint
 
 DOC08_DOCUMENT_ID = "08_escalation_and_risk_rules"
+OVERLAY_LOGICAL_SOURCE_DIR = CLEAN_MARKDOWN_DIRNAME
 
 
 @dataclass(frozen=True)
@@ -40,12 +43,42 @@ class Doc08ChunkDiff:
     non_doc08_byte_identical: bool
 
 
+def logical_source_path(document_id: str, *, source_dir: str = OVERLAY_LOGICAL_SOURCE_DIR) -> str:
+    """Return stable repo-relative source identity for overlay corpus chunks."""
+    return f"{source_dir}/{document_id}.md"
+
+
+def normalize_overlay_corpus_source_paths(
+    chunks: list[ChunkRecord],
+    *,
+    source_dir: str = OVERLAY_LOGICAL_SOURCE_DIR,
+) -> list[ChunkRecord]:
+    """Replace physical build paths with stable logical source identities."""
+    return [
+        chunk.model_copy(
+            update={"source_path": logical_source_path(chunk.document_id, source_dir=source_dir)},
+        )
+        for chunk in chunks
+    ]
+
+
+def compute_overlay_corpus_fingerprint(
+    chunks: list[ChunkRecord],
+    *,
+    embedding_model: str = "text-embedding-3-small",
+) -> str:
+    """Fingerprint overlay corpus using normalized logical source paths."""
+    normalized = normalize_overlay_corpus_source_paths(chunks)
+    return compute_corpus_fingerprint(normalized, embedding_model=embedding_model)
+
+
 def build_overlay_input_directory(
     *,
     canonical_dir: Path,
     overlay_document_path: Path,
     document_id: str,
     permitted_root: Path,
+    staging_parent: Path | None = None,
 ) -> Path:
     """Create a temporary directory with canonical corpus and one replaced document."""
     canonical_resolved = canonical_dir.resolve()
@@ -59,8 +92,12 @@ def build_overlay_input_directory(
             f"overlay file must be named {expected_name!r}, got {overlay_resolved.name!r}"
         )
 
-    staging_root = permitted_root / ".tmp" / "corpus_overlay"
-    staging_root.mkdir(parents=True, exist_ok=True)
+    if staging_parent is not None:
+        staging_root = staging_parent.resolve()
+        staging_root.mkdir(parents=True, exist_ok=True)
+    else:
+        staging_root = permitted_root / ".tmp" / "corpus_overlay"
+        staging_root.mkdir(parents=True, exist_ok=True)
     temp_dir = Path(tempfile.mkdtemp(prefix="build_", dir=str(staging_root)))
     for source in sorted(canonical_resolved.glob("*.md")):
         dest = temp_dir / source.name
@@ -77,6 +114,7 @@ def build_baseline_and_overlay_chunks(
     overlay_document_path: Path,
     document_id: str = DOC08_DOCUMENT_ID,
     permitted_root: Path,
+    staging_parent: Path | None = None,
 ) -> CorpusOverlayBuildResult:
     """Build baseline chunks from canonical dir and candidate chunks with overlay."""
     builder = CorpusBuilder(permitted_root=permitted_root)
@@ -87,8 +125,10 @@ def build_baseline_and_overlay_chunks(
         overlay_document_path=overlay_document_path,
         document_id=document_id,
         permitted_root=permitted_root,
+        staging_parent=staging_parent,
     )
-    _, candidate_chunks = builder.build_from_directory(temp_input_dir)
+    _, raw_candidate_chunks = builder.build_from_directory(temp_input_dir)
+    candidate_chunks = normalize_overlay_corpus_source_paths(raw_candidate_chunks)
 
     baseline_doc08 = [c for c in baseline_chunks if c.document_id == document_id]
     candidate_doc08 = [c for c in candidate_chunks if c.document_id == document_id]
@@ -172,6 +212,7 @@ def cleanup_overlay_temp_dir(temp_dir: Path | None) -> None:
 
 __all__ = [
     "DOC08_DOCUMENT_ID",
+    "OVERLAY_LOGICAL_SOURCE_DIR",
     "CorpusOverlayBuildResult",
     "Doc08ChunkDiff",
     "build_baseline_and_overlay_chunks",
@@ -179,4 +220,7 @@ __all__ = [
     "cleanup_overlay_temp_dir",
     "compute_doc08_chunk_diff",
     "compute_doc08_fingerprint",
+    "compute_overlay_corpus_fingerprint",
+    "logical_source_path",
+    "normalize_overlay_corpus_source_paths",
 ]
