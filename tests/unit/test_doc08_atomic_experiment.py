@@ -154,6 +154,9 @@ def test_candidate_index_separate_from_production() -> None:
     prod = load_manifest(PRODUCTION_INDEX)
     cand = load_manifest(CANDIDATE_INDEX)
     assert cand.corpus_fingerprint != prod.corpus_fingerprint
+    assert cand.corpus_fingerprint == (
+        "d3c27f4a72e5f78582c6cc29b8cb6c9f26234f6582970ead602f44e5b375bad6"
+    )
     assert cand.chunk_count == 337
 
 
@@ -169,11 +172,19 @@ def test_artifact_has_per_arm_metadata() -> None:
     assert payload["baseline_arm"]["fetch_k"] == 48
     assert payload["candidate_arm"]["fetch_k"] == 48
     assert payload["source_commit"]
-    if "source_dirty" in payload:
-        assert payload["source_dirty"] is False
+    assert payload["source_dirty"] is False
     assert payload["artifact_commit"] is None
-    if "reference_experiment_id" in payload:
-        assert payload["reference_experiment_id"] == "vector-pool-36-cap4-v1"
+    assert payload["reference_experiment_id"] == "vector-pool-36-cap4-v1"
+    assert payload["baseline_reproduction"]["passed"] is True
+
+
+@pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
+def test_baseline_reproduction_in_artifact() -> None:
+    payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+    assert payload["frozen_baseline_primary_hit_at_12"] == pytest.approx(0.9137931034482759)
+    assert payload["frozen_baseline_metrics"]["mrr"] == pytest.approx(0.6456896551724138)
+    assert payload["frozen_reachability_baseline"]["primary_reachable"] == 55
+    assert payload["frozen_reachability_baseline"]["primary_denominator"] == 57
 
 
 @pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
