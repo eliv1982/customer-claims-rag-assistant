@@ -21,6 +21,13 @@ from customer_claims_rag.evaluation.doc12_threat_atomic_evaluator import (
     Doc12ThreatAtomicAbEvaluator,
     prepare_doc12_chunk_diff_and_fingerprints,
 )
+from customer_claims_rag.evaluation.environment_provenance import (
+    EnvironmentProvenanceError,
+    capture_environment_provenance,
+    validate_project_venv,
+)
+from customer_claims_rag.evaluation.doc12_threat_atomic_models import EnvironmentProvenance
+from customer_claims_rag.evaluation.exact_frozen_arm import load_exact_frozen_arm
 from customer_claims_rag.evaluation.doc12_threat_atomic_reporting import (
     DEFAULT_JSON,
     DEFAULT_MARKDOWN,
@@ -36,6 +43,10 @@ from customer_claims_rag.evaluation.extension_parser import (
 )
 from customer_claims_rag.evaluation.parser import load_evaluation_corpus
 from customer_claims_rag.evaluation.pool_expansion_metrics import compute_evaluation_dataset_fingerprint
+from customer_claims_rag.ingestion.corpus_overlay import (
+    build_doc12_experimental_corpora,
+    cleanup_overlay_temp_dir,
+)
 from customer_claims_rag.retrieval.factory import create_embedding_provider, create_vector_store
 from customer_claims_rag.retrieval.path_helpers import validate_index_dir
 from customer_claims_rag.retrieval.reranker import SourceAuthorityV1Reranker, load_reranker_config
@@ -171,6 +182,51 @@ def main(argv: list[str] | None = None) -> int:
 
     reference_artifact = root / config.get("reference_artifact", DEFAULT_REFERENCE_ARTIFACT)
 
+    snapshot_cfg = config.get("embedding_snapshot") or {}
+    baseline_snapshot_path = root / snapshot_cfg.get(
+        "baseline_snapshot_path",
+        "data/05_evaluation/embedding_snapshots/doc08_atomic_risk_units_v1.npz",
+    )
+    baseline_manifest_path = root / snapshot_cfg.get(
+        "baseline_manifest_path",
+        "data/05_evaluation/embedding_snapshots/doc08_atomic_risk_units_v1.manifest.json",
+    )
+    candidate_snapshot_path = root / snapshot_cfg.get(
+        "candidate_snapshot_path",
+        "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.npz",
+    )
+    candidate_manifest_path = root / snapshot_cfg.get(
+        "candidate_manifest_path",
+        "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.manifest.json",
+    )
+
+    canonical_dir = args.canonical_dir if args.canonical_dir.is_absolute() else root / args.canonical_dir
+    overlay = build_doc12_experimental_corpora(
+        canonical_dir=canonical_dir,
+        doc08_overlay_path=doc08_overlay,
+        doc12_overlay_path=doc12_overlay,
+        permitted_root=root,
+    )
+    try:
+        exact_baseline_arm = load_exact_frozen_arm(
+            arm="baseline",
+            chunks=overlay.baseline_chunks,
+            npz_path=baseline_snapshot_path,
+            manifest_path=baseline_manifest_path,
+            embedding_model=args.embedding_model,
+            project_root=root,
+        )
+        exact_candidate_arm = load_exact_frozen_arm(
+            arm="candidate",
+            chunks=overlay.candidate_chunks,
+            npz_path=candidate_snapshot_path,
+            manifest_path=candidate_manifest_path,
+            embedding_model=args.embedding_model,
+            project_root=root,
+        )
+    finally:
+        cleanup_overlay_temp_dir(overlay.temp_input_dir)
+
     evaluator = Doc12ThreatAtomicAbEvaluator(
         baseline_retriever=baseline_retriever,
         candidate_retriever=candidate_retriever,
@@ -210,37 +266,57 @@ def main(argv: list[str] | None = None) -> int:
         production_retrieval_config_hash=compute_vector_pool_cap_config_hash(pool_cfg),
         reference_artifact_path=reference_artifact,
         project_root=root,
+        exact_baseline_arm=exact_baseline_arm,
+        exact_candidate_arm=exact_candidate_arm,
+        query_embedding_provider=emb,
+        evaluation_backend="exact_fixed_snapshot_evaluation",
     )
+    ann_evaluator = evaluator.with_ann_backend()
 
     replay_integrity = None
     if args.stability_matrix:
-        canonical_dir = args.canonical_dir if args.canonical_dir.is_absolute() else root / args.canonical_dir
         from customer_claims_rag.evaluation.doc12_replay_integrity import build_replay_integrity_result
 
-        snapshot_cfg = config.get("embedding_snapshot") or {}
-        snapshot_path = root / snapshot_cfg.get(
-            "candidate_snapshot_path",
-            "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.npz",
-        )
-        manifest_path = root / snapshot_cfg.get(
-            "candidate_manifest_path",
-            "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.manifest.json",
-        )
+        validate_project_venv(root)
         replay_integrity = build_replay_integrity_result(
             index_dir=candidate_index,
             project_root=root,
             config=config,
             canonical_dir=canonical_dir,
             evaluator=evaluator,
+            ann_evaluator=ann_evaluator,
+            exact_baseline_arm=exact_baseline_arm,
+            exact_candidate_arm=exact_candidate_arm,
             rebuild_parent=root / ".tmp" / "doc12_replay_matrix",
-            embedding_snapshot=snapshot_path,
-            embedding_snapshot_manifest=manifest_path,
+            embedding_snapshot=candidate_snapshot_path,
+            embedding_snapshot_manifest=candidate_manifest_path,
+            baseline_snapshot=baseline_snapshot_path,
+            baseline_snapshot_manifest=baseline_manifest_path,
             run_live_probe=not args.skip_live_probe,
         )
         evaluator.replay_integrity = replay_integrity
 
     try:
+        validate_project_venv(root)
         run = evaluator.evaluate()
+        if run.environment is None:
+            if replay_integrity is not None and replay_integrity.environment is not None:
+                run = run.model_copy(update={"environment": replay_integrity.environment})
+            else:
+                env_payload = capture_environment_provenance(root)
+                run = run.model_copy(
+                    update={
+                        "environment": EnvironmentProvenance(
+                            kind="project_venv",
+                            python_version=str(env_payload["python_version"]),
+                            pip_version=str(env_payload["pip_version"]),
+                            pip_check_exit_code=int(env_payload["pip_check_exit_code"]),
+                            dependency_check_summary=str(
+                                env_payload["dependency_check_summary"]
+                            ),
+                        )
+                    }
+                )
         json_path = args.output_json if args.output_json.is_absolute() else root / args.output_json
         markdown_path = (
             args.output_markdown if args.output_markdown.is_absolute() else root / args.output_markdown
@@ -256,7 +332,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"holdout_positive_hit4={run.holdout.candidate.positive_doc12_hit_at_4}/6")
         if run.replay_integrity_verdict:
             print(f"replay_integrity={run.replay_integrity_verdict}")
+        print(f"experiment_verdict_source={run.experiment_verdict_source}")
         return 0 if run.verdict == "ACCEPTED AS COMBINED TARGETED CORPUS REPAIR" else 2
+    except EnvironmentProvenanceError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 4
     except (BaselineReproductionError, DirtySourceTreeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 3

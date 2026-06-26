@@ -1,4 +1,4 @@
-"""Export committed frozen embedding snapshot from experiment embedding cache."""
+"""Export committed frozen embedding snapshot from experiment embedding cache or index."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Literal
 
 from customer_claims_rag.config import DEFAULT_INPUT_DIR
 from customer_claims_rag.env_bootstrap import load_project_env, project_root
@@ -17,17 +18,14 @@ from customer_claims_rag.ingestion.corpus_overlay import (
 )
 from customer_claims_rag.retrieval.embedding_snapshot import (
     SnapshotValidationError,
+    export_snapshot_from_committed_index,
     export_snapshot_from_experiment_cache,
 )
 from customer_claims_rag.retrieval.experiment_embedding_cache import experiment_cache_path
+from customer_claims_rag.retrieval_config import RetrievalSettings
 
 DEFAULT_CONFIG = Path("configs/experiments/doc12_threat_atomic_units_v1.json")
-DEFAULT_NPZ = Path(
-    "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.npz"
-)
-DEFAULT_MANIFEST = Path(
-    "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.manifest.json"
-)
+ArmName = Literal["baseline", "candidate"]
 
 
 def _current_commit(root: Path) -> str | None:
@@ -44,6 +42,18 @@ def _current_commit(root: Path) -> str | None:
         return None
 
 
+def _default_paths(arm: ArmName) -> tuple[Path, Path]:
+    if arm == "baseline":
+        return (
+            Path("data/05_evaluation/embedding_snapshots/doc08_atomic_risk_units_v1.npz"),
+            Path("data/05_evaluation/embedding_snapshots/doc08_atomic_risk_units_v1.manifest.json"),
+        )
+    return (
+        Path("data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.npz"),
+        Path("data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.manifest.json"),
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Export frozen embedding snapshot for doc12 threat experiment.",
@@ -51,10 +61,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--canonical-dir", type=Path, default=DEFAULT_INPUT_DIR)
     parser.add_argument("--index-dir", type=Path, default=None)
-    parser.add_argument("--npz-path", type=Path, default=DEFAULT_NPZ)
-    parser.add_argument("--manifest-path", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--npz-path", type=Path, default=None)
+    parser.add_argument("--manifest-path", type=Path, default=None)
     parser.add_argument("--embedding-model", default=None)
     parser.add_argument("--build-run-id", default=None)
+    parser.add_argument(
+        "--arm",
+        choices=("baseline", "candidate"),
+        default="candidate",
+        help="Experiment arm whose corpus vectors are exported",
+    )
     return parser
 
 
@@ -68,18 +84,21 @@ def main(argv: list[str] | None = None) -> int:
     if not canonical_dir.is_absolute():
         canonical_dir = root / canonical_dir
 
-    index_dir = args.index_dir
-    if index_dir is None:
-        index_dir = root / config["candidate_index_dir"]
-    elif not index_dir.is_absolute():
-        index_dir = root / index_dir
+    default_npz, default_manifest = _default_paths(args.arm)
+    npz_path = args.npz_path or default_npz
+    manifest_path = args.manifest_path or default_manifest
+    if not npz_path.is_absolute():
+        npz_path = root / npz_path
+    if not manifest_path.is_absolute():
+        manifest_path = root / manifest_path
 
-    npz_path = args.npz_path if args.npz_path.is_absolute() else root / args.npz_path
-    manifest_path = (
-        args.manifest_path if args.manifest_path.is_absolute() else root / args.manifest_path
-    )
-
-    from customer_claims_rag.retrieval_config import RetrievalSettings
+    if args.index_dir is None:
+        index_key = "baseline_index_dir" if args.arm == "baseline" else "candidate_index_dir"
+        index_dir = root / config[index_key]
+    elif not args.index_dir.is_absolute():
+        index_dir = root / args.index_dir
+    else:
+        index_dir = args.index_dir
 
     settings = RetrievalSettings.from_env()
     embedding_model = args.embedding_model or settings.embedding_model
@@ -92,25 +111,49 @@ def main(argv: list[str] | None = None) -> int:
         doc12_overlay_path=doc12_overlay,
         permitted_root=root,
     )
+    chunks = overlay.baseline_chunks if args.arm == "baseline" else overlay.candidate_chunks
+    experiment_id = (
+        "doc08-atomic-risk-units-v1-baseline"
+        if args.arm == "baseline"
+        else config["experiment_id"]
+    )
     try:
         cache_path = experiment_cache_path(index_dir)
         lineage = {
             "build_run_id": args.build_run_id,
-            "selected_before_independent_audit": True,
-            "matches_post_r1_authoritative_index": True,
-            "source": "experiment_embeddings_v1.json from post-R1 authoritative build",
+            "arm": args.arm,
+            "source": (
+                "experiment_embeddings_v1.json"
+                if cache_path.is_file()
+                else "committed_chroma_index_export"
+            ),
         }
-        manifest = export_snapshot_from_experiment_cache(
-            chunks=overlay.candidate_chunks,
-            cache_path=cache_path,
-            npz_path=npz_path,
-            manifest_path=manifest_path,
-            embedding_model=embedding_model,
-            candidate_experiment_id=config["experiment_id"],
-            creation_source_commit=_current_commit(root),
-            project_root=root,
-            lineage=lineage,
-        )
+        if cache_path.is_file():
+            manifest = export_snapshot_from_experiment_cache(
+                chunks=chunks,
+                cache_path=cache_path,
+                npz_path=npz_path,
+                manifest_path=manifest_path,
+                embedding_model=embedding_model,
+                candidate_experiment_id=experiment_id,
+                creation_source_commit=_current_commit(root),
+                project_root=root,
+                lineage=lineage,
+            )
+        else:
+            manifest = export_snapshot_from_committed_index(
+                chunks=chunks,
+                index_dir=index_dir,
+                collection_name=settings.collection_name,
+                npz_path=npz_path,
+                manifest_path=manifest_path,
+                embedding_model=embedding_model,
+                candidate_experiment_id=experiment_id,
+                creation_source_commit=_current_commit(root),
+                project_root=root,
+                lineage=lineage,
+            )
+        print(f"arm={args.arm}")
         print(f"snapshot_path={manifest['snapshot_path']}")
         print(f"embedding_digest={manifest['embedding_digest']}")
         print(f"snapshot_digest={manifest['snapshot_digest']}")

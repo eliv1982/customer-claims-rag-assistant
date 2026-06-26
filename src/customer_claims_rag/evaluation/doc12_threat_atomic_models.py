@@ -55,8 +55,14 @@ class Doc12ChunkDiffModel(BaseModel):
 
 Doc12Verdict = Literal["ACCEPTED AS COMBINED TARGETED CORPUS REPAIR", "REJECTED"]
 ReplayIntegrityVerdict = Literal[
+    "PASS — EXACT FIXED-SNAPSHOT EVALUATION REPRODUCIBLE",
+    "FAIL — EXACT FIXED-SNAPSHOT EVALUATION NOT REPRODUCIBLE",
     "PASS — FIXED-SNAPSHOT REPLAY REPRODUCIBLE",
     "FAIL — FIXED-SNAPSHOT REPLAY NOT REPRODUCIBLE",
+]
+ExperimentVerdictSource = Literal[
+    "exact_fixed_snapshot_evaluation",
+    "ann_chroma_evaluation",
 ]
 
 
@@ -65,7 +71,7 @@ class FrozenSnapshotReplayResult(BaseModel):
 
     runs: int
     all_identical: bool
-    authoritative: bool = True
+    authoritative: bool = False
     builds: list[dict[str, Any]] = Field(default_factory=list)
     chunk_payload_identical: bool = False
     embedding_identical: bool = False
@@ -73,6 +79,55 @@ class FrozenSnapshotReplayResult(BaseModel):
     e008_identical: bool = False
     repeated_query_runs: dict[str, Any] = Field(default_factory=dict)
     repeated_full_runs: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExactReplayResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    authoritative: bool = True
+    repeated_full_runs: int = 3
+    repeated_full_identical: bool = False
+    repeated_full_digest: str | None = None
+    independent_loader_roots: int = 3
+    independent_loader_identical: bool = False
+    loader_digests: list[str] = Field(default_factory=list)
+    source_commit_reconstruction_identical: bool = False
+    baseline_snapshot_digest: str | None = None
+    candidate_snapshot_digest: str | None = None
+
+
+class AnnRebuildStability(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["VARIABLE", "STABLE"] = "VARIABLE"
+    authoritative: bool = False
+
+
+class AnnRobustnessResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    authoritative: bool = False
+    builds: int
+    build_summaries: list[dict[str, Any]] = Field(default_factory=list)
+    cases_with_top4_variation: list[dict[str, Any]] = Field(default_factory=list)
+    cases_with_top12_variation: list[dict[str, Any]] = Field(default_factory=list)
+    e008_ann_rank_range: list[int] = Field(default_factory=list)
+    h005_ann_rank_range: list[int] = Field(default_factory=list)
+    exact_e008_final_rank_doc12: int | None = None
+    exact_h005_final_rank_doc12: int | None = None
+    ann_verdict_variation: list[str] = Field(default_factory=list)
+    exact_authoritative_verdict: Doc12Verdict | None = None
+    verdict_changes_experiment_acceptance: bool = False
+
+
+class EnvironmentProvenance(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["project_venv"] = "project_venv"
+    python_version: str
+    pip_version: str
+    pip_check_exit_code: int
+    dependency_check_summary: str
 
 
 class LiveProviderRobustnessResult(BaseModel):
@@ -91,18 +146,24 @@ class LiveProviderRobustnessResult(BaseModel):
 class ReplayIntegrityResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    frozen_snapshot_replay: FrozenSnapshotReplayResult
+    frozen_snapshot_replay: FrozenSnapshotReplayResult | None = None
+    exact_replay: ExactReplayResult | None = None
+    ann_robustness: AnnRobustnessResult | None = None
+    ann_rebuild_stability: AnnRebuildStability | None = None
     live_provider_robustness: LiveProviderRobustnessResult | None = None
-    integrity_verdict: ReplayIntegrityVerdict = "FAIL — FIXED-SNAPSHOT REPLAY NOT REPRODUCIBLE"
+    integrity_verdict: ReplayIntegrityVerdict = "FAIL — EXACT FIXED-SNAPSHOT EVALUATION NOT REPRODUCIBLE"
     corpus_fingerprint: str | None = None
     chunk_payload_digest: str | None = None
     embedding_snapshot_path: str | None = None
     embedding_snapshot_manifest_path: str | None = None
+    baseline_snapshot_path: str | None = None
+    baseline_snapshot_manifest_path: str | None = None
     embedding_snapshot_digest: str | None = None
     embedding_digest: str | None = None
     collection_content_digest: str | None = None
     index_fingerprint: str | None = None
     lineage: dict[str, Any] = Field(default_factory=dict)
+    environment: EnvironmentProvenance | None = None
     pip_environment: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -202,6 +263,11 @@ class Doc12ThreatAtomicEvaluationRun(BaseModel):
     replay_integrity: ReplayIntegrityResult | None = None
     replay_stability: ReplayStabilityResult | None = None
     replay_integrity_verdict: ReplayIntegrityVerdict | None = None
+    ann_robustness: AnnRobustnessResult | None = None
+    ann_rebuild_stability: AnnRebuildStability | None = None
+    exact_replay: ExactReplayResult | None = None
+    environment: EnvironmentProvenance | None = None
+    experiment_verdict_source: ExperimentVerdictSource = "exact_fixed_snapshot_evaluation"
     acceptance_checks: list[AcceptanceCheck] = Field(default_factory=list)
     interpretation_boundary: list[str] = Field(default_factory=list)
     verdict: Doc12Verdict

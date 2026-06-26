@@ -46,11 +46,13 @@ from customer_claims_rag.evaluation.doc12_threat_atomic_models import (
     Doc12ThreatAtomicCaseResult,
     Doc12ThreatAtomicEvaluationRun,
     Doc12Verdict,
+    ExperimentVerdictSource,
     HoldoutEvaluationResult,
     ReplayIntegrityResult,
     ReplayIntegrityVerdict,
     ReplayStabilityResult,
 )
+from customer_claims_rag.evaluation.exact_frozen_arm import ExactFrozenArm
 from customer_claims_rag.evaluation.git_state import read_git_state
 from customer_claims_rag.evaluation.metrics import aggregate_case_metrics, compute_case_metrics
 from customer_claims_rag.evaluation.pool_expansion_metrics import (
@@ -68,6 +70,7 @@ from customer_claims_rag.ingestion.corpus_overlay import (
 )
 from customer_claims_rag.retrieval.manifest import load_manifest
 from customer_claims_rag.retrieval.factory import create_embedding_provider, create_vector_store
+from customer_claims_rag.retrieval.ports import EmbeddingProvider
 from customer_claims_rag.retrieval.reranker import SourceAuthorityV1Reranker, compute_config_hash
 from customer_claims_rag.retrieval.retriever import BaselineRetriever
 
@@ -115,6 +118,10 @@ class Doc12ThreatAtomicAbEvaluator:
         allow_dirty_source: bool = False,
         replay_stability: ReplayStabilityResult | None = None,
         replay_integrity: ReplayIntegrityResult | None = None,
+        exact_baseline_arm: ExactFrozenArm | None = None,
+        exact_candidate_arm: ExactFrozenArm | None = None,
+        query_embedding_provider: EmbeddingProvider | None = None,
+        evaluation_backend: ExperimentVerdictSource = "exact_fixed_snapshot_evaluation",
     ) -> None:
         self.baseline_retriever = baseline_retriever
         self.candidate_retriever = candidate_retriever
@@ -146,6 +153,10 @@ class Doc12ThreatAtomicAbEvaluator:
         self.allow_dirty_source = allow_dirty_source
         self.replay_stability = replay_stability
         self.replay_integrity = replay_integrity
+        self.exact_baseline_arm = exact_baseline_arm
+        self.exact_candidate_arm = exact_candidate_arm
+        self.query_embedding_provider = query_embedding_provider or baseline_retriever.embedding_provider
+        self.evaluation_backend = evaluation_backend
         self._candidate_vector_store = candidate_retriever.vector_store
         self.reference_oracle = load_doc08_experimental_oracle(
             reference_artifact_path,
@@ -364,6 +375,19 @@ class Doc12ThreatAtomicAbEvaluator:
                     self.replay_stability.integrity_verdict if self.replay_stability else None
                 )
             ),
+            ann_robustness=(
+                self.replay_integrity.ann_robustness if self.replay_integrity else None
+            ),
+            ann_rebuild_stability=(
+                self.replay_integrity.ann_rebuild_stability if self.replay_integrity else None
+            ),
+            exact_replay=(
+                self.replay_integrity.exact_replay if self.replay_integrity else None
+            ),
+            environment=(
+                self.replay_integrity.environment if self.replay_integrity else None
+            ),
+            experiment_verdict_source=self.evaluation_backend,
             acceptance_checks=all_checks,
             interpretation_boundary=[
                 "Baseline arm is the accepted doc08 experimental candidate corpus; "
@@ -506,10 +530,14 @@ class Doc12ThreatAtomicAbEvaluator:
         }
 
     def _evaluate_single_case(self, case) -> dict:
-        b_resp = self.baseline_retriever.search(case.query)
-        c_resp = self.candidate_retriever.search(case.query)
-        b_vector = list(b_resp.results)
-        c_vector = list(c_resp.results)
+        if self._uses_exact_backend():
+            b_vector = self._exact_vector_search(case.query, arm="baseline")
+            c_vector = self._exact_vector_search(case.query, arm="candidate")
+        else:
+            b_resp = self.baseline_retriever.search(case.query)
+            c_resp = self.candidate_retriever.search(case.query)
+            b_vector = list(b_resp.results)
+            c_vector = list(c_resp.results)
 
         b_pool, _ = apply_per_document_cap(
             b_vector,
@@ -602,6 +630,61 @@ class Doc12ThreatAtomicAbEvaluator:
             "baseline_vector": b_vector,
             "candidate_vector": c_vector,
         }
+
+    def _uses_exact_backend(self) -> bool:
+        return (
+            self.evaluation_backend == "exact_fixed_snapshot_evaluation"
+            and self.exact_baseline_arm is not None
+            and self.exact_candidate_arm is not None
+        )
+
+    def _exact_vector_search(self, query: str, *, arm: str) -> list:
+        frozen_arm = (
+            self.exact_baseline_arm if arm == "baseline" else self.exact_candidate_arm
+        )
+        if frozen_arm is None:
+            raise RuntimeError(f"exact frozen arm missing for {arm}")
+        query_vector = self.query_embedding_provider.embed_query(query)
+        return frozen_arm.search(
+            query_vector,
+            fetch_k=self.fetch_k,
+            threshold=self.threshold,
+        )
+
+    def with_ann_backend(self) -> Doc12ThreatAtomicAbEvaluator:
+        """Return a shallow copy that evaluates through Chroma ANN (diagnostics only)."""
+        clone = Doc12ThreatAtomicAbEvaluator(
+            baseline_retriever=self.baseline_retriever,
+            candidate_retriever=self.candidate_retriever,
+            reranker=self.reranker,
+            fetch_k=self.fetch_k,
+            pool_k=self.pool_k,
+            per_document_cap=self.per_document_cap,
+            final_top_k=self.final_top_k,
+            threshold=self.threshold,
+            frozen_cases=self.frozen_cases,
+            extension_cases=self.extension_cases,
+            holdout_cases=self.holdout_cases,
+            baseline_index_dir=self.baseline_index_dir,
+            candidate_index_dir=self.candidate_index_dir,
+            collection_name=self.collection_name,
+            embedding_model=self.embedding_model,
+            experiment_id=self.experiment_id,
+            config=self.config,
+            chunk_diff=self.chunk_diff,
+            baseline_doc08_fingerprint=self.baseline_doc08_fingerprint,
+            candidate_doc08_fingerprint=self.candidate_doc08_fingerprint,
+            doc08_fingerprint_unchanged=self.doc08_fingerprint_unchanged,
+            frozen_benchmark_fingerprint=self.frozen_benchmark_fingerprint,
+            extension_benchmark_fingerprint=self.extension_benchmark_fingerprint,
+            holdout_benchmark_fingerprint=self.holdout_benchmark_fingerprint,
+            production_retrieval_config_hash=self.production_retrieval_config_hash,
+            reference_artifact_path=self.reference_artifact_path,
+            project_root=self.project_root,
+            allow_dirty_source=self.allow_dirty_source,
+            evaluation_backend="ann_chroma_evaluation",
+        )
+        return clone
 
 
 def prepare_doc12_chunk_diff_and_fingerprints(

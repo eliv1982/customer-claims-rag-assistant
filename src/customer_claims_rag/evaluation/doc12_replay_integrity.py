@@ -15,11 +15,21 @@ from typing import Any
 from customer_claims_rag.evaluation.diversity_pool import apply_per_document_cap
 from customer_claims_rag.evaluation.doc08_atomic_contract import DOC12_DOCUMENT_ID
 from customer_claims_rag.evaluation.doc12_threat_atomic_contract import repo_relative_path
+from customer_claims_rag.evaluation.doc12_ann_robustness import digest_exact_run, run_ann_robustness_matrix
 from customer_claims_rag.evaluation.doc12_threat_atomic_models import (
+    AnnRebuildStability,
+    EnvironmentProvenance,
+    ExactReplayResult,
     FrozenSnapshotReplayResult,
     LiveProviderRobustnessResult,
     ReplayIntegrityResult,
     ReplayIntegrityVerdict,
+)
+from customer_claims_rag.evaluation.environment_provenance import capture_environment_provenance
+from customer_claims_rag.evaluation.exact_frozen_arm import (
+    ExactFrozenArm,
+    copy_snapshot_to_temp_root,
+    load_exact_frozen_arm,
 )
 from customer_claims_rag.evaluation.extension_parser import load_extension_corpus
 from customer_claims_rag.evaluation.pool_expansion_metrics import rerank_to_final_top_k
@@ -347,7 +357,7 @@ def run_frozen_snapshot_replay(
         ),
         repeated_query_runs=repeated_query,
         repeated_full_runs=repeated_full,
-        authoritative=True,
+        authoritative=False,
     )
 
 
@@ -449,27 +459,132 @@ def run_repeated_full_evaluation_stability(
 
 
 def capture_pip_environment(*, project_root: Path) -> dict[str, Any]:
-    pip_version = subprocess.run(
-        [sys.executable, "-m", "pip", "--version"],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
+    """Backward-compatible wrapper; prefer capture_environment_provenance."""
+    provenance = capture_environment_provenance(project_root)
+    return provenance
+
+
+def run_exact_replay_matrix(
+    *,
+    evaluator,
+    exact_baseline_arm: ExactFrozenArm,
+    exact_candidate_arm: ExactFrozenArm,
+    baseline_npz: Path,
+    baseline_manifest: Path,
+    candidate_npz: Path,
+    candidate_manifest: Path,
+    project_root: Path,
+    canonical_dir: Path,
+    parent_dir: Path,
+    runs: int = 3,
+) -> ExactReplayResult:
+    if parent_dir.exists():
+        shutil.rmtree(parent_dir)
+    parent_dir.mkdir(parents=True, exist_ok=True)
+
+    full_digests: list[str] = []
+    for _ in range(runs):
+        run = evaluator.evaluate()
+        full_digests.append(digest_exact_run(run))
+
+    loader_digests: list[str] = []
+    for label in ("ROOT_A", "ROOT_B", "ROOT_C"):
+        temp_root = parent_dir / label
+        copy_snapshot_to_temp_root(
+            npz_path=baseline_npz,
+            manifest_path=baseline_manifest,
+            temp_root=temp_root / "baseline",
+        )
+        copy_snapshot_to_temp_root(
+            npz_path=candidate_npz,
+            manifest_path=candidate_manifest,
+            temp_root=temp_root / "candidate",
+        )
+        baseline_copy_npz, baseline_copy_manifest = copy_snapshot_to_temp_root(
+            npz_path=baseline_npz,
+            manifest_path=baseline_manifest,
+            temp_root=temp_root / "reload_baseline",
+        )
+        candidate_copy_npz, candidate_copy_manifest = copy_snapshot_to_temp_root(
+            npz_path=candidate_npz,
+            manifest_path=candidate_manifest,
+            temp_root=temp_root / "reload_candidate",
+        )
+        from customer_claims_rag.ingestion.corpus_overlay import (
+            build_doc12_experimental_corpora,
+            cleanup_overlay_temp_dir,
+        )
+
+        overlay = build_doc12_experimental_corpora(
+            canonical_dir=canonical_dir,
+            doc08_overlay_path=project_root
+            / evaluator.config["baseline_corpus"]["doc08_overlay_path"],
+            doc12_overlay_path=project_root
+            / evaluator.config["candidate_overlay"]["overlay_path"],
+            permitted_root=project_root,
+        )
+        try:
+            reloaded_baseline = load_exact_frozen_arm(
+                arm="baseline",
+                chunks=overlay.baseline_chunks,
+                npz_path=baseline_copy_npz,
+                manifest_path=baseline_copy_manifest,
+                embedding_model=evaluator.embedding_model,
+                project_root=project_root,
+            )
+            reloaded_candidate = load_exact_frozen_arm(
+                arm="candidate",
+                chunks=overlay.candidate_chunks,
+                npz_path=candidate_copy_npz,
+                manifest_path=candidate_copy_manifest,
+                embedding_model=evaluator.embedding_model,
+                project_root=project_root,
+            )
+        finally:
+            cleanup_overlay_temp_dir(overlay.temp_input_dir)
+
+        assert reloaded_baseline.chunk_ids == exact_baseline_arm.chunk_ids
+        assert reloaded_candidate.chunk_ids == exact_candidate_arm.chunk_ids
+        assert reloaded_baseline.embedding_digest == exact_baseline_arm.embedding_digest
+        assert reloaded_candidate.embedding_digest == exact_candidate_arm.embedding_digest
+        loader_digests.append(
+            hashlib.sha256(
+                json.dumps(
+                    {
+                        "baseline": reloaded_baseline.embedding_digest,
+                        "candidate": reloaded_candidate.embedding_digest,
+                        "baseline_ids": list(reloaded_baseline.chunk_ids[:3]),
+                        "candidate_ids": list(reloaded_candidate.chunk_ids[:3]),
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+        )
+
+    reconstruction_root = parent_dir / "SOURCE_COMMIT"
+    copy_snapshot_to_temp_root(
+        npz_path=candidate_npz,
+        manifest_path=candidate_manifest,
+        temp_root=reconstruction_root,
     )
-    pip_check = subprocess.run(
-        [sys.executable, "-m", "pip", "check"],
-        cwd=project_root,
-        capture_output=True,
-        text=True,
+    reconstruction_identical = (
+        hashlib.sha256(candidate_npz.read_bytes()).hexdigest()
+        == hashlib.sha256((reconstruction_root / candidate_npz.name).read_bytes()).hexdigest()
     )
-    return {
-        "sys_executable": sys.executable.replace("\\", "/"),
-        "working_directory": str(project_root).replace("\\", "/"),
-        "pip_version_stdout": pip_version.stdout.strip(),
-        "pip_version_stderr": pip_version.stderr.strip(),
-        "pip_check_stdout": pip_check.stdout.strip(),
-        "pip_check_stderr": pip_check.stderr.strip(),
-        "pip_check_exit_code": pip_check.returncode,
-    }
+
+    return ExactReplayResult(
+        authoritative=True,
+        repeated_full_runs=runs,
+        repeated_full_identical=len(set(full_digests)) == 1,
+        repeated_full_digest=full_digests[0] if full_digests else None,
+        independent_loader_roots=3,
+        independent_loader_identical=len(set(loader_digests)) == 1,
+        loader_digests=loader_digests,
+        source_commit_reconstruction_identical=reconstruction_identical,
+        baseline_snapshot_digest=exact_baseline_arm.snapshot_digest,
+        candidate_snapshot_digest=exact_candidate_arm.snapshot_digest,
+    )
 
 
 def build_replay_integrity_result(
@@ -479,10 +594,16 @@ def build_replay_integrity_result(
     config: dict,
     canonical_dir: Path,
     evaluator,
+    ann_evaluator,
+    exact_baseline_arm: ExactFrozenArm,
+    exact_candidate_arm: ExactFrozenArm,
     rebuild_parent: Path,
     embedding_snapshot: Path,
     embedding_snapshot_manifest: Path,
+    baseline_snapshot: Path,
+    baseline_snapshot_manifest: Path,
     run_live_probe: bool = True,
+    exact_run=None,
 ) -> ReplayIntegrityResult:
     resolved_snapshot = (
         embedding_snapshot if embedding_snapshot.is_absolute() else project_root / embedding_snapshot
@@ -492,11 +613,31 @@ def build_replay_integrity_result(
         if embedding_snapshot_manifest.is_absolute()
         else project_root / embedding_snapshot_manifest
     )
+    resolved_baseline_snapshot = (
+        baseline_snapshot
+        if baseline_snapshot.is_absolute()
+        else project_root / baseline_snapshot
+    )
+    resolved_baseline_manifest = (
+        baseline_snapshot_manifest
+        if baseline_snapshot_manifest.is_absolute()
+        else project_root / baseline_snapshot_manifest
+    )
     manifest = load_snapshot_manifest(resolved_manifest)
     original_candidate_index = evaluator.candidate_index_dir
+    environment_payload = capture_environment_provenance(project_root)
+    environment = EnvironmentProvenance(
+        kind="project_venv",
+        python_version=str(environment_payload["python_version"]),
+        pip_version=str(environment_payload["pip_version"]),
+        pip_check_exit_code=int(environment_payload["pip_check_exit_code"]),
+        dependency_check_summary=str(environment_payload["dependency_check_summary"]),
+    )
 
-    frozen_parent = rebuild_parent / "frozen"
+    frozen_parent = rebuild_parent / "frozen_ann"
     live_parent = rebuild_parent / "live"
+    exact_parent = rebuild_parent / "exact"
+    ann_parent = rebuild_parent / "ann_robustness"
     try:
         frozen = run_frozen_snapshot_replay(
             config=config,
@@ -505,7 +646,31 @@ def build_replay_integrity_result(
             project_root=project_root,
             embedding_snapshot=resolved_snapshot,
             embedding_snapshot_manifest=resolved_manifest,
+            evaluator=ann_evaluator,
+            builds=3,
+        )
+        exact_replay = run_exact_replay_matrix(
             evaluator=evaluator,
+            exact_baseline_arm=exact_baseline_arm,
+            exact_candidate_arm=exact_candidate_arm,
+            baseline_npz=resolved_baseline_snapshot,
+            baseline_manifest=resolved_baseline_manifest,
+            candidate_npz=resolved_snapshot,
+            candidate_manifest=resolved_manifest,
+            project_root=project_root,
+            canonical_dir=canonical_dir,
+            parent_dir=exact_parent,
+        )
+        authoritative_run = exact_run or evaluator.evaluate()
+        ann_robustness = run_ann_robustness_matrix(
+            config=config,
+            canonical_dir=canonical_dir,
+            parent_dir=ann_parent,
+            project_root=project_root,
+            ann_evaluator=ann_evaluator,
+            exact_run=authoritative_run,
+            embedding_snapshot=resolved_snapshot,
+            embedding_snapshot_manifest=resolved_manifest,
             builds=3,
         )
         live = None
@@ -515,34 +680,45 @@ def build_replay_integrity_result(
                 canonical_dir=canonical_dir,
                 parent_dir=live_parent,
                 project_root=project_root,
-                evaluator=evaluator,
+                evaluator=ann_evaluator,
                 runs=9,
                 original_candidate_index=original_candidate_index,
             )
         else:
-            evaluator.replace_candidate_index(original_candidate_index)
+            ann_evaluator.replace_candidate_index(original_candidate_index)
 
         integrity_verdict: ReplayIntegrityVerdict = (
-            "PASS — FIXED-SNAPSHOT REPLAY REPRODUCIBLE"
-            if frozen.all_identical
-            else "FAIL — FIXED-SNAPSHOT REPLAY NOT REPRODUCIBLE"
+            "PASS — EXACT FIXED-SNAPSHOT EVALUATION REPRODUCIBLE"
+            if exact_replay.repeated_full_identical
+            and exact_replay.independent_loader_identical
+            and exact_replay.source_commit_reconstruction_identical
+            else "FAIL — EXACT FIXED-SNAPSHOT EVALUATION NOT REPRODUCIBLE"
         )
 
         candidate_manifest = load_manifest(index_dir)
         return ReplayIntegrityResult(
             frozen_snapshot_replay=frozen,
+            exact_replay=exact_replay,
+            ann_robustness=ann_robustness,
+            ann_rebuild_stability=AnnRebuildStability(status="VARIABLE", authoritative=False),
             live_provider_robustness=live,
             integrity_verdict=integrity_verdict,
             corpus_fingerprint=manifest.get("corpus_fingerprint"),
             chunk_payload_digest=manifest.get("chunk_payload_digest"),
             embedding_snapshot_path=repo_relative_path(resolved_snapshot, project_root),
             embedding_snapshot_manifest_path=repo_relative_path(resolved_manifest, project_root),
+            baseline_snapshot_path=repo_relative_path(resolved_baseline_snapshot, project_root),
+            baseline_snapshot_manifest_path=repo_relative_path(
+                resolved_baseline_manifest,
+                project_root,
+            ),
             embedding_snapshot_digest=manifest.get("snapshot_digest"),
             embedding_digest=manifest.get("embedding_digest"),
             collection_content_digest=candidate_manifest.collection_content_digest,
             index_fingerprint=candidate_manifest.corpus_fingerprint,
             lineage=dict(manifest.get("lineage") or {}),
-            pip_environment=capture_pip_environment(project_root=project_root),
+            environment=environment,
+            pip_environment=environment_payload,
         )
     finally:
         shutil.rmtree(rebuild_parent, ignore_errors=True)
@@ -555,9 +731,15 @@ def build_replay_stability_result(
     config: dict,
     canonical_dir: Path,
     evaluator,
+    ann_evaluator,
+    exact_baseline_arm: ExactFrozenArm,
+    exact_candidate_arm: ExactFrozenArm,
     rebuild_parent: Path,
     embedding_snapshot: Path | None = None,
     embedding_snapshot_manifest: Path | None = None,
+    baseline_snapshot: Path | None = None,
+    baseline_snapshot_manifest: Path | None = None,
+    exact_run=None,
 ) -> ReplayIntegrityResult:
     """Backward-compatible entry point used by evaluation CLI."""
     snapshot_cfg = config.get("embedding_snapshot") or {}
@@ -569,14 +751,27 @@ def build_replay_stability_result(
         "candidate_manifest_path",
         "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.manifest.json",
     )
+    baseline_path = baseline_snapshot or project_root / snapshot_cfg.get(
+        "baseline_snapshot_path",
+        "data/05_evaluation/embedding_snapshots/doc08_atomic_risk_units_v1.npz",
+    )
+    baseline_manifest_path = baseline_snapshot_manifest or project_root / snapshot_cfg.get(
+        "baseline_manifest_path",
+        "data/05_evaluation/embedding_snapshots/doc08_atomic_risk_units_v1.manifest.json",
+    )
     return build_replay_integrity_result(
         index_dir=index_dir,
         project_root=project_root,
         config=config,
         canonical_dir=canonical_dir,
         evaluator=evaluator,
+        ann_evaluator=ann_evaluator,
+        exact_baseline_arm=exact_baseline_arm,
+        exact_candidate_arm=exact_candidate_arm,
         rebuild_parent=rebuild_parent,
         embedding_snapshot=snapshot_path,
         embedding_snapshot_manifest=manifest_path,
-        run_live_probe=True,
+        baseline_snapshot=baseline_path,
+        baseline_snapshot_manifest=baseline_manifest_path,
+        exact_run=exact_run,
     )

@@ -361,3 +361,56 @@ def export_snapshot_from_experiment_cache(
         project_root=project_root,
         lineage=lineage,
     )
+
+
+def export_snapshot_from_committed_index(
+    *,
+    chunks: list[ChunkRecord],
+    index_dir: Path,
+    collection_name: str,
+    npz_path: Path,
+    manifest_path: Path,
+    embedding_model: str,
+    candidate_experiment_id: str,
+    creation_source_commit: str | None,
+    project_root: Path,
+    lineage: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Export NPZ snapshot from vectors stored in a committed Chroma index (no API calls)."""
+    from customer_claims_rag.retrieval.factory import create_vector_store
+
+    ordered = sort_chunks_deterministic(chunks)
+    chunk_payload_digest = compute_chunk_payload_digest(ordered)
+    corpus_fingerprint = compute_corpus_fingerprint(
+        ordered,
+        embedding_model=embedding_model,
+    )
+    store = create_vector_store(index_dir=index_dir, collection_name=collection_name)
+    try:
+        exported = store.export_collection_records()
+    finally:
+        store.close()
+
+    by_id = {str(record["chunk_id"]): record for record in exported}
+    missing = [chunk.chunk_id for chunk in ordered if chunk.chunk_id not in by_id]
+    if missing:
+        raise SnapshotValidationError(
+            f"committed index missing vectors for chunks: {missing[:5]}"
+        )
+    embeddings = [
+        [float(value) for value in by_id[chunk.chunk_id]["embedding"]]
+        for chunk in ordered
+    ]
+    return write_embedding_snapshot(
+        npz_path=npz_path,
+        manifest_path=manifest_path,
+        chunks=ordered,
+        embeddings=embeddings,
+        embedding_model=embedding_model,
+        corpus_fingerprint=corpus_fingerprint,
+        chunk_payload_digest=chunk_payload_digest,
+        candidate_experiment_id=candidate_experiment_id,
+        creation_source_commit=creation_source_commit,
+        project_root=project_root,
+        lineage=lineage,
+    )

@@ -54,6 +54,8 @@
   "baseline_index_dir": "data/04_index_experiments/doc08_atomic_risk_units_v1",
   "candidate_index_dir": "data/04_index_experiments/doc12_threat_atomic_units_v1",
   "embedding_snapshot": {
+    "baseline_snapshot_path": "data/05_evaluation/embedding_snapshots/doc08_atomic_risk_units_v1.npz",
+    "baseline_manifest_path": "data/05_evaluation/embedding_snapshots/doc08_atomic_risk_units_v1.manifest.json",
     "candidate_snapshot_path": "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.npz",
     "candidate_manifest_path": "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.manifest.json"
   },

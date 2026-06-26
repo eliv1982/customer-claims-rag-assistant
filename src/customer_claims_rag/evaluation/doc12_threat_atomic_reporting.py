@@ -21,6 +21,7 @@ def render_doc12_markdown(run: Doc12ThreatAtomicEvaluationRun) -> str:
         f"**Artifact commit:** `{run.artifact_commit or 'pending'}`",
         f"**Reference:** `{run.reference_experiment_id}` / `{run.reference_arm}`",
         f"**Verdict:** `{run.verdict}`",
+        f"**Experiment verdict source:** `{run.experiment_verdict_source}`",
         "",
         "## Baseline reproduction",
         "",
@@ -57,23 +58,76 @@ def render_doc12_markdown(run: Doc12ThreatAtomicEvaluationRun) -> str:
         f"| FAQ top-4 | {run.faq_top4_baseline} | {run.faq_top4_candidate} |",
         "",
     ]
+    if run.environment is not None:
+        lines.extend(
+            [
+                "## Environment",
+                "",
+                f"- Kind: `{run.environment.kind}`",
+                f"- Python: `{run.environment.python_version}`",
+                f"- Pip: `{run.environment.pip_version}`",
+                f"- Pip check exit code: `{run.environment.pip_check_exit_code}`",
+                f"- Dependency check: `{run.environment.dependency_check_summary}`",
+                "",
+            ]
+        )
     if run.replay_integrity is not None:
+        replay = run.replay_integrity
+        frozen = replay.frozen_snapshot_replay
         lines.extend(
             [
                 "## Replay integrity",
                 "",
-                f"- Integrity verdict: `{run.replay_integrity.integrity_verdict}`",
-                f"- Frozen snapshot replay identical: **{run.replay_integrity.frozen_snapshot_replay.all_identical}**",
-                f"- Frozen runs: {run.replay_integrity.frozen_snapshot_replay.runs}",
-                f"- Repeated query runs identical: {run.replay_integrity.frozen_snapshot_replay.repeated_query_runs.get('all_identical')}",
-                f"- Repeated full runs identical: {run.replay_integrity.frozen_snapshot_replay.repeated_full_runs.get('all_identical')}",
-                f"- Embedding snapshot: `{run.replay_integrity.embedding_snapshot_path}`",
-                f"- Snapshot digest: `{run.replay_integrity.embedding_snapshot_digest}`",
-                f"- Candidate collection digest: `{run.replay_integrity.collection_content_digest}`",
-                f"- Candidate embedding digest: `{run.replay_integrity.embedding_digest}`",
+                f"- Integrity verdict: `{replay.integrity_verdict}`",
             ]
         )
-        live = run.replay_integrity.live_provider_robustness
+        if frozen is not None:
+            lines.extend(
+                [
+                    f"- ANN frozen rebuild identical: **{frozen.all_identical}** (authoritative={frozen.authoritative})",
+                    f"- ANN frozen runs: {frozen.runs}",
+                    f"- ANN repeated query runs identical: {frozen.repeated_query_runs.get('all_identical')}",
+                    f"- ANN repeated full runs identical: {frozen.repeated_full_runs.get('all_identical')}",
+                ]
+            )
+        if replay.exact_replay is not None:
+            exact = replay.exact_replay
+            lines.extend(
+                [
+                    f"- Exact repeated full runs identical: **{exact.repeated_full_identical}**",
+                    f"- Exact independent loader roots identical: **{exact.independent_loader_identical}**",
+                    f"- Exact source-commit reconstruction identical: **{exact.source_commit_reconstruction_identical}**",
+                    f"- Baseline snapshot digest: `{exact.baseline_snapshot_digest}`",
+                    f"- Candidate snapshot digest: `{exact.candidate_snapshot_digest}`",
+                ]
+            )
+        if replay.ann_robustness is not None:
+            ann = replay.ann_robustness
+            lines.extend(
+                [
+                    f"- ANN robustness builds: {ann.builds} (authoritative={ann.authoritative})",
+                    f"- E008 ANN rank range: {ann.e008_ann_rank_range}",
+                    f"- H005 ANN rank range: {ann.h005_ann_rank_range}",
+                    f"- Exact E008 final rank doc12: {ann.exact_e008_final_rank_doc12}",
+                    f"- Exact H005 final rank doc12: {ann.exact_h005_final_rank_doc12}",
+                    f"- ANN verdict variation: {ann.ann_verdict_variation}",
+                ]
+            )
+        if replay.ann_rebuild_stability is not None:
+            lines.append(
+                f"- ANN rebuild stability: `{replay.ann_rebuild_stability.status}` "
+                f"(authoritative={replay.ann_rebuild_stability.authoritative})"
+            )
+        lines.extend(
+            [
+                f"- Candidate embedding snapshot: `{replay.embedding_snapshot_path}`",
+                f"- Baseline embedding snapshot: `{replay.baseline_snapshot_path}`",
+                f"- Snapshot digest: `{replay.embedding_snapshot_digest}`",
+                f"- Candidate collection digest: `{replay.collection_content_digest}`",
+                f"- Candidate embedding digest: `{replay.embedding_digest}`",
+            ]
+        )
+        live = replay.live_provider_robustness
         if live is not None:
             lines.extend(
                 [

@@ -206,8 +206,16 @@ def test_doc12_artifact_paths_are_repo_relative() -> None:
     assert not re.match(r"^[A-Za-z]:\\", payload["reference_artifact_path"])
     replay = payload.get("replay_integrity")
     if replay is not None:
-        assert "independent_rebuilds_identical" not in json.dumps(replay)
-        assert replay.get("frozen_snapshot_replay", {}).get("authoritative") is True
+        frozen = replay.get("frozen_snapshot_replay") or {}
+        if frozen.get("authoritative") is True and replay.get("exact_replay") is None:
+            pytest.skip("artifact predates R3 exact evaluation oracle")
+        assert frozen.get("authoritative") is False
+        exact = replay.get("exact_replay") or {}
+        if exact:
+            assert exact.get("authoritative") is True
+        ann = replay.get("ann_robustness") or {}
+        if ann:
+            assert ann.get("authoritative") is False
         live = replay.get("live_provider_robustness")
         if live is not None:
             assert live.get("authoritative") is False
@@ -219,3 +227,5 @@ def test_config_declares_embedding_snapshot_paths() -> None:
     snapshot = config.get("embedding_snapshot") or {}
     assert snapshot["candidate_snapshot_path"].endswith("doc12_threat_atomic_units_v1.npz")
     assert snapshot["candidate_manifest_path"].endswith("doc12_threat_atomic_units_v1.manifest.json")
+    assert snapshot["baseline_snapshot_path"].endswith("doc08_atomic_risk_units_v1.npz")
+    assert snapshot["baseline_manifest_path"].endswith("doc08_atomic_risk_units_v1.manifest.json")
