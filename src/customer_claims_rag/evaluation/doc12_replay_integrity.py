@@ -201,12 +201,12 @@ def run_independent_rebuild_stability(
     canonical_dir: Path,
     parent_dir: Path,
     project_root: Path,
+    cache_home: Path,
     builds: int = 3,
 ) -> dict[str, Any]:
     if parent_dir.exists():
         shutil.rmtree(parent_dir)
     parent_dir.mkdir(parents=True, exist_ok=True)
-    shared_cache = parent_dir / "shared_embedding_cache"
     results = []
     for label in ("A", "B", "C")[:builds]:
         index_dir = parent_dir / f"BUILD_{label}"
@@ -217,7 +217,7 @@ def run_independent_rebuild_stability(
                 index_dir=index_dir,
                 project_root=project_root,
                 run_id=f"{label.lower()}-{uuid.uuid4().hex[:8]}",
-                shared_cache_dir=shared_cache,
+                shared_cache_dir=cache_home,
             )
         )
     chunk_digests = {item["chunk_payload_digest"] for item in results}
@@ -284,6 +284,7 @@ def build_replay_stability_result(
         canonical_dir=canonical_dir,
         parent_dir=rebuild_parent,
         project_root=project_root,
+        cache_home=index_dir,
         builds=3,
     )
     all_identical = (
