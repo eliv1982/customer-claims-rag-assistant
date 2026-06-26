@@ -80,7 +80,7 @@ validate-release-posture
 - Emergency rollback returns to the previously rejected 15-document posture (archive only).
 - Specialized deferred capabilities listed above are not available in production.
 - Startup fails closed on index, manifest, or frozen-config mismatch.
-- Legacy `RAG_INDEX_DIR` must match the selected release target path or production startup rejects the conflict.
+- `RAG_INDEX_DIR` is **not** used by production answer/UI flow; it applies only to build/search/evaluation CLIs.
 
 ## Rollback procedure (emergency only)
 
@@ -90,7 +90,6 @@ Rollback does **not** copy, rename, rebuild, or overwrite either index directory
 
    ```powershell
    $env:RAG_RELEASE_TARGET = "rollback"
-   $env:RAG_INDEX_DIR = "data/04_index"
    ```
 
 2. Validate release posture:
@@ -109,8 +108,26 @@ Rollback does **not** copy, rename, rebuild, or overwrite either index directory
 
    ```powershell
    $env:RAG_RELEASE_TARGET = "active"
-   $env:RAG_INDEX_DIR = "data/04_index_backup_10docs_215chunks"
    validate-release-posture
    ```
 
 No directory copy, rename, or rebuild is required for rollback or return-to-active.
+
+## Chroma internal storage drift (stage 4C.4-B-R1)
+
+Read-only runtime access to a provisioned local Chroma index may update internal persistent files (`chroma.sqlite3`, HNSW segment files) **without changing semantic index identity**.
+
+Investigation on disposable copies outside the repository (active and rollback indices) found:
+
+- Opening `PersistentClient` / `ChromaVectorStore(open_existing=True)` may change byte hashes of `chroma.sqlite3` and HNSW `data_level0.bin` / `length.bin`.
+- `get_collection`, record counts, document IDs, metadata, embeddings, manifest fingerprint, and representative similarity-search rankings remained identical across open, count/metadata read, and query steps.
+- **Classification:** `BENIGN INTERNAL STORAGE DRIFT`.
+
+Release identity is therefore defined by:
+
+1. Descriptor target identity (`configs/release/production_posture.json`);
+2. Manifest corpus fingerprint and chunk/document counts;
+3. Semantic record validation (collection name, IDs, counts, supported documents);
+4. Frozen retrieval metrics on the unchanged 60-question benchmark.
+
+Do **not** treat internal Chroma/HNSW byte-hash drift alone as index corruption when semantic invariants and frozen metrics remain stable.

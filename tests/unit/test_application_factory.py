@@ -31,9 +31,14 @@ from customer_claims_rag.generation.risk_aware_generator import RiskAwareGrounde
 from customer_claims_rag.generation_config import GenerationSettings
 from customer_claims_rag.retrieval.retriever import BaselineRetriever
 from customer_claims_rag.retrieval_config import RetrievalSettings
-from customer_claims_rag.release.posture import ReleasePostureDiagnostics
+from customer_claims_rag.release.posture import (
+    ProductionReleaseContext,
+    ReleasePostureDiagnostics,
+    load_release_posture_descriptor,
+)
 from tests.release_posture_helpers import (
     resolved_release_target_for_index,
+    stage_project_configs,
     write_test_release_descriptor,
 )
 
@@ -118,6 +123,7 @@ def _application_settings(
         reranker_config_path=reranker_config_path,
         release_target=release_target,
         release_descriptor_path=descriptor_path,
+        project_root=tmp_path,
     )
 
 
@@ -225,9 +231,11 @@ def test_application_settings_from_env_reuses_nested_loaders(
         "customer_claims_rag.application.settings.GenerationSettings.from_env",
         generation_mock,
     )
+    mock_context = MagicMock()
+    mock_context.resolved_target = release_target
     monkeypatch.setattr(
-        "customer_claims_rag.release.posture.load_production_release_context",
-        lambda **_: (MagicMock(), release_target),
+        "customer_claims_rag.release.posture.resolve_production_release_posture",
+        lambda **_: mock_context,
     )
 
     settings = ApplicationSettings.from_env()
@@ -264,20 +272,20 @@ def test_default_config_paths_use_project_root_not_cwd(
         "customer_claims_rag.application.settings.GenerationSettings.from_env",
         _generation_settings,
     )
+    resolved = resolved_release_target_for_index(
+        tmp_path / "release-index",
+        project_root=tmp_path,
+        corpus_fingerprint="fp",
+        chunk_count=1,
+        document_count=1,
+        supported_document_ids=("01_service_overview",),
+        embedding_model="fake-embedding-model",
+    )
+    mock_context = MagicMock()
+    mock_context.resolved_target = resolved
     monkeypatch.setattr(
-        "customer_claims_rag.release.posture.load_production_release_context",
-        lambda **_: (
-            MagicMock(),
-            resolved_release_target_for_index(
-                tmp_path / "release-index",
-                project_root=tmp_path,
-                corpus_fingerprint="fp",
-                chunk_count=1,
-                document_count=1,
-                supported_document_ids=("01_service_overview",),
-                embedding_model="fake-embedding-model",
-            ),
-        ),
+        "customer_claims_rag.release.posture.resolve_production_release_posture",
+        lambda **_: mock_context,
     )
 
     settings = ApplicationSettings.from_env()
@@ -300,20 +308,20 @@ def test_application_settings_from_env_missing_api_key_follows_retrieval_contrac
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     env_bootstrap.load_project_env(force=True)
 
+    resolved = resolved_release_target_for_index(
+        tmp_path / "release-index",
+        project_root=tmp_path,
+        corpus_fingerprint="fp",
+        chunk_count=1,
+        document_count=1,
+        supported_document_ids=("01_service_overview",),
+        embedding_model="fake-embedding-model",
+    )
+    mock_context = MagicMock()
+    mock_context.resolved_target = resolved
     monkeypatch.setattr(
-        "customer_claims_rag.release.posture.load_production_release_context",
-        lambda **_: (
-            MagicMock(),
-            resolved_release_target_for_index(
-                tmp_path / "release-index",
-                project_root=tmp_path,
-                corpus_fingerprint="fp",
-                chunk_count=1,
-                document_count=1,
-                supported_document_ids=("01_service_overview",),
-                embedding_model="fake-embedding-model",
-            ),
-        ),
+        "customer_claims_rag.release.posture.resolve_production_release_posture",
+        lambda **_: mock_context,
     )
 
     settings = ApplicationSettings.from_env()
@@ -347,6 +355,22 @@ class _RecordingVectorStore:
 
     def close(self) -> None:
         pass
+
+
+def _production_context_for_settings(
+    settings: ApplicationSettings,
+    project_root: Path,
+) -> ProductionReleaseContext:
+    descriptor_path = settings.release_descriptor_path or (
+        project_root / "configs" / "release" / "production_posture.json"
+    )
+    descriptor = load_release_posture_descriptor(descriptor_path)
+    return ProductionReleaseContext(
+        descriptor=descriptor,
+        resolved_target=settings.release_target,
+        descriptor_path=descriptor_path,
+        project_root=project_root,
+    )
 
 
 def _build_pipeline_with_recorders(
@@ -409,12 +433,15 @@ def _build_pipeline_with_recorders(
         reranker_id="source-authority-v1",
     )
 
+    resolved_settings = settings or _application_settings(tmp_path)
+    production_context = _production_context_for_settings(resolved_settings, tmp_path)
+
     with patch(
-        "customer_claims_rag.application.factory.validate_release_posture_for_production",
-        return_value=diagnostics,
+        "customer_claims_rag.application.factory.resolve_production_release_posture",
+        return_value=production_context,
     ), patch(
-        "customer_claims_rag.application.factory.load_release_posture_descriptor",
-        return_value=MagicMock(),
+        "customer_claims_rag.application.factory.validate_production_release_posture",
+        return_value=diagnostics,
     ), patch(
         "customer_claims_rag.application.factory.BaselineRetriever"
     ) as retriever_cls:
@@ -423,7 +450,7 @@ def _build_pipeline_with_recorders(
         retriever_cls.return_value = retriever_instance
 
         pipeline = build_customer_claims_pipeline(
-            settings or _application_settings(tmp_path),
+            resolved_settings,
             embedding_provider_factory=_embedding_factory,
             vector_store_factory=_vector_store_factory,
             grounded_generator_factory=_grounded_generator_factory,
@@ -554,6 +581,58 @@ def test_factory_wires_frozen_retrieval_service_with_expected_provenance(
     assert retrieval.reranker_config_id == "source-authority-v1"
 
 
+def test_factory_validates_posture_before_vector_store(tmp_path: Path) -> None:
+    call_order: list[str] = []
+
+    def _validate_posture(context, *, vector_store=None):
+        call_order.append("validate" if vector_store is None else "validate_with_store")
+        return ReleasePostureDiagnostics(
+            release_posture_id="test",
+            selected_target="active",
+            target_status="selected_production_release",
+            index_path_relative="index",
+            corpus_fingerprint="test-fingerprint",
+            chunk_count=1,
+            document_count=1,
+            collection_name="customer_claims",
+            embedding_model="fake-embedding-model",
+            vector_dimension=8,
+            frozen_retrieval_config_path="configs/retrieval/vector_pool_expansion_v1.json",
+            frozen_config_hash="ff53ff9721ad86b1c542bf96dce616d9057ed3b347e341fed59750b07b69e048",
+            vector_fetch_k=24,
+            candidate_pool_k=24,
+            final_top_k=12,
+            similarity_threshold=0.0,
+            reranker_id="source-authority-v1",
+        )
+
+    def _vector_store_factory(**kwargs):
+        call_order.append("vector_store")
+        return _RecordingVectorStore()
+
+    settings = _application_settings(tmp_path)
+    production_context = _production_context_for_settings(settings, tmp_path)
+    with patch(
+        "customer_claims_rag.application.factory.resolve_production_release_posture",
+        return_value=production_context,
+    ), patch(
+        "customer_claims_rag.application.factory.validate_production_release_posture",
+        side_effect=_validate_posture,
+    ), patch(
+        "customer_claims_rag.application.factory.BaselineRetriever"
+    ) as retriever_cls:
+        retriever_cls.return_value = MagicMock(validate_index=MagicMock())
+        build_customer_claims_pipeline(
+            settings,
+            vector_store_factory=_vector_store_factory,
+            embedding_provider_factory=lambda **_: _RecordingEmbeddingProvider(),
+            grounded_generator_factory=lambda _: MagicMock(spec=GroundedGenerator),
+        )
+
+    assert call_order[:2] == ["validate", "vector_store"]
+    assert call_order[-1] == "validate_with_store"
+
+
 def test_factory_validates_index_before_returning_pipeline(tmp_path: Path) -> None:
     validate_mock = MagicMock()
     _build_pipeline_with_recorders(tmp_path, validate_index=validate_mock)
@@ -587,12 +666,14 @@ def test_factory_does_not_return_pipeline_when_index_validation_fails(tmp_path: 
         reranker_id="source-authority-v1",
     )
     (tmp_path / "index").mkdir()
+    settings = _application_settings(tmp_path, index_dir=tmp_path / "index")
+    production_context = _production_context_for_settings(settings, tmp_path)
     with patch(
-        "customer_claims_rag.application.factory.validate_release_posture_for_production",
-        return_value=diagnostics,
+        "customer_claims_rag.application.factory.resolve_production_release_posture",
+        return_value=production_context,
     ), patch(
-        "customer_claims_rag.application.factory.load_release_posture_descriptor",
-        return_value=MagicMock(),
+        "customer_claims_rag.application.factory.validate_production_release_posture",
+        return_value=diagnostics,
     ), patch(
         "customer_claims_rag.application.factory.BaselineRetriever"
     ) as retriever_cls:
@@ -601,7 +682,7 @@ def test_factory_does_not_return_pipeline_when_index_validation_fails(tmp_path: 
         retriever_cls.return_value = retriever_instance
         with pytest.raises(IndexManifestError):
             build_customer_claims_pipeline(
-                _application_settings(tmp_path, index_dir=tmp_path / "index"),
+                settings,
                 embedding_provider_factory=lambda **_: _RecordingEmbeddingProvider(),
                 vector_store_factory=lambda **_: _RecordingVectorStore(),
                 grounded_generator_factory=lambda _: MagicMock(spec=GroundedGenerator),
@@ -736,6 +817,7 @@ def test_factory_rejects_empty_schema_consistent_index_before_pipeline_return(
 
     provider = FakeEmbeddingProvider(model_name="fake-embedding-model", vector_dimension=8)
     index_dir = _write_empty_index(tmp_path, provider)
+    staged_frozen, staged_reranker = stage_project_configs(tmp_path)
     descriptor_path = tmp_path / "release_descriptor.json"
     write_test_release_descriptor(
         descriptor_path,
@@ -757,8 +839,8 @@ def test_factory_rejects_empty_schema_consistent_index_before_pipeline_return(
             openai_api_key="dummy-test-key",
         ),
         generation=_generation_settings(),
-        frozen_retrieval_config_path=FROZEN_CONFIG_PATH,
-        reranker_config_path=RERANKER_CONFIG_PATH,
+        frozen_retrieval_config_path=staged_frozen,
+        reranker_config_path=staged_reranker,
         release_target=resolved_release_target_for_index(
             index_dir,
             project_root=tmp_path,
@@ -768,6 +850,7 @@ def test_factory_rejects_empty_schema_consistent_index_before_pipeline_return(
             supported_document_ids=("01_service_overview",),
         ),
         release_descriptor_path=descriptor_path,
+        project_root=tmp_path,
     )
     generator_calls: list[GenerationSettings] = []
 

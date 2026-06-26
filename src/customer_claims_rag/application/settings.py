@@ -41,6 +41,7 @@ class ApplicationSettings:
     reranker_config_path: Path
     release_target: ResolvedReleaseTarget
     release_descriptor_path: Path | None = None
+    project_root: Path | None = None
 
     def __repr__(self) -> str:
         api_key_state = "set" if self.retrieval.openai_api_key else "unset"
@@ -58,11 +59,12 @@ class ApplicationSettings:
 
     @classmethod
     def from_env(cls) -> ApplicationSettings:
-        from customer_claims_rag.release.posture import load_production_release_context
+        from customer_claims_rag.release.posture import resolve_production_release_posture
 
         env_bootstrap.load_project_env()
         root = env_bootstrap.project_root()
-        _descriptor, resolved_target = load_production_release_context(project_root=root)
+        context = resolve_production_release_posture(project_root=root)
+        resolved_target = context.resolved_target
         retrieval = RetrievalSettings.from_env()
         retrieval = replace(
             retrieval,
@@ -76,7 +78,8 @@ class ApplicationSettings:
             frozen_retrieval_config_path=root / DEFAULT_FROZEN_RETRIEVAL_CONFIG_RELATIVE,
             reranker_config_path=root / DEFAULT_RERANKER_CONFIG_RELATIVE,
             release_target=resolved_target,
-            release_descriptor_path=None,
+            release_descriptor_path=context.descriptor_path,
+            project_root=root,
         )
 
 

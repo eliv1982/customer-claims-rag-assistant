@@ -13,12 +13,11 @@ import pytest
 from customer_claims_rag.release.posture import (
     DEFAULT_DESCRIPTOR_PATH,
     ReleasePostureDescriptor,
-    load_production_release_context,
     load_release_posture_descriptor,
+    resolve_production_release_posture,
     resolve_release_target,
     resolve_release_target_name,
     validate_frozen_retrieval_contract,
-    validate_legacy_index_dir_policy,
     validate_release_posture_for_production,
 )
 from customer_claims_rag.application.settings import load_frozen_retrieval_config
@@ -32,6 +31,7 @@ from customer_claims_rag.retrieval.models import IndexManifest
 from tests.release_posture_helpers import (
     PRODUCTION_FROZEN_CONFIG_HASH,
     resolved_release_target_for_index,
+    stage_test_production_posture,
     write_test_release_descriptor,
 )
 from tests.retrieval_helpers import make_chunk_record
@@ -129,9 +129,8 @@ def test_path_traversal_rejected(tmp_path: Path) -> None:
         document_count=1,
         supported_document_ids=["01_service_overview"],
     )
-    descriptor = load_release_posture_descriptor(descriptor_path)
-    with pytest.raises(ReleasePostureError, match="outside repository root"):
-        resolve_release_target(descriptor, "active", project_root=tmp_path)
+    with pytest.raises(ReleasePostureError, match="parent-directory traversal"):
+        load_release_posture_descriptor(descriptor_path)
 
 
 def test_default_target_is_active() -> None:
@@ -325,28 +324,30 @@ def test_production_factory_uses_release_target_not_raw_index_dir(
         supported_document_ids=("01_service_overview",),
     )
     with patch(
-        "customer_claims_rag.release.posture.load_production_release_context",
-        return_value=(MagicMock(), release_target),
+        "customer_claims_rag.release.posture.resolve_production_release_posture",
+        return_value=MagicMock(
+            descriptor=MagicMock(),
+            resolved_target=release_target,
+            descriptor_path=DEFAULT_DESCRIPTOR_PATH,
+            project_root=tmp_path,
+            frozen_retrieval_config_path=FROZEN_CONFIG_PATH,
+        ),
     ):
         settings = ApplicationSettings.from_env()
     assert settings.retrieval.index_dir == release_index
     assert settings.retrieval.index_dir != legacy_index
 
 
-def test_conflicting_legacy_index_dir_rejected(tmp_path: Path) -> None:
-    resolved = resolved_release_target_for_index(
-        tmp_path / "release-index",
-        project_root=tmp_path,
-        corpus_fingerprint="fp",
-        chunk_count=1,
-        document_count=1,
-        supported_document_ids=("01_service_overview",),
+def test_stale_rag_index_dir_does_not_affect_descriptor_resolution(tmp_path: Path, monkeypatch) -> None:
+    index_dir = stage_test_production_posture(tmp_path)
+    monkeypatch.setattr(
+        __import__("customer_claims_rag", fromlist=["env_bootstrap"]).env_bootstrap,
+        "project_root",
+        lambda: tmp_path,
     )
-    with pytest.raises(ReleasePostureError, match="conflicts with release target"):
-        validate_legacy_index_dir_policy(
-            resolved_target=resolved,
-            legacy_index_dir=tmp_path / "other-index",
-        )
+    monkeypatch.setenv("RAG_INDEX_DIR", "data/04_index")
+    context = resolve_production_release_posture(project_root=tmp_path)
+    assert context.resolved_target.index_dir == index_dir
 
 
 def test_missing_collection_open_existing_does_not_create_collection(tmp_path: Path) -> None:
@@ -424,5 +425,5 @@ def test_load_production_release_context_default_target(tmp_path: Path, monkeypa
     monkeypatch.delenv("RAG_RELEASE_TARGET", raising=False)
     monkeypatch.delenv("RAG_INDEX_DIR", raising=False)
     monkeypatch.setattr(env_bootstrap, "project_root", lambda: PROJECT_ROOT)
-    descriptor, resolved = load_production_release_context(project_root=PROJECT_ROOT)
-    assert resolved.target_name == descriptor.default_target == "active"
+    context = resolve_production_release_posture(project_root=PROJECT_ROOT)
+    assert context.resolved_target.target_name == context.descriptor.default_target == "active"

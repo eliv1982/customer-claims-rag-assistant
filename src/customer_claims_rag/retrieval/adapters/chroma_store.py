@@ -9,6 +9,7 @@ import chromadb
 
 from customer_claims_rag.exceptions import VectorStoreError
 from customer_claims_rag.models import ChunkRecord
+from customer_claims_rag.retrieval.chroma_storage import validate_open_existing_chroma_preconditions
 from customer_claims_rag.retrieval.metadata_mapper import (
     chunk_to_vector_metadata,
     vector_metadata_to_search_hit,
@@ -29,7 +30,12 @@ class ChromaVectorStore:
         self._index_dir = index_dir
         self._collection_name = collection_name
         self._open_existing = open_existing
-        if not open_existing:
+        if open_existing:
+            validate_open_existing_chroma_preconditions(
+                self._index_dir,
+                collection_name=self._collection_name,
+            )
+        else:
             self._index_dir.mkdir(parents=True, exist_ok=True)
         self._client = chromadb.PersistentClient(path=str(self._index_dir))
         if open_existing:

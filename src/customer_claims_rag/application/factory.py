@@ -8,10 +8,11 @@ from pathlib import Path
 
 from customer_claims_rag.application.frozen_retrieval import FrozenRetrievalService
 from customer_claims_rag.application.pipeline import CustomerClaimsPipeline
+from customer_claims_rag import env_bootstrap
+from customer_claims_rag.exceptions import ReleasePostureError
 from customer_claims_rag.release.posture import (
-    DEFAULT_DESCRIPTOR_PATH,
-    load_release_posture_descriptor,
-    validate_release_posture_for_production,
+    resolve_production_release_posture,
+    validate_production_release_posture,
 )
 from customer_claims_rag.application.settings import (
     ApplicationSettings,
@@ -50,19 +51,17 @@ def build_customer_claims_pipeline(
     reranker_config = reranker_config_loader(settings.reranker_config_path)
     reranker = SourceAuthorityV1Reranker(reranker_config)
 
-    descriptor = load_release_posture_descriptor(
-        settings.release_descriptor_path or DEFAULT_DESCRIPTOR_PATH,
+    context = resolve_production_release_posture(
+        descriptor_path=settings.release_descriptor_path,
+        target_name=settings.release_target.target_name,
+        project_root=settings.project_root or env_bootstrap.project_root(),
     )
-    resolved_target = settings.release_target
-    from customer_claims_rag import env_bootstrap
+    if context.resolved_target != settings.release_target:
+        raise ReleasePostureError(
+            "application release target does not match resolved production posture"
+        )
 
-    project_root = env_bootstrap.project_root()
-    validate_release_posture_for_production(
-        descriptor,
-        resolved_target,
-        project_root=project_root,
-        frozen_retrieval_config_path=settings.frozen_retrieval_config_path,
-    )
+    validate_production_release_posture(context)
 
     embedding_provider = embedding_provider_factory(
         model_name=settings.retrieval.embedding_model,
@@ -73,12 +72,9 @@ def build_customer_claims_pipeline(
         collection_name=settings.retrieval.collection_name,
         open_existing=True,
     )
-    diagnostics = validate_release_posture_for_production(
-        descriptor,
-        resolved_target,
-        project_root=project_root,
+    diagnostics = validate_production_release_posture(
+        context,
         vector_store=vector_store,
-        frozen_retrieval_config_path=settings.frozen_retrieval_config_path,
     )
     for line in diagnostics.format_lines():
         logger.info("release posture: %s", line)

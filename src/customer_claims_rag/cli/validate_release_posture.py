@@ -9,10 +9,8 @@ from pathlib import Path
 from customer_claims_rag import env_bootstrap
 from customer_claims_rag.release.posture import (
     DEFAULT_DESCRIPTOR_PATH,
-    load_production_release_context,
-    load_release_posture_descriptor,
-    resolve_release_target,
-    validate_release_posture_for_production,
+    resolve_production_release_posture,
+    validate_production_release_posture,
 )
 from customer_claims_rag.exceptions import ReleasePostureError, RetrievalError
 from customer_claims_rag.retrieval.factory import create_vector_store
@@ -47,36 +45,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     env_bootstrap.load_project_env()
-    root = env_bootstrap.project_root()
     vector_store = None
+    diagnostics = None
 
     try:
-        descriptor = load_release_posture_descriptor(args.descriptor)
-        if args.target is not None:
-            target_name = args.target.strip()
-            resolved_target = resolve_release_target(
-                descriptor,
-                target_name,
-                project_root=root,
-            )
-        else:
-            _descriptor, resolved_target = load_production_release_context(
-                descriptor_path=args.descriptor,
-                project_root=root,
-            )
-
-        vector_store = None
+        context = resolve_production_release_posture(
+            descriptor_path=args.descriptor,
+            project_root=env_bootstrap.project_root(),
+            target_name=args.target.strip() if args.target is not None else None,
+        )
         if not args.skip_vector_store:
             vector_store = create_vector_store(
-                index_dir=resolved_target.index_dir,
-                collection_name=resolved_target.collection_name,
+                index_dir=context.resolved_target.index_dir,
+                collection_name=context.resolved_target.collection_name,
                 open_existing=True,
             )
-
-        diagnostics = validate_release_posture_for_production(
-            descriptor,
-            resolved_target,
-            project_root=root,
+        diagnostics = validate_production_release_posture(
+            context,
             vector_store=vector_store,
         )
     except (ReleasePostureError, RetrievalError) as exc:
@@ -86,6 +71,8 @@ def main(argv: list[str] | None = None) -> int:
         if vector_store is not None:
             vector_store.close()
 
+    if diagnostics is None:
+        return 1
     for line in diagnostics.format_lines():
         print(line)
     return 0

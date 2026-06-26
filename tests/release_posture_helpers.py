@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 from customer_claims_rag.release.posture import ResolvedReleaseTarget
+from customer_claims_rag.config import METADATA_SCHEMA_VERSION
+from customer_claims_rag.retrieval.adapters.chroma_store import ChromaVectorStore
+from customer_claims_rag.retrieval.adapters.fake_embeddings import FakeEmbeddingProvider
+from customer_claims_rag.retrieval.manifest import build_manifest, write_manifest_atomic
+from tests.retrieval_helpers import make_chunk_record
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 PRODUCTION_FROZEN_CONFIG_HASH = (
     "ff53ff9721ad86b1c542bf96dce616d9057ed3b347e341fed59750b07b69e048"
@@ -58,6 +66,61 @@ def write_test_release_descriptor(
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def stage_project_configs(tmp_path: Path) -> tuple[Path, Path]:
+    """Copy committed config trees into a temporary project root."""
+    retrieval_dst = tmp_path / "configs" / "retrieval"
+    reranker_dst = tmp_path / "configs" / "reranking"
+    if not retrieval_dst.is_dir():
+        shutil.copytree(PROJECT_ROOT / "configs" / "retrieval", retrieval_dst)
+    if not reranker_dst.is_dir():
+        shutil.copytree(PROJECT_ROOT / "configs" / "reranking", reranker_dst)
+    return (
+        retrieval_dst / "vector_pool_expansion_v1.json",
+        reranker_dst / "source_authority_v1.json",
+    )
+
+
+def stage_test_production_posture(tmp_path: Path) -> Path:
+    """Create a portable active release posture tree under tmp_path."""
+    frozen_config_path, reranker_config_path = stage_project_configs(tmp_path)
+    _ = frozen_config_path, reranker_config_path
+
+    provider = FakeEmbeddingProvider(model_name="fake-embedding-model", vector_dimension=8)
+    index_dir = tmp_path / "index"
+    chunk = make_chunk_record(
+        chunk_id="01_service_overview::1",
+        document_id="01_service_overview",
+        content="service overview",
+        source_path="data/02_clean_markdown/01_service_overview.md",
+    )
+    store = ChromaVectorStore(index_dir=index_dir, collection_name="customer_claims")
+    store.recreate_collection(embedding_dimension=provider.vector_dimension)
+    store.add_chunks([chunk], provider.embed_documents([chunk.content]))
+    write_manifest_atomic(
+        index_dir,
+        build_manifest(
+            collection_name="customer_claims",
+            embedding_model="fake-embedding-model",
+            corpus_fingerprint="test-fingerprint",
+            chunk_count=1,
+            document_count=1,
+            metadata_schema_version=METADATA_SCHEMA_VERSION,
+            vector_dimension=provider.vector_dimension,
+        ),
+    )
+    store.close()
+
+    write_test_release_descriptor(
+        tmp_path / "configs" / "release" / "production_posture.json",
+        index_path_relative="index",
+        corpus_fingerprint="test-fingerprint",
+        chunk_count=1,
+        document_count=1,
+        supported_document_ids=["01_service_overview"],
+    )
+    return index_dir
 
 
 def resolved_release_target_for_index(

@@ -13,7 +13,7 @@
 | `data/01_raw/` | Исходные тексты документов базы знаний (`.txt`) |
 | `data/02_clean_markdown/` | Очищенные версии документов в Markdown (`.md`) |
 | `data/03_chunks/` | Сгенерированные чанки (JSONL) и статистика; не источник истины |
-| `data/04_index/` | Сгенерированный persistent vector index (Chroma) и `manifest.json` |
+| `data/04_index/` | Emergency rollback/archive vector index (15 documents); **not** production default |
 | `data/05_evaluation/` | Сгенерированные JSON-результаты retrieval evaluation; не источник истины |
 | `docs/` | Проектная документация: область проекта, инвентаризация, отчеты, стратегии |
 | `prompts/` | Системный промпт и шаблон RAG-запроса |
@@ -46,7 +46,7 @@
 
 **Еще не реализованы:** deployment/operations, authentication, chat history, document upload из UI, feedback collection, query rewriting, production threshold auto-selection.
 
-Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/` и `data/04_index/` содержат только сгенерированные артефакты.
+Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/`, `data/04_index/` (rollback archive) и provisioned production index — только локальные generated/deployment артефакты.
 
 ## Запуск с нуля (Windows / PowerShell)
 
@@ -166,7 +166,7 @@ python -m customer_claims_rag.cli.build_index --rebuild --verbose
 По умолчанию:
 
 - вход: `data/02_clean_markdown/` (через `CorpusBuilder`);
-- index: `data/04_index/`;
+- index (build CLI default): `data/04_index/` — generic build/evaluation path, **not** the production release target;
 - collection: `customer_claims`;
 - embedding model: `text-embedding-3-small`.
 
@@ -192,7 +192,7 @@ python -m customer_claims_rag.cli.search_index "Заказ отмечен дос
 
 ### Production claim answer (single-shot)
 
-Требуется собранный vector index (`data/04_index/`), заполненный `OPENAI_API_KEY` и настроенные generation env vars (см. `.env.example`).
+Требуется provisioned production index (`data/04_index_backup_10docs_215chunks` per release descriptor), заполненный `OPENAI_API_KEY` и generation env vars (см. `.env.example`). Production index path задаётся **только** через `configs/release/production_posture.json`; `RAG_INDEX_DIR` на answer/UI flow **не влияет**.
 
 Команда принимает одно обращение, выполняет production pipeline один раз и печатает стабильный JSON в stdout:
 
@@ -216,7 +216,7 @@ JSON содержит customer-safe поля: `answer`, `response_mode`, `genera
 python -m pip install -e ".[ui]"
 ```
 
-Требования те же, что и для `answer-claim`: заполненный `.env`, собранный vector index в `data/04_index/`, generation env vars из `.env.example`. UI **не пересобирает** индекс и не загружает документы.
+Требования те же, что и для `answer-claim`: заполненный `.env`, provisioned production index, generation env vars из `.env.example`. UI **не пересобирает** индекс и не загружает документы.
 
 Запуск:
 
@@ -242,12 +242,13 @@ python -m customer_claims_rag.cli.search_index "возврат" --top-k 4 --fetc
 
 ### Generated artifacts
 
-- Chroma index и `manifest.json` создаются в `data/04_index/` **внутри project root**;
-- рекомендуемый путь — `data/04_index`;
+- **Production release index** (`data/04_index_backup_10docs_215chunks`) — separately provisioned local artifact; see `docs/06_release_posture.md`;
+- **Build/evaluation index** (`data/04_index/`) — default for `build-index` / `search-index` / evaluation CLIs; also emergency rollback archive when `RAG_RELEASE_TARGET=rollback`;
+- Chroma index и `manifest.json` создаются **внутри project root**;
 - нельзя направлять `--index-dir` в `data/01_raw/`, `data/02_clean_markdown/` или внутрь `--input-dir`;
 - generated contents **не коммитятся** (см. `.gitignore`);
-- `data/04_index/.gitkeep` сохраняет структуру каталога в git;
-- index можно безопасно пересобрать: `python -m customer_claims_rag.cli.build_index --rebuild`.
+- `data/04_index/.gitkeep` сохраняет структуру rollback/archive каталога в git;
+- build index можно безопасно пересобрать: `python -m customer_claims_rag.cli.build_index --rebuild`.
 
 ### Остановка окружения
 
@@ -262,7 +263,8 @@ deactivate
 | `OPENAI_API_KEY` | Ключ OpenAI для embeddings и generation | — |
 | `OPENAI_EMBEDDING_MODEL` | Модель embeddings | `text-embedding-3-small` |
 | `OPENAI_CHAT_MODEL` | Модель chat completion для generation | `gpt-4o-mini` |
-| `RAG_INDEX_DIR` | Каталог vector index | `data/04_index` |
+| `RAG_RELEASE_TARGET` | Production release target (`active` / `rollback`) | `active` (descriptor default) |
+| `RAG_INDEX_DIR` | Index path for **build/search/evaluation CLIs only** | `data/04_index` |
 | `RAG_COLLECTION_NAME` | Имя Chroma collection | `customer_claims` |
 | `RAG_TOP_K` | Максимум результатов поиска (retrieval CLI) | `4` |
 | `RAG_FETCH_K` | Размер candidate pool (retrieval CLI) | `12` |

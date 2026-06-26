@@ -13,7 +13,11 @@ from customer_claims_rag.application.frozen_retrieval import FrozenRetrievalServ
 from customer_claims_rag.application.models import CustomerClaimsRequest
 from customer_claims_rag.application.pipeline import CustomerClaimsPipeline
 from customer_claims_rag.application.settings import ApplicationSettings, load_frozen_retrieval_config
-from customer_claims_rag.release.posture import ReleasePostureDiagnostics
+from customer_claims_rag.release.posture import (
+    ProductionReleaseContext,
+    ReleasePostureDiagnostics,
+    load_release_posture_descriptor,
+)
 from customer_claims_rag.config import METADATA_SCHEMA_VERSION
 from customer_claims_rag.exceptions import IndexManifestError, LLMCallError, ReleasePostureError
 from customer_claims_rag.generation.adapters.fake_chat import FakeChatModel
@@ -33,6 +37,7 @@ from customer_claims_rag.retrieval.retriever import BaselineRetriever
 from customer_claims_rag.retrieval_config import RetrievalSettings
 from tests.release_posture_helpers import (
     resolved_release_target_for_index,
+    stage_project_configs,
     write_test_release_descriptor,
 )
 from customer_claims_rag.risk.models import RiskLevel
@@ -120,12 +125,15 @@ def _application_settings(
     tmp_path: Path,
     index_dir: Path,
     *,
-    frozen_config_path: Path = FROZEN_CONFIG_PATH,
+    frozen_config_path: Path | None = None,
     corpus_fingerprint: str | None = None,
     chunk_count: int | None = None,
     document_ids: tuple[str, ...] | None = None,
     expected_frozen_config_hash: str | None = None,
 ) -> ApplicationSettings:
+    staged_frozen, staged_reranker = stage_project_configs(tmp_path)
+    if frozen_config_path is None:
+        frozen_config_path = staged_frozen
     if chunk_count is None or document_ids is None or corpus_fingerprint is None:
         loaded_chunk_count, loaded_document_ids, loaded_fingerprint = _release_params_from_index(
             index_dir
@@ -168,7 +176,7 @@ def _application_settings(
         ),
         generation=_generation_settings(),
         frozen_retrieval_config_path=frozen_config_path,
-        reranker_config_path=RERANKER_CONFIG_PATH,
+        reranker_config_path=staged_reranker,
         release_target=resolved_release_target_for_index(
             index_dir,
             project_root=tmp_path,
@@ -179,6 +187,7 @@ def _application_settings(
             embedding_model=EMBEDDING_MODEL,
         ),
         release_descriptor_path=descriptor_path,
+        project_root=tmp_path,
     )
 
 
@@ -199,7 +208,10 @@ def _grounded_generator_factory(chat_model: FakeChatModel):
     return factory
 
 
-def _release_validation_patches():
+def _release_validation_patches(
+    settings: ApplicationSettings,
+    project_root: Path,
+):
     diagnostics = ReleasePostureDiagnostics(
         release_posture_id="test",
         selected_target="active",
@@ -219,14 +231,24 @@ def _release_validation_patches():
         similarity_threshold=0.0,
         reranker_id="source-authority-v1",
     )
+    descriptor_path = settings.release_descriptor_path or (
+        project_root / "configs" / "release" / "production_posture.json"
+    )
+    descriptor = load_release_posture_descriptor(descriptor_path)
+    context = ProductionReleaseContext(
+        descriptor=descriptor,
+        resolved_target=settings.release_target,
+        descriptor_path=descriptor_path,
+        project_root=project_root,
+    )
     return (
         patch(
-            "customer_claims_rag.application.factory.validate_release_posture_for_production",
-            return_value=diagnostics,
+            "customer_claims_rag.application.factory.resolve_production_release_posture",
+            return_value=context,
         ),
         patch(
-            "customer_claims_rag.application.factory.load_release_posture_descriptor",
-            return_value=MagicMock(),
+            "customer_claims_rag.application.factory.validate_production_release_posture",
+            return_value=diagnostics,
         ),
     )
 
@@ -237,9 +259,11 @@ def _build_pipeline(
     chat_model: FakeChatModel,
     *,
     bypass_release_validation: bool = False,
+    project_root: Path | None = None,
 ) -> CustomerClaimsPipeline:
+    resolved_root = project_root or settings.project_root
     if bypass_release_validation:
-        validation_patches = _release_validation_patches()
+        validation_patches = _release_validation_patches(settings, resolved_root or PROJECT_ROOT)
         with validation_patches[0], validation_patches[1]:
             return build_customer_claims_pipeline(
                 settings,
@@ -467,8 +491,11 @@ def _manual_application_settings(
     corpus_fingerprint: str,
     chunk_count: int,
     document_ids: tuple[str, ...],
-    frozen_config_path: Path = FROZEN_CONFIG_PATH,
+    frozen_config_path: Path | None = None,
 ) -> ApplicationSettings:
+    staged_frozen, staged_reranker = stage_project_configs(tmp_path)
+    if frozen_config_path is None:
+        frozen_config_path = staged_frozen
     descriptor_path = tmp_path / "release_descriptor.json"
     relative_index = (
         index_dir.resolve().relative_to(tmp_path.resolve()).as_posix()
@@ -496,7 +523,7 @@ def _manual_application_settings(
         ),
         generation=_generation_settings(),
         frozen_retrieval_config_path=frozen_config_path,
-        reranker_config_path=RERANKER_CONFIG_PATH,
+        reranker_config_path=staged_reranker,
         release_target=resolved_release_target_for_index(
             index_dir,
             project_root=tmp_path,
@@ -507,6 +534,7 @@ def _manual_application_settings(
             embedding_model=EMBEDDING_MODEL,
         ),
         release_descriptor_path=descriptor_path,
+        project_root=tmp_path,
     )
 
 

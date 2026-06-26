@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from customer_claims_rag import env_bootstrap
 from customer_claims_rag.evaluation.pool_expansion_metrics import (
@@ -17,6 +18,11 @@ from customer_claims_rag.evaluation.pool_expansion_metrics import (
 )
 from customer_claims_rag.exceptions import IndexManifestError, ReleasePostureError
 from customer_claims_rag.ingestion.path_helpers import resolve_safe_path, to_relative_posix_path
+from customer_claims_rag.retrieval.chroma_storage import (
+    CHROMA_SQLITE_FILENAME,
+    chroma_sqlite_path,
+    validate_open_existing_chroma_preconditions,
+)
 from customer_claims_rag.retrieval.manifest import load_manifest
 from customer_claims_rag.retrieval.ports import VectorStore
 
@@ -24,7 +30,10 @@ SUPPORTED_SCHEMA_VERSIONS = frozenset({"1.0.0"})
 DEFAULT_DESCRIPTOR_RELATIVE = Path("configs") / "release" / "production_posture.json"
 DEFAULT_DESCRIPTOR_PATH = env_bootstrap.project_root() / DEFAULT_DESCRIPTOR_RELATIVE
 RELEASE_TARGET_ENV = "RAG_RELEASE_TARGET"
-LEGACY_INDEX_DIR_ENV = "RAG_INDEX_DIR"
+
+_WINDOWS_DRIVE_PATH = re.compile(r"^[a-zA-Z]:[/\\]")
+_POSIX_ABSOLUTE_PATH = re.compile(r"^/")
+_UNC_PATH = re.compile(r"^\\\\")
 
 FROZEN_VECTOR_FETCH_K = 24
 FROZEN_CANDIDATE_POOL_K = 24
@@ -46,7 +55,12 @@ class _ReleaseTargetDescriptor(BaseModel):
     embedding_model: str
     vector_dimension: int
 
-    @field_validator("status", "index_path", "expected_corpus_fingerprint", "collection_name", "embedding_model")
+    @field_validator("index_path")
+    @classmethod
+    def validate_repository_relative_index_path(cls, value: str) -> str:
+        return _validate_repository_relative_index_path(value)
+
+    @field_validator("status", "expected_corpus_fingerprint", "collection_name", "embedding_model")
     @classmethod
     def validate_non_empty_string(cls, value: str) -> str:
         if not value.strip():
@@ -114,6 +128,23 @@ class ReleasePostureDescriptor(BaseModel):
         if self.default_target not in self.targets:
             raise ValueError("default_target must name a configured target")
         return self
+
+
+@dataclass(frozen=True)
+class ProductionReleaseContext:
+    """Shared production release resolution used by startup and validator."""
+
+    descriptor: ReleasePostureDescriptor
+    resolved_target: ResolvedReleaseTarget
+    descriptor_path: Path
+    project_root: Path
+
+    @property
+    def frozen_retrieval_config_path(self) -> Path:
+        return _resolve_repository_path(
+            self.descriptor.frozen_retrieval_config_path,
+            project_root=self.project_root,
+        )
 
 
 @dataclass(frozen=True)
@@ -192,14 +223,98 @@ def load_release_posture_descriptor(path: Path | None = None) -> ReleasePostureD
             f"release posture descriptor at {descriptor_path} is invalid JSON"
         ) from exc
     try:
-        return ReleasePostureDescriptor.model_validate(payload)
+        descriptor = ReleasePostureDescriptor.model_validate(payload)
     except Exception as exc:
         raise ReleasePostureError(
             f"release posture descriptor at {descriptor_path} failed validation: {exc}"
         ) from exc
+    return descriptor
+
+
+def resolve_production_release_posture(
+    *,
+    descriptor_path: Path | None = None,
+    project_root: Path | None = None,
+    target_name: str | None = None,
+) -> ProductionReleaseContext:
+    """Resolve the production release target from descriptor and environment."""
+    root = (project_root or env_bootstrap.project_root()).resolve()
+    resolved_descriptor_path = descriptor_path or (root / DEFAULT_DESCRIPTOR_RELATIVE)
+    descriptor = load_release_posture_descriptor(resolved_descriptor_path)
+    _validate_descriptor_target_path_distinctness(descriptor, project_root=root)
+
+    if target_name is None:
+        selected_target = resolve_release_target_name(descriptor)
+    else:
+        selected_target = target_name.strip()
+        if not selected_target:
+            raise ReleasePostureError("release target name must not be empty")
+        if selected_target not in descriptor.targets:
+            known = ", ".join(sorted(descriptor.targets))
+            raise ReleasePostureError(
+                f"unknown release target {selected_target!r}; expected one of: {known}"
+            )
+        if descriptor.schema_version not in SUPPORTED_SCHEMA_VERSIONS:
+            raise ReleasePostureError(
+                f"unsupported release posture schema_version {descriptor.schema_version!r}"
+            )
+
+    resolved_target = resolve_release_target(descriptor, selected_target, project_root=root)
+    return ProductionReleaseContext(
+        descriptor=descriptor,
+        resolved_target=resolved_target,
+        descriptor_path=resolved_descriptor_path,
+        project_root=root,
+    )
+
+
+def load_production_release_context(
+    *,
+    descriptor_path: Path | None = None,
+    project_root: Path | None = None,
+) -> tuple[ReleasePostureDescriptor, ResolvedReleaseTarget]:
+    """Load descriptor and resolve the production release target."""
+    context = resolve_production_release_posture(
+        descriptor_path=descriptor_path,
+        project_root=project_root,
+    )
+    return context.descriptor, context.resolved_target
+
+
+def _validate_repository_relative_index_path(path: str) -> str:
+    normalized = path.strip().replace("\\", "/")
+    if not normalized:
+        raise ValueError("index_path must be a non-empty repository-relative path")
+    if _WINDOWS_DRIVE_PATH.match(normalized) or _POSIX_ABSOLUTE_PATH.match(normalized):
+        raise ValueError("index_path must be repository-relative, not absolute")
+    if _UNC_PATH.match(path.strip()):
+        raise ValueError("index_path must not be a UNC path")
+    parts = PurePosixPath(normalized).parts
+    if ".." in parts:
+        raise ValueError("index_path must not contain parent-directory traversal")
+    return normalized
+
+
+def _validate_descriptor_target_path_distinctness(
+    descriptor: ReleasePostureDescriptor,
+    *,
+    project_root: Path,
+) -> None:
+    canonical_by_target: dict[str, Path] = {}
+    for target_name, target in descriptor.targets.items():
+        resolved = _resolve_repository_path(target.index_path, project_root=project_root)
+        canonical = resolved.resolve()
+        for other_name, other_canonical in canonical_by_target.items():
+            if canonical == other_canonical:
+                raise ReleasePostureError(
+                    f"release targets {target_name!r} and {other_name!r} resolve to the "
+                    f"same physical index path: {to_relative_posix_path(canonical, project_root)}"
+                )
+        canonical_by_target[target_name] = canonical
 
 
 def _resolve_repository_path(relative_path: str, *, project_root: Path) -> Path:
+    _validate_repository_relative_index_path(relative_path)
     root = project_root.resolve()
     try:
         return resolve_safe_path(root / relative_path, root=root)
@@ -257,36 +372,6 @@ def resolve_release_target(
         embedding_model=target.embedding_model,
         vector_dimension=target.vector_dimension,
     )
-
-
-def validate_legacy_index_dir_policy(
-    *,
-    resolved_target: ResolvedReleaseTarget,
-    legacy_index_dir: Path | None,
-) -> None:
-    """Reject conflicting legacy RAG_INDEX_DIR values in production wiring."""
-    if legacy_index_dir is None:
-        return
-    try:
-        legacy_resolved = legacy_index_dir.resolve()
-    except OSError as exc:
-        raise ReleasePostureError(
-            f"legacy {LEGACY_INDEX_DIR_ENV} is not a valid path: {legacy_index_dir}"
-        ) from exc
-    if legacy_resolved != resolved_target.index_dir.resolve():
-        raise ReleasePostureError(
-            f"legacy {LEGACY_INDEX_DIR_ENV}={legacy_index_dir} conflicts with release "
-            f"target {resolved_target.target_name!r} index "
-            f"{resolved_target.index_path_relative}; production uses the release posture "
-            f"descriptor, not {LEGACY_INDEX_DIR_ENV}. Remove or align the variable."
-        )
-
-
-def _read_legacy_index_dir_from_env() -> Path | None:
-    raw = os.environ.get(LEGACY_INDEX_DIR_ENV)
-    if raw is None or not raw.strip():
-        return None
-    return Path(raw.strip())
 
 
 def validate_frozen_retrieval_contract(
@@ -348,6 +433,13 @@ def validate_release_posture_for_production(
             f"release target {resolved_target.target_name!r} index directory does not "
             f"exist: {resolved_target.index_path_relative}; provision the index locally"
         )
+    try:
+        validate_open_existing_chroma_preconditions(
+            resolved_target.index_dir,
+            collection_name=resolved_target.collection_name,
+        )
+    except Exception as exc:
+        raise ReleasePostureError(str(exc)) from exc
 
     if frozen_retrieval_config_path is not None:
         frozen_config_path = frozen_retrieval_config_path.resolve()
@@ -459,18 +551,16 @@ def validate_release_posture_for_production(
     )
 
 
-def load_production_release_context(
+def validate_production_release_posture(
+    context: ProductionReleaseContext,
     *,
-    descriptor_path: Path | None = None,
-    project_root: Path | None = None,
-) -> tuple[ReleasePostureDescriptor, ResolvedReleaseTarget]:
-    """Load descriptor, resolve target, and apply legacy index-dir policy."""
-    root = (project_root or env_bootstrap.project_root()).resolve()
-    descriptor = load_release_posture_descriptor(descriptor_path)
-    target_name = resolve_release_target_name(descriptor)
-    resolved_target = resolve_release_target(descriptor, target_name, project_root=root)
-    validate_legacy_index_dir_policy(
-        resolved_target=resolved_target,
-        legacy_index_dir=_read_legacy_index_dir_from_env(),
+    vector_store: VectorStore | None = None,
+) -> ReleasePostureDiagnostics:
+    """Validate a resolved production release context."""
+    return validate_release_posture_for_production(
+        context.descriptor,
+        context.resolved_target,
+        project_root=context.project_root,
+        vector_store=vector_store,
+        frozen_retrieval_config_path=context.frozen_retrieval_config_path,
     )
-    return descriptor, resolved_target
