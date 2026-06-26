@@ -41,6 +41,7 @@ evaluate-vector-pool-cap-ab = "customer_claims_rag.cli.evaluate_vector_pool_cap_
 build-experiment-index = "customer_claims_rag.cli.build_experiment_index:main"
 evaluate-doc08-atomic-ab = "customer_claims_rag.cli.evaluate_doc08_atomic_ab:main"
 build-doc12-threat-index = "customer_claims_rag.cli.build_doc12_threat_index:main"
+export-embedding-snapshot = "customer_claims_rag.cli.export_embedding_snapshot:main"
 evaluate-doc12-threat-atomic-ab = "customer_claims_rag.cli.evaluate_doc12_threat_atomic_ab:main"
 evaluate-hybrid-ab = "customer_claims_rag.cli.evaluate_hybrid_ab:main"
 rebuild-hybrid-lexical-pools = "customer_claims_rag.cli.rebuild_hybrid_lexical_pools:main"

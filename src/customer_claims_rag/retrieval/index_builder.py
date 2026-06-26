@@ -68,6 +68,8 @@ class IndexBuilder:
         *,
         rebuild: bool = True,
         embedding_cache_path: Path | None = None,
+        embedding_snapshot_path: Path | None = None,
+        embedding_snapshot_manifest: Path | None = None,
         build_run_id: str | None = None,
     ) -> IndexBuildReport:
         """Build index from pre-built chunk records (experiment overlays)."""
@@ -81,6 +83,8 @@ class IndexBuilder:
             chunks,
             started=started,
             embedding_cache_path=embedding_cache_path,
+            embedding_snapshot_path=embedding_snapshot_path,
+            embedding_snapshot_manifest=embedding_snapshot_manifest,
             build_run_id=build_run_id,
         )
 
@@ -91,6 +95,8 @@ class IndexBuilder:
         *,
         started: float,
         embedding_cache_path: Path | None = None,
+        embedding_snapshot_path: Path | None = None,
+        embedding_snapshot_manifest: Path | None = None,
         build_run_id: str | None = None,
     ) -> IndexBuildReport:
         self._validate_corpus(chunks)
@@ -101,7 +107,12 @@ class IndexBuilder:
             embedding_model=self.embedding_provider.model_name,
         )
 
-        embeddings = self._embed_all(ordered_chunks, embedding_cache_path=embedding_cache_path)
+        embeddings = self._embed_all(
+            ordered_chunks,
+            embedding_cache_path=embedding_cache_path,
+            embedding_snapshot_path=embedding_snapshot_path,
+            embedding_snapshot_manifest=embedding_snapshot_manifest,
+        )
         if not embeddings:
             raise IndexBuildError("embedding provider returned no vectors")
 
@@ -180,7 +191,27 @@ class IndexBuilder:
         chunks: list[ChunkRecord],
         *,
         embedding_cache_path: Path | None = None,
+        embedding_snapshot_path: Path | None = None,
+        embedding_snapshot_manifest: Path | None = None,
     ) -> list[list[float]]:
+        if embedding_snapshot_path is not None:
+            if embedding_cache_path is not None:
+                raise IndexBuildError(
+                    "embedding_cache_path and embedding_snapshot_path are mutually exclusive"
+                )
+            if embedding_snapshot_manifest is None:
+                raise IndexBuildError(
+                    "embedding_snapshot_manifest is required with embedding_snapshot_path"
+                )
+            from customer_claims_rag.retrieval.embedding_snapshot import resolve_snapshot_embeddings
+
+            return resolve_snapshot_embeddings(
+                chunks,
+                npz_path=embedding_snapshot_path,
+                manifest_path=embedding_snapshot_manifest,
+                embedding_model=self.embedding_provider.model_name,
+            )
+
         if embedding_cache_path is not None:
             from customer_claims_rag.retrieval.experiment_embedding_cache import (
                 resolve_experiment_embeddings,

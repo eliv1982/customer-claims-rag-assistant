@@ -35,3 +35,5 @@ data/05_evaluation/*
 !data/05_evaluation/vector_pool_36_cap4_v1.json
 !data/05_evaluation/doc08_atomic_risk_units_v1.json
 !data/05_evaluation/doc12_threat_atomic_units_v1.json
+!data/05_evaluation/embedding_snapshots/
+!data/05_evaluation/embedding_snapshots/**

@@ -19,6 +19,7 @@ from customer_claims_rag.ingestion.corpus_overlay import (
 from customer_claims_rag.retrieval.factory import create_embedding_provider, create_vector_store
 from customer_claims_rag.retrieval.index_builder import IndexBuilder
 from customer_claims_rag.retrieval.path_helpers import validate_index_dir
+from customer_claims_rag.retrieval.snapshot_embedding_provider import SnapshotEmbeddingProvider
 from customer_claims_rag.retrieval_config import RetrievalSettings
 from customer_claims_rag.token_counter import TiktokenCounter
 
@@ -73,6 +74,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Perform destructive full rebuild",
     )
     parser.add_argument(
+        "--embedding-snapshot",
+        type=Path,
+        default=None,
+        help="NPZ frozen embedding snapshot (disables document embedding API calls)",
+    )
+    parser.add_argument(
+        "--embedding-snapshot-manifest",
+        type=Path,
+        default=None,
+        help="Manifest for --embedding-snapshot (default: sibling .manifest.json)",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print traceback on error",
@@ -92,6 +105,8 @@ def run_build_experiment_index(
     rebuild: bool,
     permitted_root: Path,
     settings: RetrievalSettings | None = None,
+    embedding_snapshot: Path | None = None,
+    embedding_snapshot_manifest: Path | None = None,
 ) -> int:
     resolved_settings = settings or RetrievalSettings.from_env()
     root = permitted_root
@@ -111,10 +126,29 @@ def run_build_experiment_index(
             raise RetrievalError("non-doc08 chunks are not byte-identical after overlay")
 
         builder = CorpusBuilder(permitted_root=root, token_counter=TiktokenCounter())
-        embedding_provider = create_embedding_provider(
+        query_provider = create_embedding_provider(
             model_name=embedding_model,
             api_key=resolved_settings.openai_api_key,
         )
+        embedding_provider = (
+            SnapshotEmbeddingProvider(query_provider=query_provider)
+            if embedding_snapshot is not None
+            else query_provider
+        )
+        resolved_snapshot = None
+        resolved_manifest = None
+        if embedding_snapshot is not None:
+            resolved_snapshot = (
+                embedding_snapshot if embedding_snapshot.is_absolute() else root / embedding_snapshot
+            )
+            if embedding_snapshot_manifest is None:
+                resolved_manifest = resolved_snapshot.with_suffix(".manifest.json")
+            else:
+                resolved_manifest = (
+                    embedding_snapshot_manifest
+                    if embedding_snapshot_manifest.is_absolute()
+                    else root / embedding_snapshot_manifest
+                )
         vector_store = create_vector_store(
             index_dir=resolved_index,
             collection_name=collection_name,
@@ -133,6 +167,8 @@ def run_build_experiment_index(
             documents=[],  # document count from chunks
             chunks=overlay_result.candidate_chunks,
             rebuild=rebuild,
+            embedding_snapshot_path=resolved_snapshot,
+            embedding_snapshot_manifest=resolved_manifest,
         )
         # Fix document count in report - IndexBuildReport uses len(documents) from param
         print(f"experiment_id={experiment_id}")
@@ -173,6 +209,8 @@ def main(argv: list[str] | None = None) -> int:
             batch_size=args.batch_size,
             rebuild=args.rebuild,
             permitted_root=root,
+            embedding_snapshot=args.embedding_snapshot,
+            embedding_snapshot_manifest=args.embedding_snapshot_manifest,
         )
     except RetrievalError as exc:
         print(f"error: {exc}", file=sys.stderr)

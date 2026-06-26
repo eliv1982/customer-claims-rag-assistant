@@ -55,9 +55,67 @@ class Doc12ChunkDiffModel(BaseModel):
 
 Doc12Verdict = Literal["ACCEPTED AS COMBINED TARGETED CORPUS REPAIR", "REJECTED"]
 ReplayIntegrityVerdict = Literal[
-    "PASS — EXPERIMENT INTEGRITY REPAIRED",
-    "FAIL — NONDETERMINISTIC EXPERIMENT",
+    "PASS — FIXED-SNAPSHOT REPLAY REPRODUCIBLE",
+    "FAIL — FIXED-SNAPSHOT REPLAY NOT REPRODUCIBLE",
 ]
+
+
+class FrozenSnapshotReplayResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    runs: int
+    all_identical: bool
+    authoritative: bool = True
+    builds: list[dict[str, Any]] = Field(default_factory=list)
+    chunk_payload_identical: bool = False
+    embedding_identical: bool = False
+    collection_identical: bool = False
+    e008_identical: bool = False
+    repeated_query_runs: dict[str, Any] = Field(default_factory=dict)
+    repeated_full_runs: dict[str, Any] = Field(default_factory=dict)
+
+
+class LiveProviderRobustnessResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    runs: int
+    unique_embedding_digests: int
+    authoritative: bool = False
+    e008_hit4_pass_count: int = 0
+    e008_hit4_fail_count: int = 0
+    experiment_verdict_rejected_count: int = 0
+    observed_metric_variability: dict[str, Any] = Field(default_factory=dict)
+    run_summaries: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ReplayIntegrityResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    frozen_snapshot_replay: FrozenSnapshotReplayResult
+    live_provider_robustness: LiveProviderRobustnessResult | None = None
+    integrity_verdict: ReplayIntegrityVerdict = "FAIL — FIXED-SNAPSHOT REPLAY NOT REPRODUCIBLE"
+    corpus_fingerprint: str | None = None
+    chunk_payload_digest: str | None = None
+    embedding_snapshot_path: str | None = None
+    embedding_snapshot_manifest_path: str | None = None
+    embedding_snapshot_digest: str | None = None
+    embedding_digest: str | None = None
+    collection_content_digest: str | None = None
+    index_fingerprint: str | None = None
+    lineage: dict[str, Any] = Field(default_factory=dict)
+    pip_environment: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReplayStabilityResult(BaseModel):
+    """Deprecated alias kept for backward-compatible deserialization."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    repeated_query_runs: dict[str, Any] = Field(default_factory=dict)
+    repeated_full_runs: dict[str, Any] = Field(default_factory=dict)
+    independent_rebuilds: dict[str, Any] = Field(default_factory=dict)
+    all_identical: bool = False
+    integrity_verdict: str = "FAIL — FIXED-SNAPSHOT REPLAY NOT REPRODUCIBLE"
 
 
 class HoldoutArmMetrics(BaseModel):
@@ -70,16 +128,6 @@ class HoldoutArmMetrics(BaseModel):
     negative_domain_hit_at_4: int
     negative_doc12_top1: int
     negative_doc12_top4: int
-
-
-class ReplayStabilityResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    repeated_query_runs: dict[str, Any] = Field(default_factory=dict)
-    repeated_full_runs: dict[str, Any] = Field(default_factory=dict)
-    independent_rebuilds: dict[str, Any] = Field(default_factory=dict)
-    all_identical: bool = False
-    integrity_verdict: ReplayIntegrityVerdict = "FAIL — NONDETERMINISTIC EXPERIMENT"
 
 
 class HoldoutEvaluationResult(BaseModel):
@@ -151,6 +199,7 @@ class Doc12ThreatAtomicEvaluationRun(BaseModel):
     regressed_cases_hit_at_12: list[str] = Field(default_factory=list)
     extension: ExtensionEvaluationResult
     holdout: HoldoutEvaluationResult
+    replay_integrity: ReplayIntegrityResult | None = None
     replay_stability: ReplayStabilityResult | None = None
     replay_integrity_verdict: ReplayIntegrityVerdict | None = None
     acceptance_checks: list[AcceptanceCheck] = Field(default_factory=list)

@@ -17,7 +17,6 @@ from customer_claims_rag.evaluation.doc12_threat_atomic_contract import (
     load_holdout_corpus,
     repo_relative_path,
 )
-from customer_claims_rag.evaluation.doc12_replay_integrity import build_replay_stability_result
 from customer_claims_rag.evaluation.doc12_threat_atomic_evaluator import (
     Doc12ThreatAtomicAbEvaluator,
     prepare_doc12_chunk_diff_and_fingerprints,
@@ -75,7 +74,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--stability-matrix",
         action="store_true",
-        help="Run replay stability matrix before final evaluation artifact",
+        help="Run frozen-snapshot replay matrix and live-provider robustness probe",
+    )
+    parser.add_argument(
+        "--skip-live-probe",
+        action="store_true",
+        help="Skip nine-run live-provider robustness probe (frozen replay only)",
     )
     return parser
 
@@ -208,18 +212,32 @@ def main(argv: list[str] | None = None) -> int:
         project_root=root,
     )
 
-    replay_stability = None
+    replay_integrity = None
     if args.stability_matrix:
         canonical_dir = args.canonical_dir if args.canonical_dir.is_absolute() else root / args.canonical_dir
-        replay_stability = build_replay_stability_result(
+        from customer_claims_rag.evaluation.doc12_replay_integrity import build_replay_integrity_result
+
+        snapshot_cfg = config.get("embedding_snapshot") or {}
+        snapshot_path = root / snapshot_cfg.get(
+            "candidate_snapshot_path",
+            "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.npz",
+        )
+        manifest_path = root / snapshot_cfg.get(
+            "candidate_manifest_path",
+            "data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.manifest.json",
+        )
+        replay_integrity = build_replay_integrity_result(
             index_dir=candidate_index,
             project_root=root,
             config=config,
             canonical_dir=canonical_dir,
             evaluator=evaluator,
             rebuild_parent=root / ".tmp" / "doc12_replay_matrix",
+            embedding_snapshot=snapshot_path,
+            embedding_snapshot_manifest=manifest_path,
+            run_live_probe=not args.skip_live_probe,
         )
-        evaluator.replay_stability = replay_stability
+        evaluator.replay_integrity = replay_integrity
 
     try:
         run = evaluator.evaluate()

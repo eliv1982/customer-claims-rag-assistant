@@ -47,6 +47,7 @@ from customer_claims_rag.evaluation.doc12_threat_atomic_models import (
     Doc12ThreatAtomicEvaluationRun,
     Doc12Verdict,
     HoldoutEvaluationResult,
+    ReplayIntegrityResult,
     ReplayIntegrityVerdict,
     ReplayStabilityResult,
 )
@@ -66,6 +67,7 @@ from customer_claims_rag.ingestion.corpus_overlay import (
     verify_doc08_overlay_unchanged,
 )
 from customer_claims_rag.retrieval.manifest import load_manifest
+from customer_claims_rag.retrieval.factory import create_embedding_provider, create_vector_store
 from customer_claims_rag.retrieval.reranker import SourceAuthorityV1Reranker, compute_config_hash
 from customer_claims_rag.retrieval.retriever import BaselineRetriever
 
@@ -112,6 +114,7 @@ class Doc12ThreatAtomicAbEvaluator:
         project_root: Path | None = None,
         allow_dirty_source: bool = False,
         replay_stability: ReplayStabilityResult | None = None,
+        replay_integrity: ReplayIntegrityResult | None = None,
     ) -> None:
         self.baseline_retriever = baseline_retriever
         self.candidate_retriever = candidate_retriever
@@ -142,9 +145,36 @@ class Doc12ThreatAtomicAbEvaluator:
         self.project_root = project_root
         self.allow_dirty_source = allow_dirty_source
         self.replay_stability = replay_stability
+        self.replay_integrity = replay_integrity
+        self._candidate_vector_store = candidate_retriever.vector_store
         self.reference_oracle = load_doc08_experimental_oracle(
             reference_artifact_path,
             project_root=project_root,
+        )
+
+    def replace_candidate_index(self, candidate_index_dir: Path) -> None:
+        """Point candidate arm at another rebuilt index (live-provider diagnostics only)."""
+        self._candidate_vector_store.close()
+        from customer_claims_rag.retrieval_config import RetrievalSettings
+
+        settings = RetrievalSettings.from_env()
+        embedding = create_embedding_provider(
+            model_name=self.embedding_model,
+            api_key=settings.openai_api_key,
+        )
+        store = create_vector_store(
+            index_dir=candidate_index_dir,
+            collection_name=self.collection_name,
+        )
+        self.candidate_index_dir = candidate_index_dir
+        self._candidate_vector_store = store
+        self.candidate_retriever = BaselineRetriever(
+            embedding_provider=embedding,
+            vector_store=store,
+            index_dir=candidate_index_dir,
+            top_k=self.fetch_k,
+            fetch_k=self.fetch_k,
+            similarity_threshold=self.threshold,
         )
 
     def evaluate(self) -> Doc12ThreatAtomicEvaluationRun:
@@ -325,9 +355,14 @@ class Doc12ThreatAtomicAbEvaluator:
                 verdict=holdout_verdict,
                 acceptance_checks=holdout_checks,
             ),
+            replay_integrity=self.replay_integrity,
             replay_stability=self.replay_stability,
             replay_integrity_verdict=(
-                self.replay_stability.integrity_verdict if self.replay_stability else None
+                self.replay_integrity.integrity_verdict
+                if self.replay_integrity
+                else (
+                    self.replay_stability.integrity_verdict if self.replay_stability else None
+                )
             ),
             acceptance_checks=all_checks,
             interpretation_boundary=[

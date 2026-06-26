@@ -197,15 +197,25 @@ def test_doc12_artifact_paths_are_repo_relative() -> None:
     if not artifact.is_file():
         pytest.skip("artifact not generated yet")
     payload = json.loads(artifact.read_text(encoding="utf-8"))
-    if payload.get("replay_stability") is None:
+    if payload.get("replay_integrity") is None and payload.get("replay_stability") is None:
         pytest.skip("artifact predates replay integrity repair")
     for arm_key in ("baseline_arm", "candidate_arm"):
         index_dir = payload[arm_key]["index_dir"]
         assert not re.match(r"^[A-Za-z]:\\", index_dir)
         assert "Cursor_Projects" not in index_dir
     assert not re.match(r"^[A-Za-z]:\\", payload["reference_artifact_path"])
+    replay = payload.get("replay_integrity")
+    if replay is not None:
+        assert "independent_rebuilds_identical" not in json.dumps(replay)
+        assert replay.get("frozen_snapshot_replay", {}).get("authoritative") is True
+        live = replay.get("live_provider_robustness")
+        if live is not None:
+            assert live.get("authoritative") is False
 
 
-def test_config_uses_logical_candidate_index_path() -> None:
+def test_config_declares_embedding_snapshot_paths() -> None:
     config = json.loads(CONFIG.read_text(encoding="utf-8"))
     assert config["candidate_index_dir"] == "data/04_index_experiments/doc12_threat_atomic_units_v1"
+    snapshot = config.get("embedding_snapshot") or {}
+    assert snapshot["candidate_snapshot_path"].endswith("doc12_threat_atomic_units_v1.npz")
+    assert snapshot["candidate_manifest_path"].endswith("doc12_threat_atomic_units_v1.manifest.json")

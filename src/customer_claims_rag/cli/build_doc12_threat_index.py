@@ -28,6 +28,7 @@ from customer_claims_rag.retrieval.factory import create_embedding_provider, cre
 from customer_claims_rag.retrieval.index_builder import IndexBuilder
 from customer_claims_rag.retrieval.manifest import load_manifest
 from customer_claims_rag.retrieval.path_helpers import validate_index_dir
+from customer_claims_rag.retrieval.snapshot_embedding_provider import SnapshotEmbeddingProvider
 from customer_claims_rag.retrieval_config import RetrievalSettings
 from customer_claims_rag.token_counter import TiktokenCounter
 
@@ -47,6 +48,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", type=int, default=settings.embedding_batch_size)
     parser.add_argument("--rebuild", action="store_true")
     parser.add_argument("--build-run-id", default=None)
+    parser.add_argument(
+        "--embedding-snapshot",
+        type=Path,
+        default=None,
+        help="NPZ frozen embedding snapshot (disables document embedding API calls)",
+    )
+    parser.add_argument(
+        "--embedding-snapshot-manifest",
+        type=Path,
+        default=None,
+        help="Manifest for --embedding-snapshot (default: sibling .manifest.json)",
+    )
     parser.add_argument("--verbose", action="store_true")
     return parser
 
@@ -63,6 +76,8 @@ def run_build_doc12_threat_index(
     permitted_root: Path,
     settings: RetrievalSettings | None = None,
     build_run_id: str | None = None,
+    embedding_snapshot: Path | None = None,
+    embedding_snapshot_manifest: Path | None = None,
 ) -> int:
     resolved_settings = settings or RetrievalSettings.from_env()
     resolved_index = validate_index_dir(index_dir, project_root=permitted_root, input_dir=canonical_dir)
@@ -94,10 +109,31 @@ def run_build_doc12_threat_index(
             raise RetrievalError("non-doc12 chunks are not byte-identical after overlay")
 
         builder = CorpusBuilder(permitted_root=permitted_root, token_counter=TiktokenCounter())
-        embedding_provider = create_embedding_provider(
+        query_provider = create_embedding_provider(
             model_name=embedding_model,
             api_key=resolved_settings.openai_api_key,
         )
+        embedding_provider = (
+            SnapshotEmbeddingProvider(query_provider=query_provider)
+            if embedding_snapshot is not None
+            else query_provider
+        )
+        resolved_snapshot = None
+        resolved_manifest = None
+        if embedding_snapshot is not None:
+            resolved_snapshot = (
+                embedding_snapshot
+                if embedding_snapshot.is_absolute()
+                else permitted_root / embedding_snapshot
+            )
+            if embedding_snapshot_manifest is None:
+                resolved_manifest = resolved_snapshot.with_suffix(".manifest.json")
+            else:
+                resolved_manifest = (
+                    embedding_snapshot_manifest
+                    if embedding_snapshot_manifest.is_absolute()
+                    else permitted_root / embedding_snapshot_manifest
+                )
         vector_store = create_vector_store(
             index_dir=staging_dir,
             collection_name=collection_name,
@@ -113,7 +149,9 @@ def run_build_doc12_threat_index(
             documents=[],
             chunks=overlay_result.candidate_chunks,
             rebuild=True,
-            embedding_cache_path=experiment_cache_path(resolved_index),
+            embedding_cache_path=None if resolved_snapshot else experiment_cache_path(resolved_index),
+            embedding_snapshot_path=resolved_snapshot,
+            embedding_snapshot_manifest=resolved_manifest,
             build_run_id=run_id,
         )
         vector_store.close()
@@ -166,6 +204,8 @@ def main(argv: list[str] | None = None) -> int:
             rebuild=args.rebuild,
             permitted_root=root,
             build_run_id=args.build_run_id,
+            embedding_snapshot=args.embedding_snapshot,
+            embedding_snapshot_manifest=args.embedding_snapshot_manifest,
         )
     except RetrievalError as exc:
         print(f"error: {exc}", file=sys.stderr)

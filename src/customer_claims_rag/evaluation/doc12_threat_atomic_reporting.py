@@ -57,18 +57,42 @@ def render_doc12_markdown(run: Doc12ThreatAtomicEvaluationRun) -> str:
         f"| FAQ top-4 | {run.faq_top4_baseline} | {run.faq_top4_candidate} |",
         "",
     ]
-    if run.replay_stability is not None:
+    if run.replay_integrity is not None:
         lines.extend(
             [
-                "## Replay stability",
+                "## Replay integrity",
+                "",
+                f"- Integrity verdict: `{run.replay_integrity.integrity_verdict}`",
+                f"- Frozen snapshot replay identical: **{run.replay_integrity.frozen_snapshot_replay.all_identical}**",
+                f"- Frozen runs: {run.replay_integrity.frozen_snapshot_replay.runs}",
+                f"- Repeated query runs identical: {run.replay_integrity.frozen_snapshot_replay.repeated_query_runs.get('all_identical')}",
+                f"- Repeated full runs identical: {run.replay_integrity.frozen_snapshot_replay.repeated_full_runs.get('all_identical')}",
+                f"- Embedding snapshot: `{run.replay_integrity.embedding_snapshot_path}`",
+                f"- Snapshot digest: `{run.replay_integrity.embedding_snapshot_digest}`",
+                f"- Candidate collection digest: `{run.replay_integrity.collection_content_digest}`",
+                f"- Candidate embedding digest: `{run.replay_integrity.embedding_digest}`",
+            ]
+        )
+        live = run.replay_integrity.live_provider_robustness
+        if live is not None:
+            lines.extend(
+                [
+                    f"- Live provider runs: {live.runs} (authoritative={live.authoritative})",
+                    f"- Unique embedding digests: {live.unique_embedding_digests}",
+                    f"- E008 hit@4 pass/fail: {live.e008_hit4_pass_count}/{live.e008_hit4_fail_count}",
+                    f"- Experiment REJECTED count: {live.experiment_verdict_rejected_count}",
+                    f"- {live.observed_metric_variability.get('wording', '')}",
+                    "",
+                ]
+            )
+        else:
+            lines.append("")
+    elif run.replay_stability is not None:
+        lines.extend(
+            [
+                "## Replay stability (legacy)",
                 "",
                 f"- Integrity verdict: `{run.replay_stability.integrity_verdict}`",
-                f"- All identical: **{run.replay_stability.all_identical}**",
-                f"- Repeated query runs identical: {run.replay_stability.repeated_query_runs.get('all_identical')}",
-                f"- Repeated full runs identical: {run.replay_stability.repeated_full_runs.get('all_identical')}",
-                f"- Independent rebuilds identical: {run.replay_stability.independent_rebuilds.get('all_identical')}",
-                f"- Candidate collection digest: `{run.candidate_arm.collection_content_digest}`",
-                f"- Candidate embedding digest: `{run.candidate_arm.embedding_digest}`",
                 "",
             ]
         )
