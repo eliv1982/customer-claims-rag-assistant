@@ -1,7 +1,7 @@
 # Doc12 threat atomic units: doc12-threat-atomic-units-v1
 
-**Timestamp:** 2026-06-26T05:15:26.334754+00:00
-**Source commit:** `7135b13acd4dc21afc23067ecfd3055395f55411`
+**Timestamp:** 2026-06-26T07:38:48.921899+00:00
+**Source commit:** `d9e3aaf066b18e4c0987d63e3b0a05e7426cf905`
 **Source dirty:** `False`
 **Artifact commit:** `pending`
 **Reference:** `doc08-atomic-risk-units-v1` / `candidate`
@@ -31,15 +31,22 @@
 | Primary reach | 57/57 | 57/57 |
 | FAQ top-4 | 36 | 35 |
 
-## Replay stability
+## Replay integrity
 
-- Integrity verdict: `PASS — EXPERIMENT INTEGRITY REPAIRED`
-- All identical: **True**
+- Integrity verdict: `PASS — FIXED-SNAPSHOT REPLAY REPRODUCIBLE`
+- Frozen snapshot replay identical: **True**
+- Frozen runs: 3
 - Repeated query runs identical: True
 - Repeated full runs identical: True
-- Independent rebuilds identical: True
+- Embedding snapshot: `data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.npz`
+- Snapshot digest: `7e86688cdd896d15d67e6cbd4e8fc75ba23192bfc05d9d17de8864b6eba16e6a`
 - Candidate collection digest: `0b74e08cb2ab6ecde5e0502f5d267875a8b5e5e36532b6889957260142a4fc65`
 - Candidate embedding digest: `0a28c6ab83dca8096578f84377ceef613b177b01c149262736d48a9f758a31f5`
+- Live provider runs: 9 (authoritative=False)
+- Unique embedding digests: 9
+- E008 hit@4 pass/fail: 7/2
+- Experiment REJECTED count: 9
+- In this nine-run diagnostic sample...
 
 - Promoted hit@4: []
 - Regressed hit@4: []
@@ -70,8 +77,8 @@
 | Metric | Baseline | Candidate |
 |--------|----------|-----------|
 | Positive doc12 hit@4 | 4/6 | 5/6 |
-| Positive doc12 hit@12 | 4/6 | 6/6 |
-| Positive rank vs doc08 ok | 4/6 | 6/6 |
+| Positive doc12 hit@12 | 4/6 | 5/6 |
+| Positive rank vs doc08 ok | 4/6 | 5/6 |
 | Negative domain hit@4 | 3/6 | 2/6 |
 | Negative doc12 top-1 | 3 | 4 |
 | Negative doc12 top-4 | 5/6 | 5/6 |
@@ -120,8 +127,8 @@
 - [PASS] `ext_negative_doc08_top1`: Doc08 not top-1 in negative cases (baseline=None, candidate=0)
 - [PASS] `ext_negative_doc08_top4`: Doc08 top-4 in <= 1/4 negative cases (baseline=None, candidate=0/4)
 - [PASS] `holdout_positive_hit4`: Holdout positive doc12 hit@4 >= 5/6 (baseline=None, candidate=5/6)
-- [PASS] `holdout_positive_hit12`: Holdout positive doc12 hit@12 = 6/6 (baseline=None, candidate=6/6)
-- [PASS] `holdout_positive_rank`: Holdout positive doc12 rank vs doc08 ok = 6/6 (baseline=None, candidate=6/6)
+- [FAIL] `holdout_positive_hit12`: Holdout positive doc12 hit@12 = 6/6 (baseline=None, candidate=5/6)
+- [FAIL] `holdout_positive_rank`: Holdout positive doc12 rank vs doc08 ok = 6/6 (baseline=None, candidate=5/6)
 - [FAIL] `holdout_negative_hit4`: Holdout negative domain hit@4 >= 5/6 (baseline=None, candidate=2/6)
 - [FAIL] `holdout_negative_doc12_top1`: Holdout negative doc12 not top-1 (baseline=None, candidate=4)
 - [FAIL] `holdout_negative_doc12_top4`: Holdout negative doc12 top-4 <= 1/6 (baseline=None, candidate=5/6)
