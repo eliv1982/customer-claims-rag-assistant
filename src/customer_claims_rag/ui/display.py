@@ -9,12 +9,25 @@ from pydantic import ValidationError
 
 from customer_claims_rag.application.models import CustomerClaimsRequest, CustomerClaimsResult
 from customer_claims_rag.application.pipeline import CustomerClaimsPipeline
-from customer_claims_rag.exceptions import GenerationError, RetrievalError
+from customer_claims_rag.exceptions import (
+    GenerationError,
+    IndexManifestError,
+    ReleasePostureError,
+    RetrievalError,
+)
 from customer_claims_rag.generation.models import Citation
 from customer_claims_rag.generation.risk_integration_models import RiskAwareGenerationOutcome
 from customer_claims_rag.risk.models import RiskLevel
 
 INPUT_ERROR_MESSAGE = "Введите текст обращения."
+LOADING_MESSAGE = "Анализируем обращение и проверяем правила FoodFlow…"
+STARTUP_CONFIG_ERROR_MESSAGE = (
+    "Конфигурация сервиса недоступна. Проверьте настройки окружения."
+)
+STARTUP_INDEX_ERROR_MESSAGE = (
+    "База знаний production недоступна. Убедитесь, что индекс установлен "
+    "и прошёл проверку release posture."
+)
 STARTUP_ERROR_MESSAGE = (
     "Сервис не готов к запуску. Проверьте настройки окружения и индекс."
 )
@@ -66,7 +79,7 @@ class ClaimSuccessView:
 @dataclass(frozen=True)
 class ClaimErrorView:
     message: str
-    category: Literal["input", "startup", "service", "unexpected"]
+    category: Literal["input", "startup", "startup_config", "startup_index", "service", "unexpected"]
 
 
 ClaimView = ClaimSuccessView | ClaimErrorView
@@ -151,3 +164,14 @@ def process_claim(
 def startup_error_view() -> ClaimErrorView:
     """Return the canonical startup/configuration error view."""
     return ClaimErrorView(STARTUP_ERROR_MESSAGE, "startup")
+
+
+def startup_error_view_for_exception(exc: Exception) -> ClaimErrorView:
+    """Map a startup exception to a safe user-facing category."""
+    if isinstance(exc, (ReleasePostureError, IndexManifestError)):
+        return ClaimErrorView(STARTUP_INDEX_ERROR_MESSAGE, "startup_index")
+    if isinstance(exc, (GenerationError, ValidationError, ValueError)):
+        return ClaimErrorView(STARTUP_CONFIG_ERROR_MESSAGE, "startup_config")
+    if isinstance(exc, RetrievalError):
+        return ClaimErrorView(STARTUP_INDEX_ERROR_MESSAGE, "startup_index")
+    return startup_error_view()

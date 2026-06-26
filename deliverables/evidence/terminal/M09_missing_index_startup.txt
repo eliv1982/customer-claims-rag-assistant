@@ -1,0 +1,18 @@
+M09 — missing-index fail-closed startup (Docker)
+==============================================
+
+Host empty directory (outside repository):
+  <TEMP>/foodflow_empty_index_m09
+
+Compose invocation:
+  RAG_ACTIVE_INDEX_HOST_PATH=<empty-dir> docker compose -p foodflow-m09 run --rm streamlit streamlit --version
+
+Exit code: 1
+
+Observed error:
+  error: production index mount is empty at /app/data/04_index_backup_10docs_215chunks
+
+Directory listing after failed startup:
+  (empty — no chroma.sqlite3 created)
+
+Result: PASS — Streamlit preflight failed closed; no index artifacts written to host directory.

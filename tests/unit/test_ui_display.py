@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from customer_claims_rag.application.models import CustomerClaimsRequest, CustomerClaimsResult
-from customer_claims_rag.exceptions import IndexManifestError
+from customer_claims_rag.exceptions import IndexManifestError, ReleasePostureError
 from customer_claims_rag.generation.fallback import (
     GENERATION_FAILURE_CUSTOMER_RESPONSE,
     INSUFFICIENT_CONTEXT_CUSTOMER_RESPONSE,
@@ -26,7 +26,10 @@ from customer_claims_rag.risk.models import RiskAssessmentRequest
 from customer_claims_rag.risk.reason_codes import RiskReasonCode
 from customer_claims_rag.ui.display import (
     INPUT_ERROR_MESSAGE,
+    LOADING_MESSAGE,
     SERVICE_ERROR_MESSAGE,
+    STARTUP_CONFIG_ERROR_MESSAGE,
+    STARTUP_INDEX_ERROR_MESSAGE,
     STARTUP_ERROR_MESSAGE,
     UNEXPECTED_ERROR_MESSAGE,
     ClaimErrorView,
@@ -35,6 +38,7 @@ from customer_claims_rag.ui.display import (
     map_result_to_display,
     process_claim,
     startup_error_view,
+    startup_error_view_for_exception,
 )
 from customer_claims_rag.ui.pipeline_resource import create_production_pipeline
 
@@ -325,6 +329,24 @@ def test_streamlit_app_wraps_pipeline_with_cache_resource() -> None:
     assert "@st.cache_resource" in source
     assert "create_production_pipeline" in source
     assert "get_production_pipeline" in source
+    assert "get_release_diagnostics" in source
+    assert "st.spinner" in source
+    assert "LOADING_MESSAGE" in source
+    assert "map_diagnostics_to_release_view" in source
+
+
+def test_startup_error_view_for_release_posture_uses_index_category() -> None:
+    view = startup_error_view_for_exception(ReleasePostureError("descriptor mismatch"))
+    assert view.category == "startup_index"
+    assert view.message == STARTUP_INDEX_ERROR_MESSAGE
+
+
+def test_startup_error_view_for_validation_uses_config_category() -> None:
+    from pydantic import ValidationError
+
+    view = startup_error_view_for_exception(ValidationError.from_exception_data("x", []))
+    assert view.category == "startup_config"
+    assert view.message == STARTUP_CONFIG_ERROR_MESSAGE
 
 
 _FORBIDDEN_STREAMLIT_IMPORT_PACKAGES = (

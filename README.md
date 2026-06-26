@@ -18,7 +18,7 @@
 | `docs/` | Проектная документация: область проекта, инвентаризация, отчеты, стратегии |
 | `prompts/` | Системный промпт и шаблон RAG-запроса |
 | `tests/` | Тестовые вопросы, ожидаемые ответы, результаты прогонов |
-| `deliverables/` | Итоговые артефакты проекта |
+| `deliverables/` | Итоговые артефакты проекта (manual acceptance evidence, Stage 5C) |
 
 ## Текущий статус
 
@@ -45,6 +45,8 @@
 **Functional MVP complete:** production retrieval, grounded generation, deterministic risk/handoff, single-shot CLI и локальный Streamlit interface реализованы и покрыты тестами.
 
 **Docker-based local delivery (stage 5B)** — reproducible Streamlit deployment через Docker Compose с bind-mount активного production index; fail-closed startup preflight. См. `docs/07_index_provisioning.md` и `docs/08_docker_runbook.md`.
+
+**Manual acceptance evidence (stage 5C)** — зафиксированы сценарии M00–M09, CLI JSON, UI screenshots и controlled fallback evidence. См. `deliverables/manual_acceptance_report.md`.
 
 **Еще не реализованы:** authentication, chat history, document upload из UI, feedback collection, query rewriting, production threshold auto-selection, remote/public deployment.
 

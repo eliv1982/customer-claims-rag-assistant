@@ -7,20 +7,44 @@ from pydantic import ValidationError
 import streamlit as st
 
 from customer_claims_rag.exceptions import GenerationError, RetrievalError
+from customer_claims_rag.ui.diagnostics_resource import load_validated_release_diagnostics
 from customer_claims_rag.ui.display import (
-    STARTUP_ERROR_MESSAGE,
+    LOADING_MESSAGE,
     ClaimErrorView,
     ClaimSuccessView,
     process_claim,
-    startup_error_view,
+    startup_error_view_for_exception,
 )
 from customer_claims_rag.ui.pipeline_resource import create_production_pipeline
+from customer_claims_rag.ui.release_identity import (
+    format_release_identity_lines,
+    map_diagnostics_to_release_view,
+)
+
+
+@st.cache_resource
+def get_release_diagnostics():
+    """Return cached validated release diagnostics for this Streamlit process."""
+    return load_validated_release_diagnostics()
 
 
 @st.cache_resource
 def get_production_pipeline():
     """Return the cached production pipeline for this Streamlit process."""
     return create_production_pipeline()
+
+
+def _render_release_identity(*, service_ready: bool) -> None:
+    try:
+        diagnostics = get_release_diagnostics()
+        identity = map_diagnostics_to_release_view(diagnostics, service_ready=service_ready)
+    except Exception:
+        st.caption("Идентификация релиза недоступна.")
+        return
+
+    with st.expander("Идентификация production-релиза", expanded=False):
+        for line in format_release_identity_lines(identity):
+            st.caption(line)
 
 
 def _render_success(view: ClaimSuccessView) -> None:
@@ -57,7 +81,7 @@ def _render_success(view: ClaimSuccessView) -> None:
 def _render_error(view: ClaimErrorView) -> None:
     if view.category == "input":
         st.warning(view.message)
-    elif view.category == "startup":
+    elif view.category in {"startup", "startup_config", "startup_index"}:
         st.error(view.message)
     else:
         st.error(view.message)
@@ -72,14 +96,19 @@ def main() -> None:
         "укажет на передачу сотруднику поддержки."
     )
 
+    pipeline = None
     try:
         pipeline = get_production_pipeline()
-    except (RetrievalError, GenerationError, ValidationError, ValueError):
-        _render_error(startup_error_view())
+    except (RetrievalError, GenerationError, ValidationError, ValueError) as exc:
+        _render_release_identity(service_ready=False)
+        _render_error(startup_error_view_for_exception(exc))
         return
     except Exception:
-        _render_error(startup_error_view())
+        _render_release_identity(service_ready=False)
+        _render_error(startup_error_view_for_exception(RuntimeError("startup")))
         return
+
+    _render_release_identity(service_ready=True)
 
     with st.form("claim_form", clear_on_submit=False):
         message = st.text_area(
@@ -92,7 +121,8 @@ def main() -> None:
     if not submitted:
         return
 
-    view = process_claim(pipeline, message)
+    with st.spinner(LOADING_MESSAGE):
+        view = process_claim(pipeline, message)
     if isinstance(view, ClaimSuccessView):
         _render_success(view)
     else:

@@ -1,0 +1,10 @@
+{
+  "answer": "Сейчас не удалось подготовить подтвержденный ответ по базе знаний. Попробуйте повторить запрос или обратитесь в поддержку.",
+  "citations": [],
+  "generation_outcome": "generation_error_fallback",
+  "handoff_notice": "Обращение требует приоритетной проверки сотрудником поддержки.",
+  "handoff_required": true,
+  "priority_handoff": true,
+  "response_mode": "insufficient_context",
+  "risk_level": "critical"
+}

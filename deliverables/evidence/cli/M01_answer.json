@@ -1,0 +1,10 @@
+{
+  "answer": "╨б╨╡╨╣╤З╨░╤Б ╨╜╨╡ ╤Г╨┤╨░╨╗╨╛╤Б╤М ╨┐╨╛╨┤╨│╨╛╤В╨╛╨▓╨╕╤В╤М ╨┐╨╛╨┤╤В╨▓╨╡╤А╨╢╨┤╨╡╨╜╨╜╤Л╨╣ ╨╛╤В╨▓╨╡╤В ╨┐╨╛ ╨▒╨░╨╖╨╡ ╨╖╨╜╨░╨╜╨╕╨╣. ╨Я╨╛╨┐╤А╨╛╨▒╤Г╨╣╤В╨╡ ╨┐╨╛╨▓╤В╨╛╤А╨╕╤В╤М ╨╖╨░╨┐╤А╨╛╤Б ╨╕╨╗╨╕ ╨╛╨▒╤А╨░╤В╨╕╤В╨╡╤Б╤М ╨▓ ╨┐╨╛╨┤╨┤╨╡╤А╨╢╨║╤Г.",
+  "citations": [],
+  "generation_outcome": "generation_error_fallback",
+  "handoff_notice": null,
+  "handoff_required": false,
+  "priority_handoff": false,
+  "response_mode": "insufficient_context",
+  "risk_level": "low"
+}

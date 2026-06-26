@@ -1,0 +1,14 @@
+release_posture_id=foodflow-10doc-release-v1
+selected_target=active
+target_status=selected_production_release
+index_path=data/04_index_backup_10docs_215chunks
+corpus_fingerprint=bf3df0d4631f29f322760b50735382039f67d3ee7c6860b25b1ce221312074f3
+chunk_count=215
+document_count=10
+collection=customer_claims
+embedding_model=text-embedding-3-small
+vector_dimension=1536
+frozen_retrieval_config_path=configs/retrieval/vector_pool_expansion_v1.json
+frozen_config_hash=ff53ff9721ad86b1c542bf96dce616d9057ed3b347e341fed59750b07b69e048
+retrieval_contract=24/24/12/0.0
+reranker_id=source-authority-v1

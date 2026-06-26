@@ -1,0 +1,21 @@
+CONTROLLED OFFLINE FALLBACK EVIDENCE
+====================================
+
+The following automated tests verify generation-error fallback while preserving
+deterministic high-risk assessment and handoff. No external OpenAI provider call
+is made in this evidence set.
+
+Command:
+  python -m pytest \
+    tests/integration/test_application_pipeline.py::test_generation_fallback_preserved_for_high_risk \
+    tests/integration/test_application_pipeline.py::test_generation_llm_call_error_fallback_preserved \
+    tests/integration/test_production_pipeline_wiring.py::test_generation_fallback_preserves_risk_for_high_risk_query \
+    -v
+
+Result: 3 passed
+
+Assertions covered:
+- generation_outcome == generation_error_fallback
+- high-risk query retains risk floor HIGH
+- handoff notice preserved
+- no customer-unsafe internal fields in CLI contract (covered by separate tests)
