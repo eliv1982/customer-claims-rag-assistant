@@ -287,20 +287,23 @@ def build_replay_stability_result(
         cache_home=index_dir,
         builds=3,
     )
-    all_identical = (
-        repeated_query["all_identical"]
-        and repeated_full["all_identical"]
-        and independent["all_identical"]
-    )
-    integrity_verdict = (
-        "PASS — EXPERIMENT INTEGRITY REPAIRED"
-        if all_identical
-        else "FAIL — NONDETERMINISTIC EXPERIMENT"
-    )
-    return ReplayStabilityResult(
-        repeated_query_runs=repeated_query,
-        repeated_full_runs=repeated_full,
-        independent_rebuilds=independent,
-        all_identical=all_identical,
-        integrity_verdict=integrity_verdict,
-    )
+    try:
+        all_identical = (
+            repeated_query["all_identical"]
+            and repeated_full["all_identical"]
+            and independent["all_identical"]
+        )
+        integrity_verdict = (
+            "PASS — EXPERIMENT INTEGRITY REPAIRED"
+            if all_identical
+            else "FAIL — NONDETERMINISTIC EXPERIMENT"
+        )
+        return ReplayStabilityResult(
+            repeated_query_runs=repeated_query,
+            repeated_full_runs=repeated_full,
+            independent_rebuilds=independent,
+            all_identical=all_identical,
+            integrity_verdict=integrity_verdict,
+        )
+    finally:
+        shutil.rmtree(rebuild_parent, ignore_errors=True)
