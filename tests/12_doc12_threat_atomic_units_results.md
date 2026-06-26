@@ -1,11 +1,12 @@
 # Doc12 threat atomic units: doc12-threat-atomic-units-v1
 
-**Timestamp:** 2026-06-26T07:38:48.921899+00:00
-**Source commit:** `d9e3aaf066b18e4c0987d63e3b0a05e7426cf905`
+**Timestamp:** 2026-06-26T09:18:04.072585+00:00
+**Source commit:** `0e7470058f250ef77d1e7aca2387d9767dda1ab7`
 **Source dirty:** `False`
 **Artifact commit:** `pending`
 **Reference:** `doc08-atomic-risk-units-v1` / `candidate`
 **Verdict:** `REJECTED`
+**Experiment verdict source:** `exact_fixed_snapshot_evaluation`
 
 ## Baseline reproduction
 
@@ -31,22 +32,38 @@
 | Primary reach | 57/57 | 57/57 |
 | FAQ top-4 | 36 | 35 |
 
+## Environment
+
+- Kind: `project_venv`
+- Python: `3.12.10`
+- Pip: `pip 26.1.2`
+- Pip check exit code: `0`
+- Dependency check: `No broken requirements found.`
+
 ## Replay integrity
 
-- Integrity verdict: `PASS — FIXED-SNAPSHOT REPLAY REPRODUCIBLE`
-- Frozen snapshot replay identical: **True**
-- Frozen runs: 3
-- Repeated query runs identical: True
-- Repeated full runs identical: True
-- Embedding snapshot: `data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.npz`
+- Integrity verdict: `PASS — EXACT FIXED-SNAPSHOT EVALUATION REPRODUCIBLE`
+- ANN frozen rebuild identical: **True** (authoritative=False)
+- ANN frozen runs: 3
+- ANN repeated query runs identical: True
+- ANN repeated full runs identical: True
+- Exact repeated full runs identical: **True**
+- Exact independent loader roots identical: **True**
+- Exact source-commit reconstruction identical: **True**
+- Baseline snapshot digest: `883941bf87f7beccd194cbbc7d9baead03b1181f06b1a8805a2b9926524c2a66`
+- Candidate snapshot digest: `7e86688cdd896d15d67e6cbd4e8fc75ba23192bfc05d9d17de8864b6eba16e6a`
+- ANN robustness builds: 3 (authoritative=False)
+- E008 ANN rank range: [3, 5]
+- H005 ANN rank range: []
+- Exact E008 final rank doc12: 3
+- Exact H005 final rank doc12: None
+- ANN verdict variation: ['REJECTED']
+- ANN rebuild stability: `VARIABLE` (authoritative=False)
+- Candidate embedding snapshot: `data/05_evaluation/embedding_snapshots/doc12_threat_atomic_units_v1.npz`
+- Baseline embedding snapshot: `data/05_evaluation/embedding_snapshots/doc08_atomic_risk_units_v1.npz`
 - Snapshot digest: `7e86688cdd896d15d67e6cbd4e8fc75ba23192bfc05d9d17de8864b6eba16e6a`
 - Candidate collection digest: `0b74e08cb2ab6ecde5e0502f5d267875a8b5e5e36532b6889957260142a4fc65`
 - Candidate embedding digest: `0a28c6ab83dca8096578f84377ceef613b177b01c149262736d48a9f758a31f5`
-- Live provider runs: 9 (authoritative=False)
-- Unique embedding digests: 9
-- E008 hit@4 pass/fail: 7/2
-- Experiment REJECTED count: 9
-- In this nine-run diagnostic sample...
 
 - Promoted hit@4: []
 - Regressed hit@4: []
