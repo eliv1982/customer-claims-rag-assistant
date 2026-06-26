@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -12,8 +13,9 @@ from customer_claims_rag.application.frozen_retrieval import FrozenRetrievalServ
 from customer_claims_rag.application.models import CustomerClaimsRequest
 from customer_claims_rag.application.pipeline import CustomerClaimsPipeline
 from customer_claims_rag.application.settings import ApplicationSettings, load_frozen_retrieval_config
+from customer_claims_rag.release.posture import ReleasePostureDiagnostics
 from customer_claims_rag.config import METADATA_SCHEMA_VERSION
-from customer_claims_rag.exceptions import IndexManifestError, LLMCallError
+from customer_claims_rag.exceptions import IndexManifestError, LLMCallError, ReleasePostureError
 from customer_claims_rag.generation.adapters.fake_chat import FakeChatModel
 from customer_claims_rag.generation.fallback import (
     GENERATION_FAILURE_CUSTOMER_RESPONSE,
@@ -29,6 +31,10 @@ from customer_claims_rag.retrieval.adapters.fake_embeddings import FakeEmbedding
 from customer_claims_rag.retrieval.manifest import build_manifest, write_manifest_atomic
 from customer_claims_rag.retrieval.retriever import BaselineRetriever
 from customer_claims_rag.retrieval_config import RetrievalSettings
+from tests.release_posture_helpers import (
+    resolved_release_target_for_index,
+    write_test_release_descriptor,
+)
 from customer_claims_rag.risk.models import RiskLevel
 from customer_claims_rag.risk.reason_codes import RiskReasonCode
 from tests.retrieval_helpers import make_chunk_record
@@ -99,12 +105,56 @@ def _write_empty_index(
     return index_dir
 
 
+def _release_params_from_index(index_dir: Path) -> tuple[int, tuple[str, ...], str]:
+    from customer_claims_rag.retrieval.adapters.chroma_store import ChromaVectorStore
+    from customer_claims_rag.retrieval.manifest import load_manifest
+
+    manifest = load_manifest(index_dir)
+    store = ChromaVectorStore(index_dir=index_dir, collection_name="customer_claims")
+    document_ids = tuple(sorted(store.list_document_ids()))
+    store.close()
+    return manifest.chunk_count, document_ids, manifest.corpus_fingerprint
+
+
 def _application_settings(
     tmp_path: Path,
     index_dir: Path,
     *,
     frozen_config_path: Path = FROZEN_CONFIG_PATH,
+    corpus_fingerprint: str | None = None,
+    chunk_count: int | None = None,
+    document_ids: tuple[str, ...] | None = None,
+    expected_frozen_config_hash: str | None = None,
 ) -> ApplicationSettings:
+    if chunk_count is None or document_ids is None or corpus_fingerprint is None:
+        loaded_chunk_count, loaded_document_ids, loaded_fingerprint = _release_params_from_index(
+            index_dir
+        )
+        chunk_count = chunk_count if chunk_count is not None else loaded_chunk_count
+        document_ids = document_ids if document_ids is not None else loaded_document_ids
+        corpus_fingerprint = (
+            corpus_fingerprint if corpus_fingerprint is not None else loaded_fingerprint
+        )
+    if expected_frozen_config_hash is None:
+        from customer_claims_rag.evaluation.pool_expansion_metrics import (
+            compute_pool_expansion_config_hash,
+            load_pool_expansion_config,
+        )
+
+        expected_frozen_config_hash = compute_pool_expansion_config_hash(
+            load_pool_expansion_config(frozen_config_path)
+        )
+    descriptor_path = tmp_path / "release_descriptor.json"
+    relative_index = index_dir.resolve().relative_to(tmp_path.resolve()).as_posix()
+    write_test_release_descriptor(
+        descriptor_path,
+        index_path_relative=relative_index,
+        corpus_fingerprint=corpus_fingerprint,
+        chunk_count=chunk_count,
+        document_count=len(document_ids),
+        supported_document_ids=list(document_ids),
+        expected_frozen_config_hash=expected_frozen_config_hash,
+    )
     return ApplicationSettings(
         retrieval=RetrievalSettings(
             index_dir=index_dir,
@@ -119,6 +169,16 @@ def _application_settings(
         generation=_generation_settings(),
         frozen_retrieval_config_path=frozen_config_path,
         reranker_config_path=RERANKER_CONFIG_PATH,
+        release_target=resolved_release_target_for_index(
+            index_dir,
+            project_root=tmp_path,
+            corpus_fingerprint=corpus_fingerprint,
+            chunk_count=chunk_count,
+            document_count=len(document_ids),
+            supported_document_ids=document_ids,
+            embedding_model=EMBEDDING_MODEL,
+        ),
+        release_descriptor_path=descriptor_path,
     )
 
 
@@ -139,11 +199,53 @@ def _grounded_generator_factory(chat_model: FakeChatModel):
     return factory
 
 
+def _release_validation_patches():
+    diagnostics = ReleasePostureDiagnostics(
+        release_posture_id="test",
+        selected_target="active",
+        target_status="selected_production_release",
+        index_path_relative="index",
+        corpus_fingerprint="integration-test-fingerprint",
+        chunk_count=1,
+        document_count=1,
+        collection_name="customer_claims",
+        embedding_model=EMBEDDING_MODEL,
+        vector_dimension=8,
+        frozen_retrieval_config_path="configs/retrieval/vector_pool_expansion_v1.json",
+        frozen_config_hash="ff53ff9721ad86b1c542bf96dce616d9057ed3b347e341fed59750b07b69e048",
+        vector_fetch_k=24,
+        candidate_pool_k=24,
+        final_top_k=12,
+        similarity_threshold=0.0,
+        reranker_id="source-authority-v1",
+    )
+    return (
+        patch(
+            "customer_claims_rag.application.factory.validate_release_posture_for_production",
+            return_value=diagnostics,
+        ),
+        patch(
+            "customer_claims_rag.application.factory.load_release_posture_descriptor",
+            return_value=MagicMock(),
+        ),
+    )
+
+
 def _build_pipeline(
     settings: ApplicationSettings,
     provider: FakeEmbeddingProvider,
     chat_model: FakeChatModel,
+    *,
+    bypass_release_validation: bool = False,
 ) -> CustomerClaimsPipeline:
+    if bypass_release_validation:
+        validation_patches = _release_validation_patches()
+        with validation_patches[0], validation_patches[1]:
+            return build_customer_claims_pipeline(
+                settings,
+                embedding_provider_factory=_embedding_factory(provider),
+                grounded_generator_factory=_grounded_generator_factory(chat_model),
+            )
     return build_customer_claims_pipeline(
         settings,
         embedding_provider_factory=_embedding_factory(provider),
@@ -304,7 +406,12 @@ def test_empty_retrieval_returns_insufficient_context_without_chat_call(
     chat_model = FakeChatModel(
         response=_valid_grounded_json("Не должно вызываться."),
     )
-    pipeline = _build_pipeline(settings, provider, chat_model)
+    pipeline = _build_pipeline(
+        settings,
+        provider,
+        chat_model,
+        bypass_release_validation=True,
+    )
 
     result = pipeline.handle(
         CustomerClaimsRequest(customer_query="Упаковка была вскрыта."),
@@ -353,12 +460,68 @@ def test_generation_llm_call_error_fallback_preserves_risk(tmp_path: Path) -> No
     assert result.response.handoff_notice == HIGH_HANDOFF_NOTICE
 
 
+def _manual_application_settings(
+    tmp_path: Path,
+    index_dir: Path,
+    *,
+    corpus_fingerprint: str,
+    chunk_count: int,
+    document_ids: tuple[str, ...],
+    frozen_config_path: Path = FROZEN_CONFIG_PATH,
+) -> ApplicationSettings:
+    descriptor_path = tmp_path / "release_descriptor.json"
+    relative_index = (
+        index_dir.resolve().relative_to(tmp_path.resolve()).as_posix()
+        if index_dir.exists()
+        else index_dir.name
+    )
+    write_test_release_descriptor(
+        descriptor_path,
+        index_path_relative=relative_index,
+        corpus_fingerprint=corpus_fingerprint,
+        chunk_count=chunk_count,
+        document_count=len(document_ids),
+        supported_document_ids=list(document_ids),
+    )
+    return ApplicationSettings(
+        retrieval=RetrievalSettings(
+            index_dir=index_dir,
+            collection_name="customer_claims",
+            embedding_model=EMBEDDING_MODEL,
+            top_k=4,
+            fetch_k=12,
+            similarity_threshold=0.0,
+            embedding_batch_size=64,
+            openai_api_key="dummy-not-real-key",
+        ),
+        generation=_generation_settings(),
+        frozen_retrieval_config_path=frozen_config_path,
+        reranker_config_path=RERANKER_CONFIG_PATH,
+        release_target=resolved_release_target_for_index(
+            index_dir,
+            project_root=tmp_path,
+            corpus_fingerprint=corpus_fingerprint,
+            chunk_count=chunk_count,
+            document_count=len(document_ids),
+            supported_document_ids=document_ids,
+            embedding_model=EMBEDDING_MODEL,
+        ),
+        release_descriptor_path=descriptor_path,
+    )
+
+
 def test_missing_index_fails_fast_without_building_pipeline(tmp_path: Path) -> None:
     missing_index = tmp_path / "missing-index"
-    settings = _application_settings(tmp_path, missing_index)
+    settings = _manual_application_settings(
+        tmp_path,
+        missing_index,
+        corpus_fingerprint="missing",
+        chunk_count=1,
+        document_ids=("01_service_overview",),
+    )
     provider = FakeEmbeddingProvider(model_name=EMBEDDING_MODEL, vector_dimension=8)
 
-    with pytest.raises(IndexManifestError, match="index manifest not found"):
+    with pytest.raises(ReleasePostureError, match="does not exist"):
         build_customer_claims_pipeline(
             settings,
             embedding_provider_factory=_embedding_factory(provider),
@@ -372,11 +535,17 @@ def test_empty_chroma_index_rejected_before_pipeline_return(
 ) -> None:
     provider = FakeEmbeddingProvider(model_name=EMBEDDING_MODEL, vector_dimension=8)
     index_dir = _write_empty_index(tmp_path, provider)
-    settings = _application_settings(tmp_path, index_dir)
+    settings = _manual_application_settings(
+        tmp_path,
+        index_dir,
+        corpus_fingerprint="empty-index",
+        chunk_count=1,
+        document_ids=("01_service_overview",),
+    )
     production_index = project_root / "data" / "04_index"
     before = {path.name for path in production_index.iterdir()} if production_index.is_dir() else set()
 
-    with pytest.raises(IndexManifestError, match="empty"):
+    with pytest.raises(ReleasePostureError, match="chunk count"):
         build_customer_claims_pipeline(
             settings,
             embedding_provider_factory=_embedding_factory(provider),
@@ -395,10 +564,16 @@ def test_missing_index_does_not_mutate_production_index(
     production_index = project_root / "data" / "04_index"
     before = {path.name for path in production_index.iterdir()} if production_index.is_dir() else set()
 
-    settings = _application_settings(tmp_path, tmp_path / "no-index")
+    settings = _manual_application_settings(
+        tmp_path,
+        tmp_path / "no-index",
+        corpus_fingerprint="missing",
+        chunk_count=1,
+        document_ids=("01_service_overview",),
+    )
     provider = FakeEmbeddingProvider(model_name=EMBEDDING_MODEL, vector_dimension=8)
 
-    with pytest.raises(IndexManifestError):
+    with pytest.raises(ReleasePostureError):
         build_customer_claims_pipeline(
             settings,
             embedding_provider_factory=_embedding_factory(provider),

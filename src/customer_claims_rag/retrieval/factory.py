@@ -22,8 +22,13 @@ def create_vector_store(
     *,
     index_dir: Path,
     collection_name: str,
+    open_existing: bool = False,
 ) -> VectorStore:
-    return ChromaVectorStore(index_dir=index_dir, collection_name=collection_name)
+    return ChromaVectorStore(
+        index_dir=index_dir,
+        collection_name=collection_name,
+        open_existing=open_existing,
+    )
 
 
 def require_openai_api_key(api_key: str | None) -> str:

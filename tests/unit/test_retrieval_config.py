@@ -7,6 +7,7 @@ from pathlib import Path
 from customer_claims_rag.application.settings import ApplicationSettings
 from customer_claims_rag.generation_config import GenerationSettings
 from customer_claims_rag.retrieval_config import RetrievalSettings
+from tests.release_posture_helpers import resolved_release_target_for_index
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROMPT_PATH = PROJECT_ROOT / "prompts" / "grounded_answer_v1.md"
@@ -90,6 +91,15 @@ def test_application_settings_repr_remains_secret_safe(tmp_path: Path) -> None:
         ).validate(),
         frozen_retrieval_config_path=FROZEN_CONFIG_PATH,
         reranker_config_path=RERANKER_CONFIG_PATH,
+        release_target=resolved_release_target_for_index(
+            tmp_path / "index",
+            project_root=tmp_path,
+            corpus_fingerprint="fp",
+            chunk_count=1,
+            document_count=1,
+            supported_document_ids=("01_service_overview",),
+            embedding_model="text-embedding-3-small",
+        ),
     )
     rendered = repr(settings)
     assert secret not in rendered

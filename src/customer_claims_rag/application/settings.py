@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+if TYPE_CHECKING:
+    from customer_claims_rag.release.posture import ResolvedReleaseTarget
 
 from customer_claims_rag import env_bootstrap
 from customer_claims_rag.generation_config import GenerationSettings
@@ -36,6 +39,8 @@ class ApplicationSettings:
     generation: GenerationSettings
     frozen_retrieval_config_path: Path
     reranker_config_path: Path
+    release_target: ResolvedReleaseTarget
+    release_descriptor_path: Path | None = None
 
     def __repr__(self) -> str:
         api_key_state = "set" if self.retrieval.openai_api_key else "unset"
@@ -44,6 +49,7 @@ class ApplicationSettings:
             f"retrieval_index_dir={self.retrieval.index_dir!r}, "
             f"retrieval_collection_name={self.retrieval.collection_name!r}, "
             f"retrieval_embedding_model={self.retrieval.embedding_model!r}, "
+            f"release_target={self.release_target.target_name!r}, "
             f"openai_api_key={api_key_state!r}, "
             f"generation_model_name={self.generation.model_name!r}, "
             f"frozen_retrieval_config_path={self.frozen_retrieval_config_path!r}, "
@@ -52,12 +58,25 @@ class ApplicationSettings:
 
     @classmethod
     def from_env(cls) -> ApplicationSettings:
+        from customer_claims_rag.release.posture import load_production_release_context
+
+        env_bootstrap.load_project_env()
         root = env_bootstrap.project_root()
+        _descriptor, resolved_target = load_production_release_context(project_root=root)
+        retrieval = RetrievalSettings.from_env()
+        retrieval = replace(
+            retrieval,
+            index_dir=resolved_target.index_dir,
+            collection_name=resolved_target.collection_name,
+            embedding_model=resolved_target.embedding_model,
+        )
         return cls(
-            retrieval=RetrievalSettings.from_env(),
+            retrieval=retrieval,
             generation=GenerationSettings.from_env(),
             frozen_retrieval_config_path=root / DEFAULT_FROZEN_RETRIEVAL_CONFIG_RELATIVE,
             reranker_config_path=root / DEFAULT_RERANKER_CONFIG_RELATIVE,
+            release_target=resolved_target,
+            release_descriptor_path=None,
         )
 
 

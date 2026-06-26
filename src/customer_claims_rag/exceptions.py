@@ -56,6 +56,10 @@ class IndexManifestError(RetrievalError):
     """Index manifest missing, corrupt, or inconsistent."""
 
 
+class ReleasePostureError(RetrievalError):
+    """Release posture descriptor or production target validation failure."""
+
+
 class SearchError(RetrievalError):
     """Search query validation or execution failure."""
 

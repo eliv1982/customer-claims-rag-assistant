@@ -36,9 +36,11 @@
 
 **Application layer (functional MVP)** — реализованы grounded generation, deterministic risk/handoff, citations и fallback handling; production composition root (`build_customer_claims_pipeline`), frozen retrieval `vector top-24 → source-authority-v1 → final top-12`, single-shot CLI (`answer-claim`) и локальный Streamlit UI.
 
-**Expanded corpus index (stage 4C.1)** — production index пересобран на 15 документов / 333 chunks; historical 10-document backup сохранён локально.
+**10-document production release posture (stage 4C.4-B)** — активирован formal release descriptor `foodflow-10doc-release-v1` (documents 01–10, index `data/04_index_backup_10docs_215chunks`, frozen pool@24 contract). Production startup fail-closed; rollback — emergency-only на 15-document archive (`data/04_index`). Подробности: `docs/06_release_posture.md`.
 
-**Expanded corpus frozen regression (stage 4C.2)** — frozen 60-question regression выполнен для historical 10-document и production 15-document index arms; артефакт `expanded_corpus_frozen_regression_v1`. **Retrieval release validation (stage 4C.3) ещё не выполнен.** Extension-set coverage для новых policy documents остаётся pending.
+**Expanded corpus index (stage 4C.1)** — historical 15-document index (`data/04_index`, 333 chunks) сохранён как emergency rollback/archive; **не** selected production release.
+
+**Expanded corpus frozen regression (stage 4C.2)** — frozen 60-question regression выполнен для historical 10-document и 15-document index arms; артефакт `expanded_corpus_frozen_regression_v1`.
 
 **Functional MVP complete:** production retrieval, grounded generation, deterministic risk/handoff, single-shot CLI и локальный Streamlit interface реализованы и покрыты тестами. Deployment и production operations **не** входят в текущий scope.
 
@@ -109,6 +111,14 @@ OPENAI_API_KEY=
 Файл `.env` **не коммитится** (см. `.gitignore`). Шаблон `.env.example` содержит безопасные placeholder-значения без секретов.
 
 Проект автоматически загружает `.env` из корня репозитория при запуске CLI, `answer-claim`, Streamlit UI и чтении `ApplicationSettings` / `RetrievalSettings`. Уже установленные переменные процесса имеют **приоритет** над значениями из `.env`. Отсутствие `.env` не является ошибкой.
+
+Production retrieval использует `configs/release/production_posture.json` (default target `active`). Индекс `data/04_index_backup_10docs_215chunks` — локальный deployment artifact; после provisioning проверьте:
+
+```powershell
+validate-release-posture
+```
+
+См. `docs/06_release_posture.md` для release identity, limitations и rollback.
 
 ### Тесты
 

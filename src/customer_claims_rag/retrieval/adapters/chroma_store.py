@@ -24,15 +24,32 @@ class ChromaVectorStore:
         *,
         index_dir: Path,
         collection_name: str,
+        open_existing: bool = False,
     ) -> None:
         self._index_dir = index_dir
         self._collection_name = collection_name
-        self._index_dir.mkdir(parents=True, exist_ok=True)
+        self._open_existing = open_existing
+        if not open_existing:
+            self._index_dir.mkdir(parents=True, exist_ok=True)
         self._client = chromadb.PersistentClient(path=str(self._index_dir))
-        self._collection = self._client.get_or_create_collection(
-            name=self._collection_name,
-            metadata={"hnsw:space": "cosine"},
-        )
+        if open_existing:
+            try:
+                self._collection = self._client.get_collection(name=self._collection_name)
+            except Exception as exc:
+                raise VectorStoreError(
+                    f"collection {self._collection_name!r} not found in index at "
+                    f"{self._index_dir}; production retrieval requires an existing index"
+                ) from exc
+            if self.count() == 0:
+                raise VectorStoreError(
+                    f"collection {self._collection_name!r} exists but is empty at "
+                    f"{self._index_dir}"
+                )
+        else:
+            self._collection = self._client.get_or_create_collection(
+                name=self._collection_name,
+                metadata={"hnsw:space": "cosine"},
+            )
 
     @property
     def collection_name(self) -> str:
@@ -100,6 +117,21 @@ class ChromaVectorStore:
             raise VectorStoreError(f"failed to list collection IDs: {exc}") from exc
         ids = result.get("ids") or []
         return sorted(str(chunk_id) for chunk_id in ids)
+
+    def list_document_ids(self) -> frozenset[str]:
+        if self.count() == 0:
+            return frozenset()
+        try:
+            result = self._collection.get(include=["metadatas"])
+        except Exception as exc:
+            raise VectorStoreError(f"failed to list collection document IDs: {exc}") from exc
+        metadatas = result.get("metadatas") or []
+        document_ids = {
+            str(metadata["document_id"])
+            for metadata in metadatas
+            if metadata is not None and metadata.get("document_id") is not None
+        }
+        return frozenset(document_ids)
 
     def export_collection_records(self) -> list[dict[str, Any]]:
         if self.count() == 0:
