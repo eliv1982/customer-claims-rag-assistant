@@ -28,6 +28,7 @@ from customer_claims_rag.ingestion.corpus_overlay import (
     build_doc12_experimental_corpora,
     cleanup_overlay_temp_dir,
 )
+from customer_claims_rag.retrieval.deterministic_search import deterministic_similarity_hits
 from customer_claims_rag.retrieval.embedding_snapshot import load_snapshot_manifest
 from customer_claims_rag.retrieval.experiment_index_publish import (
     experiment_staging_dir,
@@ -72,6 +73,8 @@ def trace_e008_case(
     index_dir: Path,
     project_root: Path,
     settings: RetrievalSettings | None = None,
+    deterministic: bool = False,
+    query_vector: list[float] | None = None,
 ) -> E008Trace:
     resolved_settings = settings or RetrievalSettings.from_env()
     cases = load_extension_corpus(
@@ -88,30 +91,63 @@ def trace_e008_case(
         index_dir=index_dir,
         collection_name=resolved_settings.collection_name,
     )
-    retriever = BaselineRetriever(
-        embedding_provider=embedding,
-        vector_store=store,
-        index_dir=index_dir,
-        top_k=48,
-        fetch_k=48,
-        similarity_threshold=0.0,
-    )
     reranker = SourceAuthorityV1Reranker(
         load_reranker_config(project_root / "configs/reranking/source_authority_v1.json")
     )
-    response = retriever.search(query)
-    vector_hits = list(response.results)
-    pool, _ = apply_per_document_cap(vector_hits, fetch_k=48, pool_k=36, per_document_cap=4)
-    final, _ = rerank_to_final_top_k(reranker, query, pool, final_top_k=12)
+    resolved_query_vector = query_vector or embedding.embed_query(query)
+
+    if deterministic:
+        records = store.export_collection_records()
+        ranked_hits = deterministic_similarity_hits(
+            records,
+            query_vector=resolved_query_vector,
+            k=48,
+        )
+        from customer_claims_rag.retrieval.models import SearchResult
+
+        search_results = [
+            SearchResult(
+                rank=index + 1,
+                chunk_id=hit.chunk_id,
+                document_id=hit.document_id,
+                content=hit.content,
+                source_path=hit.source_path,
+                chunk_type=hit.chunk_type,
+                topic=hit.topic,
+                risk_level=hit.risk_level,
+                heading=hit.heading,
+                heading_path=hit.heading_path,
+                section=hit.section,
+                subsection=hit.subsection,
+                similarity=hit.similarity,
+                distance=hit.distance,
+            )
+            for index, hit in enumerate(ranked_hits)
+        ]
+    else:
+        retriever = BaselineRetriever(
+            embedding_provider=embedding,
+            vector_store=store,
+            index_dir=index_dir,
+            top_k=48,
+            fetch_k=48,
+            similarity_threshold=0.0,
+        )
+        search_results = list(retriever.search(query).results)
+
     store.close()
-    vector_doc12 = tuple(hit.rank for hit in vector_hits if hit.document_id == DOC12_DOCUMENT_ID)
+    pool, _ = apply_per_document_cap(search_results, fetch_k=48, pool_k=36, per_document_cap=4)
+    final, _ = rerank_to_final_top_k(reranker, query, pool, final_top_k=12)
+    vector_doc12 = tuple(
+        hit.rank for hit in search_results if hit.document_id == DOC12_DOCUMENT_ID
+    )
     pool_doc12 = tuple(item.rank for item in pool if item.document_id == DOC12_DOCUMENT_ID)
     final_doc12_rank = next(
         (index + 1 for index, item in enumerate(final) if item.document_id == DOC12_DOCUMENT_ID),
         None,
     )
     return E008Trace(
-        vector_top_ids=tuple(hit.chunk_id for hit in vector_hits[:48]),
+        vector_top_ids=tuple(hit.chunk_id for hit in search_results[:48]),
         vector_doc12_ranks=vector_doc12,
         pool_doc12_ranks=pool_doc12,
         final_doc12_rank=final_doc12_rank,
@@ -147,6 +183,7 @@ def build_candidate_index_to_dir(
     embedding_snapshot: Path | None = None,
     embedding_snapshot_manifest: Path | None = None,
     live_provider: bool = False,
+    e008_query_vector: list[float] | None = None,
 ) -> dict[str, Any]:
     resolved_settings = settings or RetrievalSettings.from_env()
     if index_dir.exists():
@@ -214,7 +251,13 @@ def build_candidate_index_to_dir(
         manifest = load_manifest(index_dir)
         if manifest.chunk_count is None:
             raise RuntimeError(f"index manifest incomplete after publish: {index_dir}")
-        trace = trace_e008_case(index_dir=index_dir, project_root=project_root, settings=resolved_settings)
+        trace = trace_e008_case(
+            index_dir=index_dir,
+            project_root=project_root,
+            settings=resolved_settings,
+            deterministic=resolved_snapshot is not None,
+            query_vector=e008_query_vector,
+        )
         return {
             "build_run_id": build_run_id,
             "corpus_fingerprint": report.fingerprint,
@@ -245,6 +288,17 @@ def run_frozen_snapshot_replay(
     parent_dir.mkdir(parents=True, exist_ok=True)
 
     index_dir_for_queries = parent_dir / "AUTHORITATIVE"
+    cases = load_extension_corpus(
+        questions_path=project_root / "tests/extension/doc08_atomic_extension_v1_questions.md",
+        expected_path=project_root / "tests/extension/doc08_atomic_extension_v1_expected.md",
+        expected_ids=["E008"],
+    )
+    settings = RetrievalSettings.from_env()
+    e008_query_vector = create_embedding_provider(
+        model_name=settings.embedding_model,
+        api_key=settings.openai_api_key,
+    ).embed_query(cases[0].query)
+
     results = []
     for label in ("A", "B", "C")[:builds]:
         index_dir = parent_dir / f"BUILD_{label}"
@@ -258,6 +312,7 @@ def run_frozen_snapshot_replay(
                 embedding_snapshot=embedding_snapshot,
                 embedding_snapshot_manifest=embedding_snapshot_manifest,
                 live_provider=False,
+                e008_query_vector=e008_query_vector,
             )
         )
     shutil.copytree(parent_dir / "BUILD_A", index_dir_for_queries, dirs_exist_ok=True)
