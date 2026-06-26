@@ -21,6 +21,9 @@ data/03_chunks/*.json
 data/04_index/*
 !data/04_index/.gitkeep
 
+# Provisioned production release index (local deployment artifact; bind-mounted in Docker)
+data/04_index_backup_10docs_215chunks/
+
 # Experiment indexes (rebuilt via CLI)
 data/04_index_experiments/*
 !data/04_index_experiments/.gitkeep

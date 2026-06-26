@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 _loaded = False
+_PROJECT_ROOT_ENV = "CUSTOMER_CLAIMS_PROJECT_ROOT"
 
 
 def project_root() -> Path:
-    """Return repository root (parent of ``src/``)."""
+    """Return repository root (parent of ``src/``) or an explicit runtime override."""
+    override = os.environ.get(_PROJECT_ROOT_ENV)
+    if override:
+        return Path(override).resolve()
     return Path(__file__).resolve().parents[2]
 
 

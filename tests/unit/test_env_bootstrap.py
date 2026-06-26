@@ -17,6 +17,7 @@ DOCUMENTED_ENV_KEYS = {
     "OPENAI_API_KEY",
     "OPENAI_EMBEDDING_MODEL",
     "OPENAI_CHAT_MODEL",
+    "RAG_RELEASE_TARGET",
     "RAG_INDEX_DIR",
     "RAG_COLLECTION_NAME",
     "RAG_TOP_K",
@@ -36,6 +37,11 @@ def reset_env_bootstrap() -> None:
     env_bootstrap.reset_project_env()
     yield
     env_bootstrap.reset_project_env()
+
+
+def test_project_root_honors_runtime_override(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("CUSTOMER_CLAIMS_PROJECT_ROOT", str(tmp_path))
+    assert env_bootstrap.project_root() == tmp_path.resolve()
 
 
 def test_env_example_contains_documented_settings_without_secrets() -> None:

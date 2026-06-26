@@ -42,11 +42,13 @@
 
 **Expanded corpus frozen regression (stage 4C.2)** — frozen 60-question regression выполнен для historical 10-document и 15-document index arms; артефакт `expanded_corpus_frozen_regression_v1`.
 
-**Functional MVP complete:** production retrieval, grounded generation, deterministic risk/handoff, single-shot CLI и локальный Streamlit interface реализованы и покрыты тестами. Deployment и production operations **не** входят в текущий scope.
+**Functional MVP complete:** production retrieval, grounded generation, deterministic risk/handoff, single-shot CLI и локальный Streamlit interface реализованы и покрыты тестами.
 
-**Еще не реализованы:** deployment/operations, authentication, chat history, document upload из UI, feedback collection, query rewriting, production threshold auto-selection.
+**Docker-based local delivery (stage 5B)** — reproducible Streamlit deployment через Docker Compose с bind-mount активного production index; fail-closed startup preflight. См. `docs/07_index_provisioning.md` и `docs/08_docker_runbook.md`.
 
-Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/`, `data/04_index/` (rollback archive) и provisioned production index — только локальные generated/deployment артефакты.
+**Еще не реализованы:** authentication, chat history, document upload из UI, feedback collection, query rewriting, production threshold auto-selection, remote/public deployment.
+
+Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/`, `data/04_index/` (rollback archive) и provisioned production index — только локальные generated/deployment артефакты. **Свежий clone не содержит production index** — его нужно provision'ить отдельно (`docs/07_index_provisioning.md`).
 
 ## Запуск с нуля (Windows / PowerShell)
 
@@ -232,7 +234,25 @@ python -m streamlit run src/customer_claims_rag/ui/streamlit_app.py
 - безопасные метки источников (`[S1] заголовок — document_id`);
 - статус при недостатке контекста или сбое генерации.
 
-Дополнительные параметры:
+### Docker (рекомендуемый способ демонстрации)
+
+Требования: Docker Desktop / Docker Engine + Compose, provisioned production index на хосте, `OPENAI_API_KEY` в environment процесса.
+
+1. Provision index: `docs/07_index_provisioning.md`
+2. Runbook: `docs/08_docker_runbook.md`
+
+Кратко (PowerShell):
+
+```powershell
+$env:OPENAI_API_KEY = "your-key-here"
+docker compose build
+docker compose run --rm streamlit validate-release-posture
+docker compose up
+```
+
+Откройте http://localhost:8501. Индекс монтируется read-write в `/app/data/04_index_backup_10docs_215chunks`; в image он **не** копируется. `RAG_INDEX_DIR` на production UI flow **не влияет**; selector — `RAG_RELEASE_TARGET` + descriptor.
+
+Дополнительные параметры search-index (локальный Python, dev/evaluation):
 
 ```powershell
 python -m customer_claims_rag.cli.search_index "возврат" --top-k 4 --fetch-k 12 --threshold 0.35
@@ -242,7 +262,7 @@ python -m customer_claims_rag.cli.search_index "возврат" --top-k 4 --fetc
 
 ### Generated artifacts
 
-- **Production release index** (`data/04_index_backup_10docs_215chunks`) — separately provisioned local artifact; see `docs/06_release_posture.md`;
+- **Production release index** (`data/04_index_backup_10docs_215chunks`) — separately provisioned local artifact; see `docs/07_index_provisioning.md` and `docs/06_release_posture.md`;
 - **Build/evaluation index** (`data/04_index/`) — default for `build-index` / `search-index` / evaluation CLIs; also emergency rollback archive when `RAG_RELEASE_TARGET=rollback`;
 - Chroma index и `manifest.json` создаются **внутри project root**;
 - нельзя направлять `--index-dir` в `data/01_raw/`, `data/02_clean_markdown/` или внутрь `--input-dir`;
@@ -263,7 +283,9 @@ deactivate
 | `OPENAI_API_KEY` | Ключ OpenAI для embeddings и generation | — |
 | `OPENAI_EMBEDDING_MODEL` | Модель embeddings | `text-embedding-3-small` |
 | `OPENAI_CHAT_MODEL` | Модель chat completion для generation | `gpt-4o-mini` |
+| `CUSTOMER_CLAIMS_PROJECT_ROOT` | Explicit project root for container/non-editable installs | unset (auto-detect from package layout) |
 | `RAG_RELEASE_TARGET` | Production release target (`active` / `rollback`) | `active` (descriptor default) |
+| `RAG_ACTIVE_INDEX_HOST_PATH` | Docker Compose **host** bind-mount path for active index only | `./data/04_index_backup_10docs_215chunks` |
 | `RAG_INDEX_DIR` | Index path for **build/search/evaluation CLIs only** | `data/04_index` |
 | `RAG_COLLECTION_NAME` | Имя Chroma collection | `customer_claims` |
 | `RAG_TOP_K` | Максимум результатов поиска (retrieval CLI) | `4` |
