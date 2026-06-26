@@ -1,0 +1,58 @@
+{
+  "experiment_id": "doc12-threat-atomic-units-v1",
+  "version": "1.0.0",
+  "experiment_mode": "corpus-ab-stacked",
+  "description": "Atomic threat-unit restructuring of document 12 on top of doc08 experimental corpus.",
+  "baseline_corpus": {
+    "doc08_overlay_path": "experiments/corpus/doc08_atomic_risk_units_v1/08_escalation_and_risk_rules.md",
+    "expected_doc08_fingerprint": "c208e6527facd195497d26e9efe6d8b4f487dfdea59629e603205ff1f4ea0c39",
+    "expected_index_fingerprint": "d3c27f4a72e5f78582c6cc29b8cb6c9f26234f6582970ead602f44e5b375bad6"
+  },
+  "candidate_overlay": {
+    "document_id": "12_staff_safety_and_threat_handling",
+    "overlay_path": "experiments/corpus/doc12_threat_atomic_units_v1/12_staff_safety_and_threat_handling.md"
+  },
+  "production_reference": {
+    "index_dir": "data/04_index",
+    "index_fingerprint": "b9526128dad23e71e812fbd8f26452b8d6efa29e4faac898fa11f279b310e827"
+  },
+  "retrieval": {
+    "fetch_k": 48,
+    "candidate_pool_k": 36,
+    "per_document_cap": 4,
+    "final_top_k": 12,
+    "threshold": 0.0,
+    "reranker_id": "source-authority-v1",
+    "reranker_config": "configs/reranking/source_authority_v1.json"
+  },
+  "frozen_benchmark": {
+    "questions": "tests/01_test_questions.md",
+    "expected": "tests/02_expected_answers.md",
+    "question_set_id": "foodflow-60-case-frozen-v1"
+  },
+  "extension_benchmark": {
+    "benchmark_id": "doc08-atomic-extension-v1",
+    "questions": "tests/extension/doc08_atomic_extension_v1_questions.md",
+    "expected": "tests/extension/doc08_atomic_extension_v1_expected.md",
+    "case_ids": [
+      "E001", "E002", "E003", "E004",
+      "E005", "E006", "E007", "E008",
+      "E009", "E010", "E011", "E012"
+    ]
+  },
+  "holdout_benchmark": {
+    "benchmark_id": "doc12-threat-holdout-v1",
+    "questions": "tests/holdout/doc12_threat_holdout_v1_questions.md",
+    "expected": "tests/holdout/doc12_threat_holdout_v1_expected.md",
+    "case_ids": [
+      "H001", "H002", "H003", "H004", "H005", "H006",
+      "H007", "H008", "H009", "H010", "H011", "H012"
+    ],
+    "positive_ids": ["H001", "H002", "H003", "H004", "H005", "H006"],
+    "negative_ids": ["H007", "H008", "H009", "H010", "H011", "H012"]
+  },
+  "baseline_index_dir": "data/04_index_experiments/doc08_atomic_risk_units_v1",
+  "candidate_index_dir": "data/04_index_experiments/doc12_threat_atomic_units_v1",
+  "reference_artifact": "data/05_evaluation/doc08_atomic_risk_units_v1.json",
+  "reference_arm": "candidate"
+}
