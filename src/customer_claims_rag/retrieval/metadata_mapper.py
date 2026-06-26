@@ -99,6 +99,7 @@ def vector_metadata_to_search_hit(
     content: str,
     metadata: dict[str, Any],
     distance: float,
+    backend_rank: int = 0,
 ) -> VectorSearchHit:
     heading_path_raw = metadata.get("heading_path", "[]")
     if isinstance(heading_path_raw, list):
@@ -125,4 +126,5 @@ def vector_metadata_to_search_hit(
         subsection=str(subsection) if subsection is not None else None,
         distance=float(distance),
         similarity=distance_to_similarity(float(distance)),
+        backend_rank=backend_rank,
     )

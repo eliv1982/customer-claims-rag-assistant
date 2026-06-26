@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 import chromadb
 
@@ -43,12 +43,19 @@ class ChromaVectorStore:
             raise VectorStoreError("embedding dimension must be >= 1")
         try:
             self._client.delete_collection(name=self._collection_name)
-        except Exception:
-            pass
+        except Exception as exc:
+            raise VectorStoreError(
+                f"failed to delete collection {self._collection_name!r}: {exc}"
+            ) from exc
+
         self._collection = self._client.get_or_create_collection(
             name=self._collection_name,
             metadata={"hnsw:space": "cosine"},
         )
+        if self.count() != 0:
+            raise VectorStoreError(
+                f"collection {self._collection_name!r} is not empty after recreate"
+            )
 
     def add_chunks(
         self,
@@ -84,6 +91,50 @@ class ChromaVectorStore:
     def count(self) -> int:
         return int(self._collection.count())
 
+    def list_chunk_ids(self) -> list[str]:
+        if self.count() == 0:
+            return []
+        try:
+            result = self._collection.get(include=[])
+        except Exception as exc:
+            raise VectorStoreError(f"failed to list collection IDs: {exc}") from exc
+        ids = result.get("ids") or []
+        return sorted(str(chunk_id) for chunk_id in ids)
+
+    def export_collection_records(self) -> list[dict[str, Any]]:
+        if self.count() == 0:
+            return []
+        try:
+            result = self._collection.get(include=["documents", "metadatas", "embeddings"])
+        except Exception as exc:
+            raise VectorStoreError(f"failed to export collection records: {exc}") from exc
+
+        ids = [str(item) for item in (result.get("ids") or [])]
+        documents = list(result.get("documents") or [])
+        metadatas = list(result.get("metadatas") or [])
+        raw_embeddings = result.get("embeddings")
+        if raw_embeddings is None:
+            embedding_rows: list = []
+        else:
+            embedding_rows = list(raw_embeddings)
+
+        records: list[dict[str, Any]] = []
+        for index, chunk_id in enumerate(ids):
+            document = documents[index] if index < len(documents) else None
+            metadata = metadatas[index] if index < len(metadatas) else None
+            embedding = embedding_rows[index] if index < len(embedding_rows) else None
+            if document is None or metadata is None or embedding is None:
+                continue
+            records.append(
+                {
+                    "chunk_id": str(metadata.get("chunk_id", chunk_id)),
+                    "document": str(document),
+                    "metadata": {str(key): metadata[key] for key in metadata},
+                    "embedding": [float(value) for value in list(embedding)],
+                }
+            )
+        return records
+
     def similarity_search(
         self,
         query_embedding: Sequence[float],
@@ -106,7 +157,10 @@ class ChromaVectorStore:
         distances = (result.get("distances") or [[]])[0]
 
         hits: list[VectorSearchHit] = []
-        for content, metadata, distance in zip(documents, metadatas, distances, strict=True):
+        for backend_rank, (content, metadata, distance) in enumerate(
+            zip(documents, metadatas, distances, strict=True),
+            start=1,
+        ):
             if content is None or metadata is None or distance is None:
                 continue
             hits.append(
@@ -114,6 +168,7 @@ class ChromaVectorStore:
                     content=content,
                     metadata=metadata,
                     distance=float(distance),
+                    backend_rank=backend_rank,
                 )
             )
         return hits

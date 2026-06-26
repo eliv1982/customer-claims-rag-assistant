@@ -17,6 +17,7 @@ from customer_claims_rag.evaluation.doc12_threat_atomic_contract import (
     load_holdout_corpus,
     repo_relative_path,
 )
+from customer_claims_rag.evaluation.doc12_replay_integrity import build_replay_stability_result
 from customer_claims_rag.evaluation.doc12_threat_atomic_evaluator import (
     Doc12ThreatAtomicAbEvaluator,
     prepare_doc12_chunk_diff_and_fingerprints,
@@ -71,6 +72,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-markdown", type=Path, default=DEFAULT_MARKDOWN)
     parser.add_argument("--collection", default=settings.collection_name)
     parser.add_argument("--embedding-model", default=settings.embedding_model)
+    parser.add_argument(
+        "--stability-matrix",
+        action="store_true",
+        help="Run replay stability matrix before final evaluation artifact",
+    )
     return parser
 
 
@@ -202,6 +208,19 @@ def main(argv: list[str] | None = None) -> int:
         project_root=root,
     )
 
+    replay_stability = None
+    if args.stability_matrix:
+        canonical_dir = args.canonical_dir if args.canonical_dir.is_absolute() else root / args.canonical_dir
+        replay_stability = build_replay_stability_result(
+            index_dir=candidate_index,
+            project_root=root,
+            config=config,
+            canonical_dir=canonical_dir,
+            evaluator=evaluator,
+            rebuild_parent=root / ".tmp" / "doc12_replay_matrix",
+        )
+        evaluator.replay_stability = replay_stability
+
     try:
         run = evaluator.evaluate()
         json_path = args.output_json if args.output_json.is_absolute() else root / args.output_json
@@ -217,6 +236,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"doc08_unchanged={run.doc08_fingerprint_unchanged}")
         print(f"holdout_positive_hit4={run.holdout.candidate.positive_doc12_hit_at_4}/6")
+        if run.replay_integrity_verdict:
+            print(f"replay_integrity={run.replay_integrity_verdict}")
         return 0 if run.verdict == "ACCEPTED AS COMBINED TARGETED CORPUS REPAIR" else 2
     except (BaselineReproductionError, DirtySourceTreeError) as exc:
         print(f"error: {exc}", file=sys.stderr)

@@ -102,7 +102,7 @@ class BaselineRetriever:
     def _rank_hits(self, hits: list[VectorSearchHit]) -> list[VectorSearchHit]:
         return sorted(
             hits,
-            key=lambda hit: (-hit.similarity, hit.chunk_id),
+            key=lambda hit: (-hit.similarity, hit.backend_rank, hit.chunk_id),
         )
 
     @staticmethod

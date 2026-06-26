@@ -56,6 +56,24 @@ def render_doc12_markdown(run: Doc12ThreatAtomicEvaluationRun) -> str:
         f"{run.frozen_reachability_candidate.primary_denominator} |",
         f"| FAQ top-4 | {run.faq_top4_baseline} | {run.faq_top4_candidate} |",
         "",
+    ]
+    if run.replay_stability is not None:
+        lines.extend(
+            [
+                "## Replay stability",
+                "",
+                f"- Integrity verdict: `{run.replay_stability.integrity_verdict}`",
+                f"- All identical: **{run.replay_stability.all_identical}**",
+                f"- Repeated query runs identical: {run.replay_stability.repeated_query_runs.get('all_identical')}",
+                f"- Repeated full runs identical: {run.replay_stability.repeated_full_runs.get('all_identical')}",
+                f"- Independent rebuilds identical: {run.replay_stability.independent_rebuilds.get('all_identical')}",
+                f"- Candidate collection digest: `{run.candidate_arm.collection_content_digest}`",
+                f"- Candidate embedding digest: `{run.candidate_arm.embedding_digest}`",
+                "",
+            ]
+        )
+    lines.extend(
+        [
         f"- Promoted hit@4: {run.promoted_cases_hit_at_4}",
         f"- Regressed hit@4: {run.regressed_cases_hit_at_4}",
         f"- Promoted hit@12: {run.promoted_cases_hit_at_12}",
@@ -105,7 +123,8 @@ def render_doc12_markdown(run: Doc12ThreatAtomicEvaluationRun) -> str:
         "",
         "| Case | Baseline hit@4 | Candidate hit@4 | Delta |",
         "|------|----------------|-----------------|-------|",
-    ]
+        ]
+    )
     for diag in run.holdout.case_diagnostics:
         lines.append(
             f"| {diag.case_id} | {diag.baseline_primary_hit_at_4} | "

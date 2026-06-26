@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import time
 from pathlib import Path
 
@@ -10,6 +12,11 @@ from customer_claims_rag.exceptions import DuplicateChunkIdError, IndexBuildErro
 from customer_claims_rag.ingestion.corpus_builder import CorpusBuilder
 from customer_claims_rag.models import ChunkRecord, DocumentRecord
 from customer_claims_rag.retrieval.fingerprint import compute_corpus_fingerprint, sort_chunks_deterministic
+from customer_claims_rag.retrieval.index_identity import (
+    compute_chunk_payload_digest,
+    compute_collection_content_digest,
+    compute_embedding_digest,
+)
 from customer_claims_rag.retrieval.manifest import (
     build_manifest,
     invalidate_manifest,
@@ -60,6 +67,8 @@ class IndexBuilder:
         chunks: list[ChunkRecord],
         *,
         rebuild: bool = True,
+        embedding_cache_path: Path | None = None,
+        build_run_id: str | None = None,
     ) -> IndexBuildReport:
         """Build index from pre-built chunk records (experiment overlays)."""
         if not rebuild:
@@ -67,7 +76,13 @@ class IndexBuilder:
                 "incremental indexing is not supported in MVP; use --rebuild"
             )
         started = time.perf_counter()
-        return self._build_from_chunks(documents, chunks, started=started)
+        return self._build_from_chunks(
+            documents,
+            chunks,
+            started=started,
+            embedding_cache_path=embedding_cache_path,
+            build_run_id=build_run_id,
+        )
 
     def _build_from_chunks(
         self,
@@ -75,6 +90,8 @@ class IndexBuilder:
         chunks: list[ChunkRecord],
         *,
         started: float,
+        embedding_cache_path: Path | None = None,
+        build_run_id: str | None = None,
     ) -> IndexBuildReport:
         self._validate_corpus(chunks)
 
@@ -84,11 +101,13 @@ class IndexBuilder:
             embedding_model=self.embedding_provider.model_name,
         )
 
-        embeddings = self._embed_all(ordered_chunks)
+        embeddings = self._embed_all(ordered_chunks, embedding_cache_path=embedding_cache_path)
         if not embeddings:
             raise IndexBuildError("embedding provider returned no vectors")
 
         dimension = len(embeddings[0])
+        chunk_payload_digest = compute_chunk_payload_digest(ordered_chunks)
+        embedding_digest = compute_embedding_digest(ordered_chunks, embeddings)
         invalidate_manifest(self.index_dir)
         document_count = (
             len(documents)
@@ -104,6 +123,17 @@ class IndexBuilder:
                     f"indexed chunk count mismatch: expected {len(ordered_chunks)}, "
                     f"got {indexed_count}"
                 )
+            stored_ids = set(self.vector_store.list_chunk_ids())
+            expected_ids = {chunk.chunk_id for chunk in ordered_chunks}
+            if stored_ids != expected_ids:
+                stale = sorted(stored_ids - expected_ids)
+                missing = sorted(expected_ids - stored_ids)
+                raise IndexBuildError(
+                    "indexed chunk ID set mismatch: "
+                    f"stale={stale[:5]} missing={missing[:5]}"
+                )
+            collection_records = self.vector_store.export_collection_records()
+            collection_content_digest = compute_collection_content_digest(collection_records)
 
             manifest = build_manifest(
                 collection_name=self.vector_store.collection_name,
@@ -113,6 +143,10 @@ class IndexBuilder:
                 document_count=document_count,
                 metadata_schema_version=METADATA_SCHEMA_VERSION,
                 vector_dimension=dimension,
+                chunk_payload_digest=chunk_payload_digest,
+                embedding_digest=embedding_digest,
+                collection_content_digest=collection_content_digest,
+                build_run_id=build_run_id,
             )
             write_manifest_atomic(self.index_dir, manifest)
         except IndexBuildError:
@@ -141,7 +175,23 @@ class IndexBuilder:
         except DuplicateChunkIdError as exc:
             raise IndexBuildError(str(exc)) from exc
 
-    def _embed_all(self, chunks: list[ChunkRecord]) -> list[list[float]]:
+    def _embed_all(
+        self,
+        chunks: list[ChunkRecord],
+        *,
+        embedding_cache_path: Path | None = None,
+    ) -> list[list[float]]:
+        if embedding_cache_path is not None:
+            from customer_claims_rag.retrieval.experiment_embedding_cache import (
+                resolve_experiment_embeddings,
+            )
+
+            return resolve_experiment_embeddings(
+                chunks,
+                embedding_provider=self.embedding_provider,
+                cache_path=embedding_cache_path,
+            )
+
         texts = [chunk.content for chunk in chunks]
         vectors: list[list[float]] = []
         for start in range(0, len(texts), self.batch_size):

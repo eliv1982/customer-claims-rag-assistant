@@ -54,6 +54,10 @@ class Doc12ChunkDiffModel(BaseModel):
 
 
 Doc12Verdict = Literal["ACCEPTED AS COMBINED TARGETED CORPUS REPAIR", "REJECTED"]
+ReplayIntegrityVerdict = Literal[
+    "PASS — EXPERIMENT INTEGRITY REPAIRED",
+    "FAIL — NONDETERMINISTIC EXPERIMENT",
+]
 
 
 class HoldoutArmMetrics(BaseModel):
@@ -66,6 +70,16 @@ class HoldoutArmMetrics(BaseModel):
     negative_domain_hit_at_4: int
     negative_doc12_top1: int
     negative_doc12_top4: int
+
+
+class ReplayStabilityResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    repeated_query_runs: dict[str, Any] = Field(default_factory=dict)
+    repeated_full_runs: dict[str, Any] = Field(default_factory=dict)
+    independent_rebuilds: dict[str, Any] = Field(default_factory=dict)
+    all_identical: bool = False
+    integrity_verdict: ReplayIntegrityVerdict = "FAIL — NONDETERMINISTIC EXPERIMENT"
 
 
 class HoldoutEvaluationResult(BaseModel):
@@ -137,6 +151,8 @@ class Doc12ThreatAtomicEvaluationRun(BaseModel):
     regressed_cases_hit_at_12: list[str] = Field(default_factory=list)
     extension: ExtensionEvaluationResult
     holdout: HoldoutEvaluationResult
+    replay_stability: ReplayStabilityResult | None = None
+    replay_integrity_verdict: ReplayIntegrityVerdict | None = None
     acceptance_checks: list[AcceptanceCheck] = Field(default_factory=list)
     interpretation_boundary: list[str] = Field(default_factory=list)
     verdict: Doc12Verdict

@@ -65,6 +65,10 @@ class RetrievalArmMetadata(BaseModel):
     embedding_model: str
     benchmark_fingerprint: str | None = None
     execution_timestamp: datetime | None = None
+    chunk_payload_digest: str | None = None
+    embedding_digest: str | None = None
+    collection_content_digest: str | None = None
+    build_run_id: str | None = None
 
 
 class FrozenReachabilitySnapshot(BaseModel):

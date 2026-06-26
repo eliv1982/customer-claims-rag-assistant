@@ -38,6 +38,7 @@ from customer_claims_rag.evaluation.doc12_threat_atomic_contract import (
     fully_unreachable_case_ids,
     load_doc08_experimental_oracle,
     primary_unreachable_case_ids,
+    repo_relative_path,
     validate_baseline_reproduction,
 )
 from customer_claims_rag.evaluation.doc12_threat_atomic_models import (
@@ -46,6 +47,8 @@ from customer_claims_rag.evaluation.doc12_threat_atomic_models import (
     Doc12ThreatAtomicEvaluationRun,
     Doc12Verdict,
     HoldoutEvaluationResult,
+    ReplayIntegrityVerdict,
+    ReplayStabilityResult,
 )
 from customer_claims_rag.evaluation.git_state import read_git_state
 from customer_claims_rag.evaluation.metrics import aggregate_case_metrics, compute_case_metrics
@@ -108,6 +111,7 @@ class Doc12ThreatAtomicAbEvaluator:
         reference_artifact_path: Path,
         project_root: Path | None = None,
         allow_dirty_source: bool = False,
+        replay_stability: ReplayStabilityResult | None = None,
     ) -> None:
         self.baseline_retriever = baseline_retriever
         self.candidate_retriever = candidate_retriever
@@ -137,6 +141,7 @@ class Doc12ThreatAtomicAbEvaluator:
         self.reference_artifact_path = reference_artifact_path
         self.project_root = project_root
         self.allow_dirty_source = allow_dirty_source
+        self.replay_stability = replay_stability
         self.reference_oracle = load_doc08_experimental_oracle(
             reference_artifact_path,
             project_root=project_root,
@@ -320,6 +325,10 @@ class Doc12ThreatAtomicAbEvaluator:
                 verdict=holdout_verdict,
                 acceptance_checks=holdout_checks,
             ),
+            replay_stability=self.replay_stability,
+            replay_integrity_verdict=(
+                self.replay_stability.integrity_verdict if self.replay_stability else None
+            ),
             acceptance_checks=all_checks,
             interpretation_boundary=[
                 "Baseline arm is the accepted doc08 experimental candidate corpus; "
@@ -342,9 +351,10 @@ class Doc12ThreatAtomicAbEvaluator:
         reranker_hash: str,
         execution_timestamp: datetime,
     ) -> RetrievalArmMetadata:
+        index_path = self.baseline_index_dir if arm == "baseline" else self.candidate_index_dir
         return RetrievalArmMetadata(
             arm=arm,
-            index_dir=str(self.baseline_index_dir if arm == "baseline" else self.candidate_index_dir),
+            index_dir=repo_relative_path(index_path, self.project_root),
             index_fingerprint=manifest.corpus_fingerprint,
             corpus_fingerprint=manifest.corpus_fingerprint,
             doc08_fingerprint=doc08_fingerprint,
@@ -361,6 +371,10 @@ class Doc12ThreatAtomicAbEvaluator:
             embedding_model=self.embedding_model,
             benchmark_fingerprint=self.frozen_benchmark_fingerprint,
             execution_timestamp=execution_timestamp,
+            chunk_payload_digest=manifest.chunk_payload_digest,
+            embedding_digest=manifest.embedding_digest,
+            collection_content_digest=manifest.collection_content_digest,
+            build_run_id=manifest.build_run_id,
         )
 
     def _evaluate_cases(self, cases: list) -> list[Doc12ThreatAtomicCaseResult]:

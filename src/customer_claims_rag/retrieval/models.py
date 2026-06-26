@@ -22,6 +22,10 @@ class IndexManifest(BaseModel):
     metadata_schema_version: str
     vector_dimension: int | None = None
     created_at: datetime | None = None
+    chunk_payload_digest: str | None = None
+    embedding_digest: str | None = None
+    collection_content_digest: str | None = None
+    build_run_id: str | None = None
 
 
 class VectorSearchHit(BaseModel):
@@ -42,6 +46,7 @@ class VectorSearchHit(BaseModel):
     subsection: str | None = None
     distance: float
     similarity: float
+    backend_rank: int = 0
 
 
 class SearchResult(BaseModel):

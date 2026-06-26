@@ -148,6 +148,10 @@ def build_manifest(
     document_count: int,
     metadata_schema_version: str,
     vector_dimension: int,
+    chunk_payload_digest: str | None = None,
+    embedding_digest: str | None = None,
+    collection_content_digest: str | None = None,
+    build_run_id: str | None = None,
 ) -> IndexManifest:
     return IndexManifest(
         index_format_version=INDEX_FORMAT_VERSION,
@@ -159,4 +163,8 @@ def build_manifest(
         metadata_schema_version=metadata_schema_version,
         vector_dimension=vector_dimension,
         created_at=datetime.now(timezone.utc),
+        chunk_payload_digest=chunk_payload_digest,
+        embedding_digest=embedding_digest,
+        collection_content_digest=collection_content_digest,
+        build_run_id=build_run_id,
     )
