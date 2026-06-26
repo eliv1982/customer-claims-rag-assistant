@@ -212,6 +212,8 @@ def build_candidate_index_to_dir(
         store.close()
         publish_staged_index(staging_dir, index_dir)
         manifest = load_manifest(index_dir)
+        if manifest.chunk_count is None:
+            raise RuntimeError(f"index manifest incomplete after publish: {index_dir}")
         trace = trace_e008_case(index_dir=index_dir, project_root=project_root, settings=resolved_settings)
         return {
             "build_run_id": build_run_id,
@@ -302,6 +304,7 @@ def run_live_provider_robustness(
     project_root: Path,
     evaluator,
     runs: int = 9,
+    original_candidate_index: Path,
 ) -> LiveProviderRobustnessResult:
     if parent_dir.exists():
         shutil.rmtree(parent_dir)
@@ -336,6 +339,8 @@ def run_live_provider_robustness(
                 "holdout_negative_doc12_top4": run.holdout.candidate.negative_doc12_top4,
             }
         )
+
+    evaluator.replace_candidate_index(original_candidate_index)
 
     unique_digests = {item["embedding_digest"] for item in summaries}
     e008_pass = sum(1 for item in summaries if item["e008_primary_hit_at_4"])
@@ -433,6 +438,7 @@ def build_replay_integrity_result(
         else project_root / embedding_snapshot_manifest
     )
     manifest = load_snapshot_manifest(resolved_manifest)
+    original_candidate_index = evaluator.candidate_index_dir
 
     frozen_parent = rebuild_parent / "frozen"
     live_parent = rebuild_parent / "live"
@@ -456,7 +462,10 @@ def build_replay_integrity_result(
                 project_root=project_root,
                 evaluator=evaluator,
                 runs=9,
+                original_candidate_index=original_candidate_index,
             )
+        else:
+            evaluator.replace_candidate_index(original_candidate_index)
 
         integrity_verdict: ReplayIntegrityVerdict = (
             "PASS — FIXED-SNAPSHOT REPLAY REPRODUCIBLE"
