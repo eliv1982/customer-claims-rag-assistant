@@ -11,6 +11,7 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+.tmp/
 
 # Generated chunk artifacts (source of truth: data/02_clean_markdown)
 data/03_chunks/*.jsonl
@@ -20,6 +21,10 @@ data/03_chunks/*.json
 data/04_index/*
 !data/04_index/.gitkeep
 
+# Experiment indexes (rebuilt via CLI)
+data/04_index_experiments/*
+!data/04_index_experiments/.gitkeep
+
 # Generated evaluation artifacts (source of truth: tests/01 + tests/02 corpus)
 data/05_evaluation/*
 !data/05_evaluation/.gitkeep
@@ -28,3 +33,4 @@ data/05_evaluation/*
 !data/05_evaluation/hybrid_lexical_vector_v1.json
 !data/05_evaluation/expanded_corpus_frozen_regression_v1.json
 !data/05_evaluation/vector_pool_36_cap4_v1.json
+!data/05_evaluation/doc08_atomic_risk_units_v1.json

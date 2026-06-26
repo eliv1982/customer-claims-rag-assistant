@@ -1,0 +1,184 @@
+"""Tests for doc08 atomic corpus experiment infrastructure."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from customer_claims_rag.env_bootstrap import project_root
+from customer_claims_rag.evaluation.diversity_metrics import compute_vector_pool_cap_config_hash, load_vector_pool_cap_config
+from customer_claims_rag.evaluation.extension_parser import (
+    compute_extension_dataset_fingerprint,
+    load_extension_corpus,
+)
+from customer_claims_rag.evaluation.parser import load_evaluation_corpus
+from customer_claims_rag.ingestion.corpus_overlay import (
+    DOC08_DOCUMENT_ID,
+    build_baseline_and_overlay_chunks,
+    cleanup_overlay_temp_dir,
+    compute_doc08_chunk_diff,
+)
+from customer_claims_rag.retrieval.manifest import load_manifest
+
+ROOT = project_root()
+OVERLAY = ROOT / "experiments/corpus/doc08_atomic_risk_units_v1/08_escalation_and_risk_rules.md"
+CANONICAL = ROOT / "data/02_clean_markdown"
+PRODUCTION_INDEX = ROOT / "data/04_index"
+CANDIDATE_INDEX = ROOT / "data/04_index_experiments/doc08_atomic_risk_units_v1"
+CONFIG = ROOT / "configs/experiments/doc08_atomic_risk_units_v1.json"
+FROZEN_Q = ROOT / "tests/01_test_questions.md"
+FROZEN_E = ROOT / "tests/02_expected_answers.md"
+EXT_Q = ROOT / "tests/extension/doc08_atomic_extension_v1_questions.md"
+EXT_E = ROOT / "tests/extension/doc08_atomic_extension_v1_expected.md"
+ARTIFACT = ROOT / "data/05_evaluation/doc08_atomic_risk_units_v1.json"
+
+
+@pytest.fixture(scope="module")
+def overlay_build():
+    result = build_baseline_and_overlay_chunks(
+        canonical_dir=CANONICAL,
+        overlay_document_path=OVERLAY,
+        permitted_root=ROOT,
+    )
+    yield result
+    cleanup_overlay_temp_dir(result.temp_input_dir)
+
+
+def test_overlay_replaces_only_doc08(overlay_build) -> None:
+    diff = compute_doc08_chunk_diff(overlay_build.baseline_chunks, overlay_build.candidate_chunks)
+    assert diff.non_doc08_byte_identical
+    assert len(diff.added_chunk_ids) > 0 or len(diff.changed_chunk_ids) > 0
+
+
+def test_non_doc08_chunks_byte_identical(overlay_build) -> None:
+    baseline_non = {
+        c.chunk_id: c.content
+        for c in overlay_build.baseline_chunks
+        if c.document_id != DOC08_DOCUMENT_ID
+    }
+    candidate_non = {
+        c.chunk_id: c.content
+        for c in overlay_build.candidate_chunks
+        if c.document_id != DOC08_DOCUMENT_ID
+    }
+    assert baseline_non == candidate_non
+
+
+def test_atomic_privacy_unit_present(overlay_build) -> None:
+    headings = [c.heading for c in overlay_build.candidate_doc08_chunks]
+    assert any("Customer personal-data exposure" in h for h in headings)
+    assert any(
+        "наклейк" in c.content.lower() or "receipt" in c.content.lower()
+        for c in overlay_build.candidate_doc08_chunks
+    )
+
+
+def test_atomic_threat_escalation_boundary(overlay_build) -> None:
+    threat_chunks = [
+        c for c in overlay_build.candidate_doc08_chunks
+        if "Threat escalation" in c.heading
+    ]
+    assert threat_chunks
+    combined = "\n".join(c.content for c in threat_chunks).lower()
+    assert "12_staff_safety_and_threat_handling" in combined
+    assert "физически покажу" not in combined
+
+
+def test_no_copied_doc12_threat_example() -> None:
+    doc12 = (ROOT / "data/02_clean_markdown/12_staff_safety_and_threat_handling.md").read_text(encoding="utf-8")
+    overlay_doc08 = OVERLAY.read_text(encoding="utf-8")
+    assert "Если этот курьер снова приедет, я ему физически покажу" not in overlay_doc08
+    assert "физически покажу" in doc12
+
+
+def test_deterministic_candidate_chunk_ids(overlay_build) -> None:
+    second = build_baseline_and_overlay_chunks(
+        canonical_dir=CANONICAL,
+        overlay_document_path=OVERLAY,
+        permitted_root=ROOT,
+    )
+    try:
+        ids_a = [c.chunk_id for c in overlay_build.candidate_doc08_chunks]
+        ids_b = [c.chunk_id for c in second.candidate_doc08_chunks]
+        assert ids_a == ids_b
+    finally:
+        cleanup_overlay_temp_dir(second.temp_input_dir)
+
+
+def test_frozen_benchmark_unchanged() -> None:
+    cases = load_evaluation_corpus(questions_path=FROZEN_Q, expected_path=FROZEN_E)
+    assert len(cases) == 60
+    t044 = next(c for c in cases if c.test_id == "T044")
+    assert t044.expected_primary_documents == ["08_escalation_and_risk_rules"]
+
+
+def test_extension_benchmark_schema() -> None:
+    config = json.loads(CONFIG.read_text(encoding="utf-8"))
+    cases = load_extension_corpus(
+        questions_path=EXT_Q,
+        expected_path=EXT_E,
+        expected_ids=config["extension_benchmark"]["case_ids"],
+    )
+    assert len(cases) == 12
+    fp = compute_extension_dataset_fingerprint(
+        questions_path=EXT_Q,
+        expected_path=EXT_E,
+        benchmark_id=config["extension_benchmark"]["benchmark_id"],
+    )
+    assert len(fp) == 64
+
+
+@pytest.mark.skipif(not PRODUCTION_INDEX.joinpath("manifest.json").exists(), reason="production index missing")
+def test_production_index_fingerprint_unchanged() -> None:
+    manifest = load_manifest(PRODUCTION_INDEX)
+    assert manifest.chunk_count == 333
+    assert manifest.corpus_fingerprint == "b9526128dad23e71e812fbd8f26452b8d6efa29e4faac898fa11f279b310e827"
+
+
+@pytest.mark.skipif(not CANDIDATE_INDEX.joinpath("manifest.json").exists(), reason="candidate index missing")
+def test_candidate_index_separate_from_production() -> None:
+    prod = load_manifest(PRODUCTION_INDEX)
+    cand = load_manifest(CANDIDATE_INDEX)
+    assert cand.corpus_fingerprint != prod.corpus_fingerprint
+    assert cand.chunk_count == 337
+
+
+def test_production_retrieval_config_hash_unchanged() -> None:
+    cfg = load_vector_pool_cap_config(ROOT / "configs/retrieval/vector_pool_36_cap4_v1.json")
+    expected = "dddf35dd503598a3987e24545c83b0964604638b027922fe6c300529d34fc083"
+    assert compute_vector_pool_cap_config_hash(cfg) == expected
+
+
+@pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
+def test_artifact_has_per_arm_metadata() -> None:
+    payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+    assert payload["baseline_arm"]["fetch_k"] == 48
+    assert payload["candidate_arm"]["fetch_k"] == 48
+    assert payload["source_commit"]
+    assert payload["artifact_commit"] is None
+
+
+@pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
+def test_t044_acceptance_in_artifact() -> None:
+    payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+    t044 = next(d for d in payload["required_diagnostics"] if d["case_id"] == "T044")
+    assert t044["candidate_primary_reachable"] is True
+    assert t044["candidate_primary_hit_at_12"] is True
+
+
+@pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
+def test_t047_doc12_guardrail() -> None:
+    payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+    t047 = next(d for d in payload["required_diagnostics"] if d["case_id"] == "T047")
+    assert t047["candidate_final_rank_doc12"] == 1
+
+
+@pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
+def test_verdict_is_raw_string() -> None:
+    payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+    assert payload["verdict"] in {
+        "ACCEPTED AS TARGETED CORPUS REPAIR",
+        "REJECTED",
+    }

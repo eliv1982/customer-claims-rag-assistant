@@ -1,0 +1,41 @@
+{
+  "experiment_id": "doc08-atomic-risk-units-v1",
+  "version": "1.0.0",
+  "experiment_mode": "corpus-ab",
+  "description": "Atomic risk-trigger restructuring of document 08 only; identical retrieval chain.",
+  "overlay_document_id": "08_escalation_and_risk_rules",
+  "overlay_path": "experiments/corpus/doc08_atomic_risk_units_v1/08_escalation_and_risk_rules.md",
+  "retrieval": {
+    "fetch_k": 48,
+    "candidate_pool_k": 36,
+    "per_document_cap": 4,
+    "final_top_k": 12,
+    "threshold": 0.0,
+    "reranker_id": "source-authority-v1",
+    "reranker_config": "configs/reranking/source_authority_v1.json"
+  },
+  "frozen_benchmark": {
+    "questions": "tests/01_test_questions.md",
+    "expected": "tests/02_expected_answers.md",
+    "question_set_id": "foodflow-60-case-frozen-v1"
+  },
+  "extension_benchmark": {
+    "benchmark_id": "doc08-atomic-extension-v1",
+    "questions": "tests/extension/doc08_atomic_extension_v1_questions.md",
+    "expected": "tests/extension/doc08_atomic_extension_v1_expected.md",
+    "case_ids": [
+      "E001", "E002", "E003", "E004",
+      "E005", "E006", "E007", "E008",
+      "E009", "E010", "E011", "E012"
+    ]
+  },
+  "baseline_index_dir": "data/04_index",
+  "candidate_index_dir": "data/04_index_experiments/doc08_atomic_risk_units_v1",
+  "baseline_targets": {
+    "primary_hit_at_4": 0.6206896551724138,
+    "primary_hit_at_12": 0.9137931034482759,
+    "mrr": 0.6456896551724138,
+    "primary_pool_reach": "55/57",
+    "faq_top4": 36
+  }
+}

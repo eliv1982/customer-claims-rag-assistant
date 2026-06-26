@@ -38,6 +38,8 @@ rebuild-reranking-ab-report = "customer_claims_rag.cli.rebuild_reranking_ab_repo
 evaluate-pool-expansion = "customer_claims_rag.cli.evaluate_pool_expansion:main"
 evaluate-expanded-corpus-regression = "customer_claims_rag.cli.evaluate_expanded_corpus_regression:main"
 evaluate-vector-pool-cap-ab = "customer_claims_rag.cli.evaluate_vector_pool_cap_ab:main"
+build-experiment-index = "customer_claims_rag.cli.build_experiment_index:main"
+evaluate-doc08-atomic-ab = "customer_claims_rag.cli.evaluate_doc08_atomic_ab:main"
 evaluate-hybrid-ab = "customer_claims_rag.cli.evaluate_hybrid_ab:main"
 rebuild-hybrid-lexical-pools = "customer_claims_rag.cli.rebuild_hybrid_lexical_pools:main"
 

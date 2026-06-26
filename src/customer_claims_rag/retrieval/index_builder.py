@@ -52,6 +52,30 @@ class IndexBuilder:
 
         started = time.perf_counter()
         documents, chunks = self.corpus_builder.build_from_directory(input_dir)
+        return self._build_from_chunks(documents, chunks, started=started)
+
+    def build_from_chunks(
+        self,
+        documents: list[DocumentRecord],
+        chunks: list[ChunkRecord],
+        *,
+        rebuild: bool = True,
+    ) -> IndexBuildReport:
+        """Build index from pre-built chunk records (experiment overlays)."""
+        if not rebuild:
+            raise IndexBuildError(
+                "incremental indexing is not supported in MVP; use --rebuild"
+            )
+        started = time.perf_counter()
+        return self._build_from_chunks(documents, chunks, started=started)
+
+    def _build_from_chunks(
+        self,
+        documents: list[DocumentRecord],
+        chunks: list[ChunkRecord],
+        *,
+        started: float,
+    ) -> IndexBuildReport:
         self._validate_corpus(chunks)
 
         ordered_chunks = sort_chunks_deterministic(chunks)
@@ -66,6 +90,11 @@ class IndexBuilder:
 
         dimension = len(embeddings[0])
         invalidate_manifest(self.index_dir)
+        document_count = (
+            len(documents)
+            if documents
+            else len({chunk.document_id for chunk in ordered_chunks})
+        )
         try:
             self.vector_store.recreate_collection(embedding_dimension=dimension)
             self.vector_store.add_chunks(ordered_chunks, embeddings)
@@ -81,7 +110,7 @@ class IndexBuilder:
                 embedding_model=self.embedding_provider.model_name,
                 corpus_fingerprint=fingerprint,
                 chunk_count=len(ordered_chunks),
-                document_count=len(documents),
+                document_count=document_count,
                 metadata_schema_version=METADATA_SCHEMA_VERSION,
                 vector_dimension=dimension,
             )
