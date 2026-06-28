@@ -29,3 +29,4 @@ class RiskReasonCode(StrEnum):
   DELAY_OVER_30_MINUTES = "delay_over_30_minutes"
   MISSING_ITEM = "missing_item"
   REFUND_REQUEST = "refund_request"
+  WRONG_ITEM = "wrong_item"

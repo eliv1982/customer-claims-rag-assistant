@@ -59,7 +59,7 @@ def format_release_identity_lines(view: ReleaseIdentityView) -> list[str]:
         f"Документы: {view.document_count}",
         f"Чанки: {view.chunk_count}",
         f"Отпечаток: {view.fingerprint_short}",
-        f"Контракт retrieval: {view.retrieval_contract}",
-        f"Reranker: {view.reranker_id}",
+        f"Контракт извлечения: {view.retrieval_contract}",
+        f"Реранкер: {view.reranker_id}",
         f"Сервис: {readiness}",
     ]

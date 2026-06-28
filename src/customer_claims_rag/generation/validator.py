@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from customer_claims_rag.exceptions import GenerationValidationError
 from customer_claims_rag.generation.citation_markers import extract_citation_markers
-from customer_claims_rag.generation.fallback import INSUFFICIENT_CONTEXT_CUSTOMER_RESPONSE
+from customer_claims_rag.generation.fallback import (
+    INSUFFICIENT_CONTEXT_CUSTOMER_RESPONSE,
+    OUT_OF_SCOPE_CUSTOMER_RESPONSE,
+)
 from customer_claims_rag.generation.models import (
     Citation,
     ContextPackage,
@@ -31,6 +34,8 @@ def validate_generation_draft(
         return _validate_insufficient_context(draft)
     if draft.response_mode == "grounded_answer":
         return _validate_grounded_answer(draft, context_package)
+    if draft.response_mode == "out_of_scope":
+        return _validate_out_of_scope(draft)
     raise GenerationValidationError(f"unsupported response_mode: {draft.response_mode}")
 
 
@@ -42,6 +47,18 @@ def _validate_insufficient_context(draft: RawGenerationDraft) -> GroundedGenerat
     return GroundedGenerationResult(
         response_mode="insufficient_context",
         customer_response=INSUFFICIENT_CONTEXT_CUSTOMER_RESPONSE,
+        citations=[],
+    )
+
+
+def _validate_out_of_scope(draft: RawGenerationDraft) -> GroundedGenerationResult:
+    if draft.answer.strip():
+        raise GenerationValidationError(
+            "out_of_scope answer must be empty or whitespace-only"
+        )
+    return GroundedGenerationResult(
+        response_mode="out_of_scope",
+        customer_response=OUT_OF_SCOPE_CUSTOMER_RESPONSE,
         citations=[],
     )
 

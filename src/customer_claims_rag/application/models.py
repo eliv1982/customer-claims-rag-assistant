@@ -25,9 +25,22 @@ class CustomerClaimsRequest(BaseModel):
         return stripped
 
 
+class RetrievedItemMeta(BaseModel):
+    """Display-safe metadata for a retrieved context item passed to the UI layer."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    citation_key: str
+    rank: int
+    heading: str
+    document_id: str
+
+
 class CustomerClaimsResult(BaseModel):
     """Framework-independent output from the customer claims application pipeline."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     response: RiskAwareGroundedGenerationResult
+    customer_query: str = ""
+    retrieved_items: tuple[RetrievedItemMeta, ...] = ()

@@ -28,6 +28,14 @@ def test_valid_insufficient_context_json() -> None:
     assert draft.answer == ""
 
 
+def test_valid_out_of_scope_json() -> None:
+    draft = parse_generation_draft(
+        '{"response_mode":"out_of_scope","answer":""}'
+    )
+    assert draft.response_mode == "out_of_scope"
+    assert draft.answer == ""
+
+
 def test_leading_trailing_whitespace() -> None:
     draft = parse_generation_draft(
         '  {"response_mode":"grounded_answer","answer":"x"}  '
@@ -59,9 +67,23 @@ def test_invalid_json() -> None:
 
 
 def test_fenced_json() -> None:
+    # Markdown fences are now stripped before parsing (repair for generation_error_fallback)
     payload = '```json\n{"response_mode":"grounded_answer","answer":"x"}\n```'
-    with pytest.raises(GenerationParseError, match="not valid JSON"):
-        parse_generation_draft(payload)
+    draft = parse_generation_draft(payload)
+    assert draft.response_mode == "grounded_answer"
+    assert draft.answer == "x"
+
+
+def test_fenced_json_plain_fence() -> None:
+    payload = '```\n{"response_mode":"insufficient_context","answer":""}\n```'
+    draft = parse_generation_draft(payload)
+    assert draft.response_mode == "insufficient_context"
+
+
+def test_fenced_json_out_of_scope() -> None:
+    payload = '```json\n{"response_mode":"out_of_scope","answer":""}\n```'
+    draft = parse_generation_draft(payload)
+    assert draft.response_mode == "out_of_scope"
 
 
 def test_prefix_text() -> None:

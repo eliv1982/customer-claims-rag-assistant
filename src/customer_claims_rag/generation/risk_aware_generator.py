@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Protocol
 
 from customer_claims_rag.exceptions import GenerationError
@@ -17,6 +18,8 @@ from customer_claims_rag.generation.risk_integration_models import (
 )
 from customer_claims_rag.risk import assess_deterministic_risk
 from customer_claims_rag.risk.models import DeterministicRiskResult, RiskAssessmentRequest
+
+logger = logging.getLogger(__name__)
 
 
 class RiskAssessor(Protocol):
@@ -63,7 +66,12 @@ class RiskAwareGroundedGenerator:
 
         try:
             generation = self._grounded_generator.generate(request)
-        except GenerationError:
+        except GenerationError as exc:
+            logger.warning(
+                "Generation failed with %s: %s",
+                type(exc).__name__,
+                str(exc),
+            )
             generation = generation_failure_result()
             generation_outcome: RiskAwareGenerationOutcome = "generation_error_fallback"
         else:
@@ -86,6 +94,8 @@ def _generation_outcome_for_result(
         return "grounded_answer"
     if generation.response_mode == "insufficient_context":
         return "insufficient_context"
+    if generation.response_mode == "out_of_scope":
+        return "out_of_scope"
     raise GenerationError(
         f"unsupported generation response_mode: {generation.response_mode}",
     )

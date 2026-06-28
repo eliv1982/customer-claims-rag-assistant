@@ -6,7 +6,10 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from customer_claims_rag.generation.fallback import GENERATION_FAILURE_CUSTOMER_RESPONSE
+from customer_claims_rag.generation.fallback import (
+    GENERATION_FAILURE_CUSTOMER_RESPONSE,
+    OUT_OF_SCOPE_CUSTOMER_RESPONSE,
+)
 from customer_claims_rag.generation.handoff import build_handoff_notice
 from customer_claims_rag.generation.models import GroundedGenerationResult
 from customer_claims_rag.risk.models import DeterministicRiskResult
@@ -14,6 +17,7 @@ from customer_claims_rag.risk.models import DeterministicRiskResult
 RiskAwareGenerationOutcome = Literal[
     "grounded_answer",
     "insufficient_context",
+    "out_of_scope",
     "generation_error_fallback",
 ]
 
@@ -49,6 +53,19 @@ class RiskAwareGroundedGenerationResult(BaseModel):
                 raise ValueError(
                     "generation_outcome=grounded_answer requires "
                     "generation.response_mode=grounded_answer",
+                )
+            return self
+
+        if outcome == "out_of_scope":
+            if mode != "out_of_scope":
+                raise ValueError(
+                    "generation_outcome=out_of_scope requires "
+                    "generation.response_mode=out_of_scope",
+                )
+            if self.generation.customer_response != OUT_OF_SCOPE_CUSTOMER_RESPONSE:
+                raise ValueError(
+                    "generation_outcome=out_of_scope requires "
+                    "canonical out-of-scope customer response",
                 )
             return self
 

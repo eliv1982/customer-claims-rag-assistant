@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from customer_claims_rag.application.models import CustomerClaimsRequest, CustomerClaimsResult
+from customer_claims_rag.application.models import (
+    CustomerClaimsRequest,
+    CustomerClaimsResult,
+    RetrievedItemMeta,
+)
 from customer_claims_rag.application.ports import RetrievalPort, RiskAwareGenerationPort
 from customer_claims_rag.generation.context_builder import build_context_package
 from customer_claims_rag.generation.models import ContextPackage, GroundedGenerationRequest
@@ -40,4 +44,18 @@ class CustomerClaimsPipeline:
 
         generation_result = self._generator.generate(generation_request)
 
-        return CustomerClaimsResult(response=generation_result)
+        retrieved_items = tuple(
+            RetrievedItemMeta(
+                citation_key=item.citation_key,
+                rank=item.rank,
+                heading=item.heading,
+                document_id=item.document_id,
+            )
+            for item in context_package.items
+        )
+
+        return CustomerClaimsResult(
+            response=generation_result,
+            customer_query=query,
+            retrieved_items=retrieved_items,
+        )

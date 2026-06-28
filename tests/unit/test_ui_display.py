@@ -135,7 +135,9 @@ def test_map_result_to_display_grounded_answer_and_citations() -> None:
     )
     view = map_result_to_display(result)
     assert isinstance(view, ClaimSuccessView)
-    assert view.answer == "Ответ по правилам [S1]."
+    # Citation markers are stripped from the customer draft
+    assert "[S1]" not in view.customer_draft
+    assert "Ответ по правилам" in view.customer_draft
     assert view.response_mode == "grounded_answer"
     assert view.generation_outcome == "grounded_answer"
     assert view.outcome_notice is None
@@ -158,6 +160,7 @@ def test_map_result_to_display_insufficient_context() -> None:
 
 def test_map_result_to_display_generation_error_fallback() -> None:
     from customer_claims_rag.generation.handoff import build_handoff_notice
+    from customer_claims_rag.ui.display import _GENERIC_RISK_DRAFTS
 
     risk = _high_risk()
     response = RiskAwareGroundedGenerationResult(
@@ -172,7 +175,9 @@ def test_map_result_to_display_generation_error_fallback() -> None:
     )
     view = map_result_to_display(CustomerClaimsResult(response=response))
     assert view.generation_outcome == "generation_error_fallback"
-    assert view.answer == GENERATION_FAILURE_CUSTOMER_RESPONSE
+    # generation_error_fallback → category template or generic risk draft (not the raw error constant)
+    assert view.customer_draft != GENERATION_FAILURE_CUSTOMER_RESPONSE
+    assert view.draft_sanitized is True
     assert view.outcome_notice is not None
     assert "отказа" in view.outcome_notice
 

@@ -3,12 +3,26 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Sequence
 
 from pydantic import ValidationError
 
 from customer_claims_rag.exceptions import GenerationParseError
 from customer_claims_rag.generation.models import RawGenerationDraft
+
+_MARKDOWN_FENCE_RE = re.compile(
+    r"^```(?:json)?\s*\r?\n(.*?)\r?\n```\s*$",
+    re.DOTALL,
+)
+
+
+def _strip_markdown_fence(text: str) -> str:
+    """Strip optional markdown code fences from model output."""
+    m = _MARKDOWN_FENCE_RE.match(text)
+    if m:
+        return m.group(1).strip()
+    return text
 
 
 def _reject_duplicate_keys(pairs: Sequence[tuple[str, object]]) -> dict[str, object]:
@@ -30,6 +44,8 @@ def parse_generation_draft(raw: str) -> RawGenerationDraft:
     text = raw.strip()
     if not text:
         raise GenerationParseError("model output is empty")
+
+    text = _strip_markdown_fence(text)
 
     try:
         decoded = json.loads(text, object_pairs_hook=_reject_duplicate_keys)
