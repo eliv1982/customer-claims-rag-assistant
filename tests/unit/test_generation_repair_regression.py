@@ -45,7 +45,7 @@ from customer_claims_rag.risk.models import RiskLevel
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PROMPT_PATH = PROJECT_ROOT / "prompts" / "grounded_answer_v1.md"
+PROMPT_PATH = PROJECT_ROOT / "prompts" / "system_prompt.md"
 
 
 # ---------------------------------------------------------------------------

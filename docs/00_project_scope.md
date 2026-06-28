@@ -143,7 +143,7 @@ FoodFlow в учебной модели предоставляет разовы�
 - `docs/03_chunking_strategy.md` — стратегия разбиения на чанки
 - `docs/04_metadata_schema.md` — схема метаданных документов и чанков
 - `docs/05_business_rules_registry.md` — внутренний реестр согласованных правил (не для RAG)
-- `prompts/system_prompt.md` — системный промпт ассистента (будет заполнено)
+- `prompts/system_prompt.md` — действующий системный промпт рабочего приложения (JSON contract, runtime)
 
 ---
 

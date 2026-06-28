@@ -317,7 +317,7 @@ deactivate
 | `GENERATION_TIMEOUT_SECONDS` | Timeout chat completion (сек.) | `60` |
 | `GENERATION_MAX_RETRIES` | Retries chat completion | `2` |
 | `GENERATION_MAX_OUTPUT_TOKENS` | Max output tokens | `1024` |
-| `GENERATION_PROMPT_PATH` | Путь к prompt-файлу | `prompts/grounded_answer_v1.md` |
+| `GENERATION_PROMPT_PATH` | Путь к prompt-файлу | `prompts/system_prompt.md` |
 
 CLI-параметры переопределяют env-значения.
 

@@ -544,16 +544,20 @@ class TestUnknownThematicQueries:
         assert "S1" not in view.customer_draft
 
     def test_wrong_item_no_template_gets_generic_draft(self) -> None:
-        """'Привезли другое блюдо' → no specific template → safe generic risk draft."""
+        """'Привезли другое блюдо' → no keyword match → generic FoodFlow clarification draft."""
         risk = _make_risk(RiskLevel.LOW)
         view = map_result_to_display(
             _result(_ic(), risk, "insufficient_context",
                     query="Привезли совсем другое блюдо, не то что я заказывал")
         )
         _no_forbidden(view.customer_draft)
-        # Generic draft is safe — doesn't mention specific items
+        # Generic draft is safe — doesn't echo back claim-specific details
         assert "другое блюдо" not in view.customer_draft
-        assert "мы проверим" in view.customer_draft.lower() or "мы" in view.customer_draft.lower()
+        # Now uses FoodFlow clarification template that asks for details
+        assert any(
+            phrase in view.customer_draft.lower()
+            for phrase in ("уточните", "укажите", "сообщите")
+        ), f"Expected clarification request; got: {view.customer_draft!r}"
 
     def test_wrong_item_grounded_clean_passes_through(self) -> None:
         risk = _make_risk(RiskLevel.LOW)
@@ -650,6 +654,24 @@ class TestTemplateIntegrityNoDemoFacts:
         assert not violations, (
             f"Generic risk draft for {risk_level} failed validator: {violations}"
         )
+
+    @pytest.mark.parametrize(
+        "risk_level",
+        [RiskLevel.LOW, RiskLevel.MEDIUM],
+    )
+    def test_generic_risk_drafts_request_clarification_not_vague_promises(
+        self, risk_level: RiskLevel,
+    ) -> None:
+        """LOW/MEDIUM generic fallbacks must ask for details, not promise review/follow-up."""
+        draft = _GENERIC_RISK_DRAFTS[risk_level]
+        lower = draft.lower()
+        assert any(phrase in lower for phrase in ("уточните", "укажите")), (
+            f"Generic draft for {risk_level} must request clarification: {draft!r}"
+        )
+        assert "мы проверим обращение" not in lower
+        assert "мы проверим детали" not in lower
+        assert "после проверки сообщим" not in lower
+        assert "сообщим о результате" not in lower
 
 
 # ---------------------------------------------------------------------------

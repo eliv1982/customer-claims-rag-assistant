@@ -38,7 +38,7 @@ from customer_claims_rag.risk.models import RiskAssessmentRequest, RiskLevel
 from customer_claims_rag.risk.reason_codes import RiskReasonCode
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PROMPT_PATH = PROJECT_ROOT / "prompts" / "grounded_answer_v1.md"
+PROMPT_PATH = PROJECT_ROOT / "prompts" / "system_prompt.md"
 
 _FORBIDDEN_RISK_IMPORTS = (
     "customer_claims_rag.evaluation",

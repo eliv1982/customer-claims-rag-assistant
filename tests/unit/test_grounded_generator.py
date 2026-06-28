@@ -20,7 +20,7 @@ from customer_claims_rag.generation.prompt_builder import PromptBuilder
 from customer_claims_rag.generation.ports import ChatMessage
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PROMPT_PATH = PROJECT_ROOT / "prompts" / "grounded_answer_v1.md"
+PROMPT_PATH = PROJECT_ROOT / "prompts" / "system_prompt.md"
 
 
 def _package() -> ContextPackage:

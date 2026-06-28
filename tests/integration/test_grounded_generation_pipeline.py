@@ -16,7 +16,7 @@ from customer_claims_rag.generation.prompt_builder import PromptBuilder
 from customer_claims_rag.generation.validator import validate_generation_draft
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PROMPT_PATH = PROJECT_ROOT / "prompts" / "grounded_answer_v1.md"
+PROMPT_PATH = PROJECT_ROOT / "prompts" / "system_prompt.md"
 
 
 def test_context_package_to_result_pipeline() -> None:

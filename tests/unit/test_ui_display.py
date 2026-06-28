@@ -21,6 +21,7 @@ from customer_claims_rag.generation.models import Citation, GroundedGenerationRe
 from customer_claims_rag.generation.risk_integration_models import (
     RiskAwareGroundedGenerationResult,
 )
+from customer_claims_rag.risk.models import RiskAssessmentRequest
 from customer_claims_rag.risk import assess_deterministic_risk
 from customer_claims_rag.risk.models import RiskAssessmentRequest
 from customer_claims_rag.risk.reason_codes import RiskReasonCode
@@ -387,3 +388,201 @@ def test_streamlit_app_imports_with_ui_dependency() -> None:
 
     assert callable(streamlit_app.main)
     assert callable(streamlit_app.get_production_pipeline)
+
+
+def test_vague_order_query_requests_clarification() -> None:
+    """Regression: vague FoodFlow query must ask for clarification, not make promises."""
+    vague_query = "С моим заказом что-то не так. Разберитесь."
+    result = _pipeline_result(
+        risk_assessment=_low_risk(),
+        generation=_insufficient_context_generation(),
+        generation_outcome="insufficient_context",
+    )
+    result = CustomerClaimsResult(
+        response=result.response,
+        customer_query=vague_query,
+    )
+    view = map_result_to_display(result)
+
+    assert isinstance(view, ClaimSuccessView)
+
+    draft = view.customer_draft
+
+    # Must actively request clarification
+    assert any(
+        phrase in draft
+        for phrase in ("уточните", "укажите", "сообщите")
+    ), f"Draft must ask for clarification; got: {draft!r}"
+
+    # Must not promise an already-started review or automatic follow-up
+    assert "Мы проверим информацию" not in draft, f"Draft must not claim review started: {draft!r}"
+    assert "сообщим о результате" not in draft, f"Draft must not promise follow-up: {draft!r}"
+
+    # No citation markers
+    import re
+    assert not re.search(r"\[S\d+\]", draft), f"Draft must not contain citation markers: {draft!r}"
+
+    # No internal terminology
+    for forbidden in ("insufficient_context", "response_mode", "high", "critical", "low", "medium"):
+        assert forbidden not in draft.lower(), (
+            f"Draft must not contain internal term {forbidden!r}: {draft!r}"
+        )
+
+    # No refund or compensation promises
+    assert "возврат" not in draft.lower(), f"Draft must not promise refund: {draft!r}"
+    assert "компенсац" not in draft.lower(), f"Draft must not promise compensation: {draft!r}"
+
+    # Service classification preserved: low risk, no escalation
+    assert view.risk_level == "low"
+    assert view.requires_escalation is False
+    assert view.priority_handoff is False
+
+    # Category should reflect generic FoodFlow query
+    assert view.claim_category == "Общий запрос по сервису FoodFlow"
+
+
+def test_vague_order_grounded_answer_with_generic_promise_replaced() -> None:
+    """Regression: grounded_answer with vague promise text must be replaced by clarification template.
+
+    Defect: for 'С моим заказом что-то не так. Разберитесь.' the LLM returns
+    grounded_answer mode with the generic promise text that previously passed all
+    forbidden-pattern checks and was shown verbatim to the customer.
+    """
+    import re as _re
+
+    from customer_claims_rag.generation.handoff import build_handoff_notice
+
+    vague_query = "С моим заказом что-то не так. Разберитесь."
+
+    # Simulate LLM returning grounded_answer with the defective generic promise text
+    bad_llm_text = (
+        "Благодарим за обращение. "
+        "Мы проверим информацию и при необходимости уточним детали. "
+        "После проверки сообщим о результате. [S1]"
+    )
+
+    risk = _low_risk()
+    result = CustomerClaimsResult(
+        response=RiskAwareGroundedGenerationResult(
+            generation=_grounded_generation(bad_llm_text),
+            risk_assessment=risk,
+            handoff_notice=build_handoff_notice(risk),
+            generation_outcome="grounded_answer",
+        ),
+        customer_query=vague_query,
+    )
+    view = map_result_to_display(result)
+
+    assert isinstance(view, ClaimSuccessView)
+    draft = view.customer_draft
+
+    # Must actively request clarification about what happened with the order
+    assert any(phrase in draft for phrase in ("уточните", "укажите", "сообщите")), (
+        f"Draft must ask for clarification; got: {draft!r}"
+    )
+
+    # Must not contain the defective vague-promise phrases
+    assert "Мы проверим информацию" not in draft, (
+        f"Draft must not claim review started: {draft!r}"
+    )
+    assert "сообщим о результате" not in draft, (
+        f"Draft must not promise follow-up without specifics: {draft!r}"
+    )
+
+    # No citation markers [Sx]
+    assert not _re.search(r"\[S\d+\]", draft), (
+        f"Draft must not contain citation markers: {draft!r}"
+    )
+
+    # No internal terminology
+    for _forbidden in ("insufficient_context", "response_mode", "generation_outcome"):
+        assert _forbidden not in draft.lower(), (
+            f"Draft must not contain internal term {_forbidden!r}: {draft!r}"
+        )
+
+    # No refund or compensation promises
+    assert "возврат" not in draft.lower(), f"Draft must not promise refund: {draft!r}"
+    assert "компенсац" not in draft.lower(), f"Draft must not promise compensation: {draft!r}"
+
+    # Service classification preserved: low risk, no escalation, no handoff
+    assert view.risk_level == "low"
+    assert view.requires_escalation is False
+    assert view.priority_handoff is False
+
+    # Category must reflect generic FoodFlow query (no specific issue detected)
+    assert view.claim_category == "Общий запрос по сервису FoodFlow"
+
+    # Draft was sanitized — replaced by template, not passed through raw
+    assert view.draft_sanitized is True
+
+
+def test_delivery_address_grounded_answer_not_replaced() -> None:
+    """Informational query with clean grounded answer must not be replaced by generic fallback."""
+    import re as _re
+
+    from customer_claims_rag.generation.handoff import build_handoff_notice
+
+    query = "Можно ли изменить адрес доставки?"
+    risk = assess_deterministic_risk(RiskAssessmentRequest(customer_query=query))
+    clean_llm_text = (
+        "Согласно правилам FoodFlow, изменить адрес можно до начала сборки заказа. [S1]"
+    )
+    result = CustomerClaimsResult(
+        response=RiskAwareGroundedGenerationResult(
+            generation=_grounded_generation(clean_llm_text),
+            risk_assessment=risk,
+            handoff_notice=build_handoff_notice(risk),
+            generation_outcome="grounded_answer",
+        ),
+        customer_query=query,
+    )
+    view = map_result_to_display(result)
+
+    assert isinstance(view, ClaimSuccessView)
+    assert view.draft_sanitized is False
+    assert "изменить адрес" in view.customer_draft.lower()
+    assert not _re.search(r"\[S\d+\]", view.customer_draft)
+    assert "Мы проверим информацию" not in view.customer_draft
+    assert view.risk_level == "low"
+    assert view.requires_escalation is False
+
+
+def test_non_delivery_refund_request_uses_non_delivery_category() -> None:
+    """Non-delivery + refund: max-risk floor wins; non-delivery category takes precedence."""
+    import re as _re
+
+    from customer_claims_rag.generation.handoff import build_handoff_notice
+    from customer_claims_rag.risk.reason_codes import RiskReasonCode
+    from customer_claims_rag.ui.display import _CATEGORY_DRAFT_TEMPLATES
+
+    query = "Я оплатил заказ, но его не доставили. Прошу вернуть деньги."
+    risk = assess_deterministic_risk(RiskAssessmentRequest(customer_query=query))
+    assert RiskReasonCode.NON_DELIVERY in risk.reason_codes
+    assert RiskReasonCode.REFUND_REQUEST in risk.reason_codes
+    assert risk.risk_floor.value == "high"
+    assert risk.handoff_required is True
+
+    result = CustomerClaimsResult(
+        response=RiskAwareGroundedGenerationResult(
+            generation=_insufficient_context_generation(),
+            risk_assessment=risk,
+            handoff_notice=build_handoff_notice(risk),
+            generation_outcome="insufficient_context",
+        ),
+        customer_query=query,
+    )
+    view = map_result_to_display(result)
+
+    assert isinstance(view, ClaimSuccessView)
+    assert view.claim_category == "Недоставка оплаченного заказа"
+    assert view.customer_draft == _CATEGORY_DRAFT_TEMPLATES["Недоставка оплаченного заказа"]
+    assert view.risk_level == "high"
+    assert view.requires_escalation is True
+    assert view.handoff_notice is not None
+    assert view.draft_sanitized is True
+    assert not _re.search(r"\[S\d+\]", view.customer_draft)
+    assert "вернём" not in view.customer_draft.lower()
+    assert "одобрим возврат" not in view.customer_draft.lower()
+    for forbidden in ("insufficient_context", "response_mode", "generation_outcome"):
+        assert forbidden not in view.customer_draft.lower()
+    assert view.citations == ()

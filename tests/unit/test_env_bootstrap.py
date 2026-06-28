@@ -59,6 +59,17 @@ def test_env_example_contains_documented_settings_without_secrets() -> None:
     assert DOCUMENTED_ENV_KEYS.issubset(keys)
 
 
+def test_env_example_prompt_path_is_current_system_prompt() -> None:
+    """Regression: .env.example must reference the active system prompt, not the legacy path."""
+    content = ENV_EXAMPLE.read_text(encoding="utf-8")
+    assert "GENERATION_PROMPT_PATH=prompts/system_prompt.md" in content, (
+        ".env.example must contain GENERATION_PROMPT_PATH=prompts/system_prompt.md"
+    )
+    assert "grounded_answer_v1.md" not in content, (
+        ".env.example must not reference the removed legacy prompt path grounded_answer_v1.md"
+    )
+
+
 def test_dotenv_loaded_when_file_exists(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(env_bootstrap, "project_root", lambda: tmp_path)
     monkeypatch.delenv("RAG_TOP_K", raising=False)

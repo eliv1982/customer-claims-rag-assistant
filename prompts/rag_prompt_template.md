@@ -1,6 +1,10 @@
+> **Исторический шаблон. Не используется рабочим приложением.**
+>
+> Файл относится к ранней архитектуре генерации. Текущий рабочий контур использует `prompts/system_prompt.md`, а пользовательское сообщение формируется программно.
+
 # RAG prompt template: FoodFlow customer claims assistant
 
-Этот шаблон используется как **user message** после system prompt (`prompts/system_prompt.md`). Подставь значения placeholders перед отправкой в LLM.
+Этот шаблон использовался как **user message** после system prompt ранней архитектуры (`prompts/system_prompt_legacy.md`). Подставь значения placeholders перед отправкой в LLM.
 
 ---
 

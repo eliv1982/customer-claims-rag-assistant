@@ -10,7 +10,7 @@ from customer_claims_rag.retrieval_config import RetrievalSettings
 from tests.release_posture_helpers import resolved_release_target_for_index
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PROMPT_PATH = PROJECT_ROOT / "prompts" / "grounded_answer_v1.md"
+PROMPT_PATH = PROJECT_ROOT / "prompts" / "system_prompt.md"
 FROZEN_CONFIG_PATH = PROJECT_ROOT / "configs" / "retrieval" / "vector_pool_expansion_v1.json"
 RERANKER_CONFIG_PATH = PROJECT_ROOT / "configs" / "reranking" / "source_authority_v1.json"
 

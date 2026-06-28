@@ -1570,6 +1570,54 @@ def test_total_non_delivery_remains_high(query: str) -> None:
     assert result.handoff_required is True
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Я оплатил заказ, но его не доставили. Прошу вернуть деньги.",
+        "Заказ так и не доставили.",
+        "Мне не доставили оплаченный заказ.",
+        "Курьер уехал, а заказ не доставили.",
+    ],
+)
+def test_active_non_delivery_forms_are_high(query: str) -> None:
+    result = assess_deterministic_risk(RiskAssessmentRequest(customer_query=query))
+    assert RiskReasonCode.NON_DELIVERY in result.reason_codes
+    assert result.risk_floor is RiskLevel.HIGH
+    assert result.handoff_required is True
+
+
+def test_non_delivery_with_refund_keeps_both_codes_and_max_risk() -> None:
+    query = "Я оплатил заказ, но его не доставили. Прошу вернуть деньги."
+    result = assess_deterministic_risk(RiskAssessmentRequest(customer_query=query))
+    assert RiskReasonCode.NON_DELIVERY in result.reason_codes
+    assert RiskReasonCode.REFUND_REQUEST in result.reason_codes
+    assert result.risk_floor is RiskLevel.HIGH
+    assert result.handoff_required is True
+    assert result.reason_codes[0] is RiskReasonCode.NON_DELIVERY
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Заказ еще не доставили, но согласованный интервал доставки заканчивается через час.",
+        "Доставляют ли заказы в мой район?",
+    ],
+)
+def test_active_non_delivery_negative_controls(query: str) -> None:
+    result = assess_deterministic_risk(RiskAssessmentRequest(customer_query=query))
+    assert RiskReasonCode.NON_DELIVERY not in result.reason_codes
+    assert result.risk_floor is RiskLevel.LOW
+
+
+def test_refund_without_non_delivery_stays_medium() -> None:
+    query = "Я хочу вернуть деньги за заказ. Подскажите, что нужно сделать."
+    result = assess_deterministic_risk(RiskAssessmentRequest(customer_query=query))
+    assert RiskReasonCode.REFUND_REQUEST in result.reason_codes
+    assert RiskReasonCode.NON_DELIVERY not in result.reason_codes
+    assert result.risk_floor is RiskLevel.MEDIUM
+    assert result.handoff_required is False
+
+
 def test_missing_item_with_package_tampering_yields_high() -> None:
     query = "Не привезли одну позицию, а упаковка остального заказа была вскрыта."
     result = assess_deterministic_risk(RiskAssessmentRequest(customer_query=query))

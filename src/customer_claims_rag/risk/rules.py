@@ -100,6 +100,41 @@ _NON_DELIVERY = re.compile(
     r")",
 )
 
+# Active past-tense delivery failure: 'не доставили', 'его не доставили', etc.
+_NON_DELIVERY_ACTIVE = re.compile(
+    r"(?:"
+    r"(?:так\s+и\s+)?не\s+доставил\w*(?!\s+(?:вовремя|в\s+срок|своевременно))"
+    r"|заказ\s+(?:так\s+и\s+)?не\s+доставил\w*"
+    r"|(?:его|её|им|нам|мне|тебе|вам)\s+не\s+доставил\w*"
+    r"|мне\s+не\s+доставил\w*\s+(?:оплаченн\w+\s+)?заказ"
+    r")",
+)
+
+# Partial missing-item phrasing must stay on the missing-item rule, not total non-delivery.
+_NON_DELIVERY_PARTIAL_EXCLUSION = re.compile(
+    r"часть\s+заказ\w*\s+не\s+доставил\w*",
+)
+
+# In-progress delivery within an open interval is not final non-delivery.
+_NON_DELIVERY_IN_PROGRESS = re.compile(
+    r"(?:"
+    r"(?:еще|ещё)\s+не\s+доставил\w*"
+    r"|не\s+доставил\w*\s*,?\s*но"
+    r").*(?:"
+    r"интервал\w*"
+    r"|заканчива(?:ет|ется|ться)"
+    r"|через\s+"
+    r"|не\s+закончил"
+    r"|не\s+истек"
+    r")",
+)
+
+_NON_DELIVERY_INFORMATIONAL = re.compile(
+    r"(?:"
+    r"доставля(?:ют|ете|ем)\s+ли"
+    r")",
+)
+
 _FALSE_DELIVERY = re.compile(
   r"(?:"
   r"статус\w*\s+[«\"']?доставлен\w*[»\"']?"
@@ -857,6 +892,18 @@ def _match_refund_request(normalized: str) -> bool:
   return _REFUND_REQUEST.search(normalized) is not None
 
 
+def _match_non_delivery(normalized: str) -> bool:
+  if _NON_DELIVERY_INFORMATIONAL.search(normalized):
+    return False
+  if _NON_DELIVERY_IN_PROGRESS.search(normalized):
+    return False
+  if _NON_DELIVERY_PARTIAL_EXCLUSION.search(normalized):
+    return False
+  if _NON_DELIVERY.search(normalized):
+    return True
+  return _NON_DELIVERY_ACTIVE.search(normalized) is not None
+
+
 def _match_official_written_response(normalized: str) -> bool:
   if _INFORMATIONAL_OFFICIAL_RESPONSE.search(normalized):
     return False
@@ -918,7 +965,7 @@ _RULES: tuple[_RiskRule, ...] = (
     RiskReasonCode.NON_DELIVERY,
     RiskLevel.HIGH,
     "non_delivery",
-    lambda text: _NON_DELIVERY.search(text) is not None,
+    _match_non_delivery,
   ),
   _RiskRule(
     RiskReasonCode.FALSE_DELIVERY_STATUS,

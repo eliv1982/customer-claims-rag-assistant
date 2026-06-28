@@ -33,7 +33,7 @@ from customer_claims_rag.ui.display import (
 from customer_claims_rag.ui.release_identity import format_release_identity_lines
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PROMPT_PATH = PROJECT_ROOT / "prompts" / "grounded_answer_v1.md"
+PROMPT_PATH = PROJECT_ROOT / "prompts" / "system_prompt.md"
 STREAMLIT_APP_PATH = (
     PROJECT_ROOT / "src" / "customer_claims_rag" / "ui" / "streamlit_app.py"
 )

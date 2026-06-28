@@ -15,7 +15,7 @@ DEFAULT_GENERATION_TEMPERATURE = 0.0
 DEFAULT_GENERATION_TIMEOUT_SECONDS = 60.0
 DEFAULT_GENERATION_MAX_RETRIES = 2
 DEFAULT_GENERATION_MAX_OUTPUT_TOKENS = 1024
-DEFAULT_GENERATION_PROMPT_PATH = project_root() / "prompts" / "grounded_answer_v1.md"
+DEFAULT_GENERATION_PROMPT_PATH = project_root() / "prompts" / "system_prompt.md"
 
 
 def _env_str(name: str, default: str) -> str:

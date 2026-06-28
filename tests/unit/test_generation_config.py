@@ -20,7 +20,7 @@ from customer_claims_rag.generation_config import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PROMPT_PATH = PROJECT_ROOT / "prompts" / "grounded_answer_v1.md"
+PROMPT_PATH = PROJECT_ROOT / "prompts" / "system_prompt.md"
 
 
 @pytest.fixture(autouse=True)
@@ -145,7 +145,7 @@ def test_relative_prompt_path_resolved_from_project_root(
 ) -> None:
     monkeypatch.setattr(env_bootstrap, "project_root", lambda: PROJECT_ROOT)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("GENERATION_PROMPT_PATH", "prompts/grounded_answer_v1.md")
+    monkeypatch.setenv("GENERATION_PROMPT_PATH", "prompts/system_prompt.md")
 
     settings = GenerationSettings.from_env()
 
