@@ -14,11 +14,12 @@
 | `data/02_clean_markdown/` | Очищенные версии документов в Markdown (`.md`) |
 | `data/03_chunks/` | Сгенерированные чанки (JSONL) и статистика; не источник истины |
 | `data/04_index/` | Emergency rollback/archive vector index (15 documents); **not** production default |
+| `data/04_index_backup_10docs_215chunks/` | **Active production index** для release posture `foodflow-10doc-release-v1` (10 documents, 215 chunks); separately provisioned local artifact; не коммитится |
 | `data/05_evaluation/` | Сгенерированные JSON-результаты retrieval evaluation; не источник истины |
 | `docs/` | Проектная документация: область проекта, инвентаризация, отчеты, стратегии |
 | `prompts/` | Системный промпт и шаблон RAG-запроса |
 | `tests/` | Тестовые вопросы, ожидаемые ответы, результаты прогонов |
-| `deliverables/` | Итоговые артефакты проекта (manual acceptance evidence, Stage 5C) |
+| `deliverables/` | Итоговые артефакты проекта: manual acceptance report, evidence index, screenshots |
 
 ## Текущий статус
 
@@ -46,9 +47,11 @@
 
 **Docker-based local delivery (stage 5B)** — reproducible Streamlit deployment через Docker Compose с bind-mount активного production index; fail-closed startup preflight. См. `docs/07_index_provisioning.md` и `docs/08_docker_runbook.md`.
 
-**Manual acceptance evidence (stage 5C)** — зафиксированы сценарии M00–M09, CLI JSON, UI screenshots и controlled fallback evidence. См. `deliverables/manual_acceptance_report.md`.
+**Russian production flow (финальный repair-пакет)** — весь пользовательский production flow русифицирован: generation, deterministic risk/handoff, category-specific fallback, risk rules на русском языке; client draft отделен от staff information; технические статусы вынесены в свернутый блок.
 
-**Еще не реализованы:** authentication, chat history, document upload из UI, feedback collection, query rewriting, production threshold auto-selection, remote/public deployment.
+**Manual acceptance (stage 5C + targeted recheck R1–R4)** — основной набор 5 типовых + 2 out-of-scope сценариев, targeted recheck R1–R4 (оплаченная недоставка, задержка, жалоба на здоровье, возврат). Verdict: **PASS**. Все targeted ответы менее 30 секунд (9.90 / 3.66 / 3.65 / 2.58 с). Отчет: `deliverables/manual_acceptance_report.md`; evidence index: `deliverables/evidence/README.md`; скриншоты: `deliverables/evidence/manual_acceptance/`.
+
+**Еще не реализованы:** authentication, chat history, document upload из UI, feedback collection, query rewriting, remote/public deployment. Клиентские черновики являются предварительными и проверяются сотрудником перед отправкой. Более естественные category-specific шаблоны и SLA-aware ответы — post-MVP improvements (`итеративная калибровка шаблонов по результатам пилотной эксплуатации`). Система не обучается самостоятельно на обращениях.
 
 Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/`, `data/04_index/` (rollback archive) и provisioned production index — только локальные generated/deployment артефакты. **Свежий clone не содержит production index** — его нужно provision'ить отдельно (`docs/07_index_provisioning.md`).
 
@@ -59,9 +62,9 @@
 ### Требования
 
 - **Git** — клонирование репозитория;
-- **Python 3.12** — версия зафиксирована в `pyproject.toml` (`requires-python = ">=3.12"`);
-- **OpenAI API** — нужен только для реальной сборки vector index и semantic search с OpenAI embeddings;
-- **Автоматические тесты** работают offline и **не требуют** OpenAI API key.
+- **Python 3.12 или новее** — минимальная поддерживаемая версия определяется `requires-python = ">=3.12"` в `pyproject.toml`;
+- **OpenAI API key** — требуется для реальных embeddings/search и grounded generation в `answer-claim` и Streamlit UI; **не требуется** для ingestion (`build-chunks`) и offline automated tests;
+- **Автоматические тесты** работают полностью offline и **не требуют** OpenAI API key.
 
 ### Клонирование
 
@@ -151,18 +154,27 @@ python -m customer_claims_rag.cli.build_chunks --verbose
 
 OpenAI API key для этой команды **не требуется**.
 
-### Сборка vector index
+### Сборка vector index (dev/evaluation)
+
+> **Важно:** active production index этой командой **не создаётся**. Provision production index согласно `docs/07_index_provisioning.md`. Не пересобирайте `data/04_index/` без отдельного осознанного решения — этот каталог является emergency rollback/archive.
 
 Требуется заполненный `OPENAI_API_KEY` в `.env` или в environment процесса.
 
+Используйте явный disposable path для dev/evaluation, чтобы не затрагивать rollback archive:
+
 ```powershell
-python -m customer_claims_rag.cli.build_index --rebuild
+python -m customer_claims_rag.cli.build_index `
+  --rebuild `
+  --index-dir data/04_index_dev_tmp
 ```
 
 Для диагностики ошибок:
 
 ```powershell
-python -m customer_claims_rag.cli.build_index --rebuild --verbose
+python -m customer_claims_rag.cli.build_index `
+  --rebuild `
+  --index-dir data/04_index_dev_tmp `
+  --verbose
 ```
 
 Флаг `--verbose` выводит полный traceback; без него CLI показывает только краткое сообщение об ошибке.
@@ -170,11 +182,11 @@ python -m customer_claims_rag.cli.build_index --rebuild --verbose
 По умолчанию:
 
 - вход: `data/02_clean_markdown/` (через `CorpusBuilder`);
-- index (build CLI default): `data/04_index/` — generic build/evaluation path, **not** the production release target;
+- index (build CLI default при отсутствии `--index-dir`): `data/04_index/` — **не** использовать без явного намерения;
 - collection: `customer_claims`;
 - embedding model: `text-embedding-3-small`.
 
-`--rebuild` обязателен в MVP: выполняется destructive full rebuild.
+`--rebuild` обязателен: выполняется destructive full rebuild. `--index-dir` явно задаёт целевой путь.
 
 ### Поиск
 
@@ -230,11 +242,16 @@ python -m streamlit run src/customer_claims_rag/ui/streamlit_app.py
 
 Интерфейс принимает одно обращение, вызывает production pipeline один раз и показывает:
 
-- проект ответа для клиента;
+- черновик ответа клиенту (предварительный; проверяется сотрудником перед отправкой);
+- отдельную служебную информацию для сотрудника;
+- категорию обращения;
 - уровень риска;
-- уведомление о передаче сотруднику поддержки (если требуется);
-- безопасные метки источников (`[S1] заголовок — document_id`);
-- статус при недостатке контекста или сбое генерации.
+- необходимость эскалации;
+- рекомендуемый маршрут обработки;
+- действия сотрудника;
+- основания и источники;
+- найденные материалы для ручной проверки;
+- техническую информацию в свернутом блоке.
 
 ### Docker (рекомендуемый способ демонстрации)
 
@@ -265,12 +282,14 @@ python -m customer_claims_rag.cli.search_index "возврат" --top-k 4 --fetc
 ### Generated artifacts
 
 - **Production release index** (`data/04_index_backup_10docs_215chunks`) — separately provisioned local artifact; see `docs/07_index_provisioning.md` and `docs/06_release_posture.md`;
-- **Build/evaluation index** (`data/04_index/`) — default for `build-index` / `search-index` / evaluation CLIs; also emergency rollback archive when `RAG_RELEASE_TARGET=rollback`;
+- **Build/evaluation index** (`data/04_index/`) — default output path для `build-index` / `search-index` / evaluation CLIs; **также** используется как emergency rollback archive (`RAG_RELEASE_TARGET=rollback`);
+
+  > **Предупреждение:** generic build command (`build-index --rebuild`) выполняет destructive full rebuild в `data/04_index/`. Не запускайте его без осознанного намерения: он перезапишет rollback archive. Для одноразовой dev/evaluation сборки укажите явный путь: `build-index --rebuild --index-dir data/04_index_dev_tmp`. Замена rollback artifact — отдельное осознанное действие.
+
 - Chroma index и `manifest.json` создаются **внутри project root**;
 - нельзя направлять `--index-dir` в `data/01_raw/`, `data/02_clean_markdown/` или внутрь `--input-dir`;
 - generated contents **не коммитятся** (см. `.gitignore`);
-- `data/04_index/.gitkeep` сохраняет структуру rollback/archive каталога в git;
-- build index можно безопасно пересобрать: `python -m customer_claims_rag.cli.build_index --rebuild`.
+- `data/04_index/.gitkeep` сохраняет структуру rollback/archive каталога в git.
 
 ### Остановка окружения
 
@@ -289,10 +308,10 @@ deactivate
 | `RAG_RELEASE_TARGET` | Production release target (`active` / `rollback`) | `active` (descriptor default) |
 | `RAG_ACTIVE_INDEX_HOST_PATH` | Docker Compose **host** bind-mount path for active index only | `./data/04_index_backup_10docs_215chunks` |
 | `RAG_INDEX_DIR` | Index path for **build/search/evaluation CLIs only** | `data/04_index` |
-| `RAG_COLLECTION_NAME` | Имя Chroma collection | `customer_claims` |
-| `RAG_TOP_K` | Максимум результатов поиска (retrieval CLI) | `4` |
-| `RAG_FETCH_K` | Размер candidate pool (retrieval CLI) | `12` |
-| `RAG_SIMILARITY_THRESHOLD` | Минимальная cosine similarity | `0.0` (baseline: без filtering) |
+| `RAG_COLLECTION_NAME` | Имя Chroma collection — **build/search/evaluation CLI only**; production pipeline использует frozen contract | `customer_claims` |
+| `RAG_TOP_K` | Максимум результатов поиска — **retrieval/evaluation CLI only**; production pipeline: final top-12 (frozen) | `4` |
+| `RAG_FETCH_K` | Размер candidate pool — **retrieval/evaluation CLI only**; production pipeline: fetch24 (frozen) | `12` |
+| `RAG_SIMILARITY_THRESHOLD` | Минимальная cosine similarity — **retrieval/evaluation CLI only**; production pipeline: threshold=0.0 (frozen) | `0.0` |
 | `RAG_EMBEDDING_BATCH_SIZE` | Batch size при индексации | `64` |
 | `GENERATION_TEMPERATURE` | Temperature для grounded generation | `0.0` |
 | `GENERATION_TIMEOUT_SECONDS` | Timeout chat completion (сек.) | `60` |
@@ -349,9 +368,11 @@ Baseline retriever:
 3. возвращает не более `top_k` результатов;
 4. сортирует по similarity desc, tie-break по `chunk_id`.
 
-**Default `RAG_SIMILARITY_THRESHOLD=0.0`** означает отсутствие automatic threshold filtering в baseline retrieval. Это диагностический режим для измерения recall и анализа кандидатов, а не production threshold.
+**Production retrieval contract (frozen):** `fetch24 / pool24 / final12 / threshold0.0 / source-authority-v1`.
 
-Реальный smoke-run показал, что threshold **`0.70` слишком высок** для текущего embedding/index: даже тематически очевидные запросы (например, срок возврата, similarity ≈ 0.66) отсекались. Production threshold **пока не установлен**. Окончательное значение будет выбрано по результатам **60-case evaluation** (`tests/01_test_questions.md`). До калибровки **retrieval quality не считается подтвержденным**.
+**`threshold=0.0` — frozen release configuration.** Означает отсутствие similarity filtering после candidate retrieval: все fetch_k кандидаты передаются reranker'у, затем возвращается final top-k. Значение зафиксировано в `configs/retrieval/vector_pool_expansion_v1.json` и не подлежит изменению без нового release. Это не «ожидающий выбора production threshold», а осознанное решение, принятое по итогам baseline evaluation и A/B анализа.
+
+Исторически: smoke-run показал, что threshold `0.70` был слишком высок для текущего embedding/index (тематически очевидные запросы отсекались). После 60-case baseline evaluation был выбран и заморожен контракт `threshold=0.0` с reranker `source-authority-v1`.
 
 ### Manifest и fingerprint
 
@@ -368,7 +389,9 @@ Fingerprint зависит от `chunk_id`, `content`, canonical metadata, embed
 
 Human-readable search output показывает rank, similarity, chunk/document IDs, heading, source path и короткий excerpt. JSON mode возвращает structured `SearchResponse` с diagnostics.
 
-## Baseline retrieval evaluation (60 cases)
+## Baseline retrieval evaluation (60 cases) — исторический этап
+
+> **Примечание:** этот раздел описывает завершённый исторический этап (stage 2C), результаты которого привели к выбору frozen production retrieval contract `fetch24 / pool24 / final12 / threshold0.0 / source-authority-v1`. Раздел сохранён для справки и воспроизводимости; он **не описывает** текущий production release.
 
 Formal retrieval-only evaluation на corpus `tests/01_test_questions.md` + `tests/02_expected_answers.md`.
 
@@ -411,14 +434,15 @@ Outputs:
 
 **Run metadata:** `git_commit` + `git_dirty` фиксируются до run; при dirty working tree commit hash не полностью идентифицирует evaluation implementation.
 
-Baseline evaluation использует `threshold=0.0` для измерения raw recall **до** выбора production threshold. Метрики **не** оценивают качество LLM-ответов, risk/handoff classification, answer factuality или Markdown output contract. Reranking и production threshold — только после анализа baseline.
+Baseline evaluation использовал `threshold=0.0` для измерения raw recall. Метрики **не** оценивают качество LLM-ответов, risk/handoff classification, answer factuality или Markdown output contract. По итогам baseline analysis был выбран и заморожен production contract; retrieval experimentation закрыто.
 
 ### Troubleshooting
 
 | Симптом | Действие |
 |---------|----------|
 | `OPENAI_API_KEY is required` | Заполнить `OPENAI_API_KEY` в `.env` или export в PowerShell |
-| `index manifest not found` | Выполнить `python -m customer_claims_rag.cli.build_index --rebuild` |
+| `index manifest not found` (production `answer-claim` / UI) | Выполнить provisioning согласно `docs/07_index_provisioning.md`, затем `validate-release-posture` |
+| `index manifest not found` (dev/evaluation CLI) | Пересобрать отдельный индекс: `build-index --rebuild --index-dir data/04_index_dev_tmp` |
 | `embedding model mismatch` | Пересобрать index с тем же `--embedding-model`, что и search CLI |
 | `chunk count mismatch` | Выполнить rebuild после изменения corpus |
 | `No results above threshold` | Проверить явный `--threshold` или `RAG_SIMILARITY_THRESHOLD`; default `0.0` не фильтрует |
@@ -435,20 +459,30 @@ Baseline evaluation использует `threshold=0.0` для измерени
 - Поле `topic` заполняется только у chunks с явным semantic ID (FAQ, template, forbidden row).
 - Output и stats должны находиться внутри permitted project root; перезапись source Markdown запрещена.
 
-### Retrieval MVP (baseline)
+### Retrieval (production frozen)
 
-- Dense cosine retrieval with frozen **2C.2** candidate: `vector top-24 → source-authority-v1 → final top-12`.
-- Stage **2C.3** hybrid BM25+RRF experiment completed and **rejected** for MVP; retrieval stage frozen.
+- Dense cosine retrieval, frozen production contract: `fetch24 / pool24 / final12 / threshold0.0 / source-authority-v1`.
+- Stage **2C.3** hybrid BM25+RRF experiment завершён и **отклонён** для MVP; retrieval stage frozen.
 - Нет query rewriting.
-- Default threshold `0.0` — diagnostic baseline без automatic filtering; production value TBD после 60-case evaluation.
-- Threshold `0.70` отвергнут smoke-run как слишком высокий для текущего index.
-- Качество retrieval **не считается подтвержденным** до отдельного evaluation stage.
+- `threshold=0.0` — frozen release configuration; similarity filtering после candidate retrieval не применяется. Контракт зафиксирован; выбор production threshold завершён.
 - Incremental indexing не поддерживается; только full rebuild.
 
-### Retrieval evaluation (baseline)
+### Retrieval evaluation (исторический этап, завершён)
 
-- Только retrieval metrics; answer/risk/handoff quality не измеряются.
-- Fallback cases (T006, T060) анализируются отдельно от source-recall aggregates.
-- Threshold sweep выполняется post-hoc над сохраненными candidates без повторных embedding calls.
-- Production threshold не выбирается автоматически по одной метрике.
-- Улучшения (reranking, hybrid search) не внедряются до A/B rerun на том же corpus.
+- Только retrieval metrics; answer/risk/handoff quality не измерялись.
+- Fallback cases (T006, T060) анализировались отдельно от source-recall aggregates.
+- Threshold sweep выполнялся post-hoc над сохраненными candidates без повторных embedding calls.
+- По итогам baseline analysis выбран и заморожен production contract; retrieval experimentation закрыто.
+
+### Application MVP (текущие ограничения)
+
+- Нет authentication.
+- Нет chat history.
+- Нет document upload из UI.
+- Нет feedback collection.
+- Нет query rewriting.
+- Нет remote/public deployment.
+- Клиентские черновики являются предварительными и проверяются сотрудником перед отправкой.
+- Более естественные category-specific шаблоны и SLA-aware ответы — post-MVP improvements (`итеративная калибровка шаблонов по результатам пилотной эксплуатации`).
+- Система не обучается самостоятельно на обращениях.
+- Documents 11–15 не входят в production support.
