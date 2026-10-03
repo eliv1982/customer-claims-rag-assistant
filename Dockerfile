@@ -22,7 +22,7 @@ COPY scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
 
 RUN sed -i 's/\r$//' ./scripts/docker-entrypoint.sh \
     && chmod +x ./scripts/docker-entrypoint.sh \
-    && mkdir -p /app/data/04_index_backup_10docs_215chunks \
+    && mkdir -p /app/data/04_index_production \
     && chown -R app:app /app
 
 USER app

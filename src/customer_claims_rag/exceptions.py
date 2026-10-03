@@ -36,6 +36,10 @@ class DuplicateChunkIdError(IngestionError):
     """Duplicate chunk_id in generated corpus."""
 
 
+class CanonicalCorpusError(IngestionError):
+    """Canonical corpus manifest invalid, or the corpus on disk does not match it."""
+
+
 class RetrievalError(Exception):
     """Base error for retrieval and indexing pipeline."""
 

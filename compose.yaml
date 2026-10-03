@@ -16,8 +16,8 @@ services:
       GENERATION_PROMPT_PATH: ${GENERATION_PROMPT_PATH:-prompts/system_prompt.md}
     volumes:
       - type: bind
-        source: ${RAG_ACTIVE_INDEX_HOST_PATH:-./data/04_index_backup_10docs_215chunks}
-        target: /app/data/04_index_backup_10docs_215chunks
+        source: ${RAG_ACTIVE_INDEX_HOST_PATH:-./data/04_index_production}
+        target: /app/data/04_index_production
     restart: unless-stopped
     healthcheck:
       test:

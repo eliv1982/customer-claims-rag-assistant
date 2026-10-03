@@ -159,11 +159,11 @@ def test_release_identity_labels_are_russian_except_internal_ids() -> None:
     from customer_claims_rag.release.posture import ReleasePostureDiagnostics
 
     diagnostics = ReleasePostureDiagnostics(
-        release_posture_id="foodflow-10doc-release-v1",
+        release_posture_id="foodflow-10doc-release-v2",
         selected_target="active",
         target_status="selected_production_release",
-        index_path_relative="data/04_index_backup_10docs_215chunks",
-        corpus_fingerprint="bf3df0d4631f29f322760b50735382039f67d3ee7c6860b25b1ce221312074f3",
+        index_path_relative="data/04_index_production",
+        corpus_fingerprint="feedbeef" * 8,
         chunk_count=215,
         document_count=10,
         collection_name="customer_claims",

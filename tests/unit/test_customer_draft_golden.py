@@ -132,19 +132,22 @@ class TestM01NonDelivery:
         view = self._view()
         assert "сожалеем" in view.customer_draft.lower()
 
-    def test_m01_has_we_will_check(self) -> None:
+    def test_m01_states_the_need_for_review_without_promising_it(self) -> None:
         view = self._view()
-        assert "мы проверим" in view.customer_draft.lower()
+        lower = view.customer_draft.lower()
+        assert "требуют проверки" in lower
+        assert "мы проверим" not in lower
 
     def test_m01_has_order_status_or_payment(self) -> None:
         view = self._view()
         lower = view.customer_draft.lower()
         assert "статус" in lower or "оплат" in lower
 
-    def test_m01_has_result_after_check(self) -> None:
+    def test_m01_outcome_depends_on_the_check_and_promises_no_follow_up(self) -> None:
         view = self._view()
         lower = view.customer_draft.lower()
-        assert "после проверки" in lower or "о результате" in lower or "сообщим" in lower
+        assert "зависит от результатов проверки" in lower
+        assert "сообщим" not in lower
 
     def test_m01_no_forbidden_terms(self) -> None:
         view = self._view()
@@ -167,7 +170,7 @@ class TestM01NonDelivery:
         risk = _make_risk(RiskLevel.LOW)
         clean_text = (
             "Сожалеем, что заказ не поступил. "
-            "Мы проверим статус и сведения об оплате. [S1]"
+            "Статус и сведения об оплате требуют проверки. [S1]"
         )
         view = map_result_to_display(
             _result(_grounded(clean_text), risk, "grounded_answer",
@@ -210,9 +213,9 @@ class TestM02IncompleteOrder:
     def test_m02_has_regret(self) -> None:
         assert "сожалеем" in self._view().customer_draft.lower()
 
-    def test_m02_has_we_will_check_order_composition(self) -> None:
+    def test_m02_names_order_composition_as_needing_review(self) -> None:
         lower = self._view().customer_draft.lower()
-        assert "состав" in lower or "мы проверим" in lower
+        assert "состав" in lower and "требуют проверки" in lower
 
     def test_m02_mentions_order_number(self) -> None:
         lower = self._view().customer_draft.lower()
@@ -221,7 +224,8 @@ class TestM02IncompleteOrder:
     def test_m02_has_partial_refund_only_conditional(self) -> None:
         lower = self._view().customer_draft.lower()
         # Must not promise partial refund unconditionally
-        assert "возможен ли частичный возврат" in lower or "возможен ли" in lower
+        assert "возможность частичного возврата" in lower
+        assert "зависит от результатов проверки" in lower
 
     def test_m02_no_forbidden_terms(self) -> None:
         _assert_no_forbidden(self._view().customer_draft)
@@ -265,8 +269,10 @@ class TestM03PackageTampering:
     def test_m03_says_take_photos(self) -> None:
         assert "фотографи" in self._view().customer_draft.lower()
 
-    def test_m03_has_we_will_check(self) -> None:
-        assert "мы проверим" in self._view().customer_draft.lower()
+    def test_m03_states_the_need_for_review(self) -> None:
+        lower = self._view().customer_draft.lower()
+        assert "обращение требует проверки" in lower
+        assert "мы проверим" not in lower
 
     def test_m03_no_forbidden_terms(self) -> None:
         _assert_no_forbidden(self._view().customer_draft)
@@ -301,7 +307,7 @@ class TestM04HealthHarm:
         risk = _make_risk(RiskLevel.CRITICAL, [RiskReasonCode.HEALTH_SYMPTOMS_AFTER_CONSUMPTION])
         if generation is None:
             if outcome == "grounded_answer":
-                generation = _grounded("Сожалеем. Мы приоритетно проверим обращение. [S1]")
+                generation = _grounded("Сожалеем. Обращение требует приоритетной проверки. [S1]")
             else:
                 generation = _ic()
         return map_result_to_display(_result(generation, risk, outcome))
@@ -385,7 +391,7 @@ class TestM05RefundDemand:
 
     def test_m05_checks_orders_history(self) -> None:
         lower = self._view().customer_draft.lower()
-        assert "историю заказов" in lower or "историю" in lower
+        assert "история заказов" in lower
 
     def test_m05_asks_for_order_numbers(self) -> None:
         lower = self._view().customer_draft.lower()
@@ -409,7 +415,8 @@ class TestM05RefundDemand:
     def test_m05_works_for_single_order(self) -> None:
         view = self._view("Требую возврат за заказ №99.")
         assert "пяти" not in view.customer_draft.lower()
-        assert "мы проверим" in view.customer_draft.lower()
+        assert "требуют проверки" in view.customer_draft.lower()
+        assert "мы проверим" not in view.customer_draft.lower()
 
     def test_m05_no_forbidden_terms(self) -> None:
         _assert_no_forbidden(self._view().customer_draft)

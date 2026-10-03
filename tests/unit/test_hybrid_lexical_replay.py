@@ -34,10 +34,10 @@ from tests.local_artifacts import requires_local_artifacts
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT = PROJECT_ROOT / "data" / "05_evaluation" / "hybrid_lexical_vector_v1.json"
-POSTURE = PROJECT_ROOT / "configs" / "release" / "production_posture.json"
-# The frozen hybrid artifact was measured on the 10-document release index, which the
-# release posture names as its active target (data/04_index holds the 15-document archive).
-INDEX_DIR = PROJECT_ROOT / json.loads(POSTURE.read_text(encoding="utf-8"))["targets"]["active"]["index_path"]
+# The frozen hybrid artifact was measured on the 10-document index of release posture v1, kept
+# only as a historical local archive. It is not the production index: the production index is
+# built from the canonical corpus at data/04_index_production (docs/07_index_provisioning.md).
+INDEX_DIR = PROJECT_ROOT / "data" / "04_index_backup_10docs_215chunks"
 EXACT_POOLS_MISSING = "tracked hybrid artifact lacks exact lexical pools"
 
 

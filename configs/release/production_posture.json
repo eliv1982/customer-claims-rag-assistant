@@ -1,6 +1,6 @@
 {
-  "schema_version": "1.0.0",
-  "release_posture_id": "foodflow-10doc-release-v1",
+  "schema_version": "2.0.0",
+  "release_posture_id": "foodflow-10doc-release-v2",
   "default_target": "active",
   "limitations_doc": "docs/06_release_posture.md",
   "frozen_retrieval_config_path": "configs/retrieval/vector_pool_expansion_v1.json",
@@ -8,49 +8,8 @@
   "targets": {
     "active": {
       "status": "selected_production_release",
-      "index_path": "data/04_index_backup_10docs_215chunks",
-      "expected_corpus_fingerprint": "bf3df0d4631f29f322760b50735382039f67d3ee7c6860b25b1ce221312074f3",
-      "expected_chunk_count": 215,
-      "expected_document_count": 10,
-      "supported_document_ids": [
-        "01_service_overview",
-        "02_delivery_rules",
-        "03_order_changes_and_cancellations",
-        "04_refund_policy",
-        "05_compensation_policy",
-        "06_food_quality_and_packaging",
-        "07_complaint_handling_procedure",
-        "08_escalation_and_risk_rules",
-        "09_response_style_and_templates",
-        "10_customer_faq"
-      ],
-      "collection_name": "customer_claims",
-      "embedding_model": "text-embedding-3-small",
-      "vector_dimension": 1536
-    },
-    "rollback": {
-      "status": "emergency_rollback_archive_only",
-      "index_path": "data/04_index",
-      "expected_corpus_fingerprint": "b9526128dad23e71e812fbd8f26452b8d6efa29e4faac898fa11f279b310e827",
-      "expected_chunk_count": 333,
-      "expected_document_count": 15,
-      "supported_document_ids": [
-        "01_service_overview",
-        "02_delivery_rules",
-        "03_order_changes_and_cancellations",
-        "04_refund_policy",
-        "05_compensation_policy",
-        "06_food_quality_and_packaging",
-        "07_complaint_handling_procedure",
-        "08_escalation_and_risk_rules",
-        "09_response_style_and_templates",
-        "10_customer_faq",
-        "11_payment_security_and_dispute_handling",
-        "12_staff_safety_and_threat_handling",
-        "13_physical_hazard_and_foreign_body_protocol",
-        "14_evidence_standards_and_incomplete_information",
-        "15_conflicting_rules_and_remedy_priority"
-      ],
+      "corpus_manifest": "configs/corpus/foodflow_production_v1.json",
+      "index_path": "data/04_index_production",
       "collection_name": "customer_claims",
       "embedding_model": "text-embedding-3-small",
       "vector_dimension": 1536

@@ -23,11 +23,8 @@ def build_fingerprint_payload(
     metadata_schema_version: str = METADATA_SCHEMA_VERSION,
 ) -> dict[str, Any]:
     ordered = sort_chunks_deterministic(chunks)
-    return {
-        "index_format_version": index_format_version,
-        "metadata_schema_version": metadata_schema_version,
-        "embedding_model": embedding_model,
-        "chunks": [
+    return fingerprint_payload_from_entries(
+        [
             {
                 "chunk_id": chunk.chunk_id,
                 "content": chunk.content,
@@ -35,7 +32,36 @@ def build_fingerprint_payload(
             }
             for chunk in ordered
         ],
+        embedding_model=embedding_model,
+        index_format_version=index_format_version,
+        metadata_schema_version=metadata_schema_version,
+    )
+
+
+def fingerprint_payload_from_entries(
+    entries: list[dict[str, Any]],
+    *,
+    embedding_model: str,
+    index_format_version: str = INDEX_FORMAT_VERSION,
+    metadata_schema_version: str = METADATA_SCHEMA_VERSION,
+) -> dict[str, Any]:
+    """The fingerprint payload for already-canonical ``{chunk_id, content, metadata}`` entries.
+
+    ``entries`` must be in ``chunk_id`` order. Shared by the build path (entries from chunk
+    records) and the release validator (entries from stored records) so that both hash exactly
+    the same structure.
+    """
+    return {
+        "index_format_version": index_format_version,
+        "metadata_schema_version": metadata_schema_version,
+        "embedding_model": embedding_model,
+        "chunks": entries,
     }
+
+
+def digest_fingerprint_payload(payload: dict[str, Any]) -> str:
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def compute_corpus_fingerprint(
@@ -45,11 +71,11 @@ def compute_corpus_fingerprint(
     index_format_version: str = INDEX_FORMAT_VERSION,
     metadata_schema_version: str = METADATA_SCHEMA_VERSION,
 ) -> str:
-    payload = build_fingerprint_payload(
-        chunks,
-        embedding_model=embedding_model,
-        index_format_version=index_format_version,
-        metadata_schema_version=metadata_schema_version,
+    return digest_fingerprint_payload(
+        build_fingerprint_payload(
+            chunks,
+            embedding_model=embedding_model,
+            index_format_version=index_format_version,
+            metadata_schema_version=metadata_schema_version,
+        )
     )
-    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()

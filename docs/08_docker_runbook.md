@@ -5,7 +5,7 @@ Reproducible local deployment for the FoodFlow customer claims Streamlit UI usin
 **Prerequisites:**
 
 - Docker Desktop (Windows/macOS) or Docker Engine + Compose plugin (Linux)
-- Provisioned active production index on the host (see `docs/07_index_provisioning.md`)
+- Production index built on the host from the repository (see `docs/07_index_provisioning.md`)
 - `OPENAI_API_KEY` available in your shell environment (not committed to Git or baked into the image)
 
 The production index is **bind-mounted** at runtime. It is **never** copied into the image.
@@ -26,10 +26,10 @@ Optional overrides:
 
 ```powershell
 $env:RAG_RELEASE_TARGET = "active"
-$env:RAG_ACTIVE_INDEX_HOST_PATH = ".\data\04_index_backup_10docs_215chunks"
+$env:RAG_ACTIVE_INDEX_HOST_PATH = ".\data\04_index_production"
 ```
 
-`RAG_ACTIVE_INDEX_HOST_PATH` controls only the **host** side of the bind mount. The container path remains `/app/data/04_index_backup_10docs_215chunks` per the release descriptor.
+`RAG_ACTIVE_INDEX_HOST_PATH` controls only the **host** side of the bind mount. The container path remains `/app/data/04_index_production` per the release descriptor.
 
 The container sets `CUSTOMER_CLAIMS_PROJECT_ROOT=/app` so non-editable package installs resolve descriptor and prompt paths correctly.
 
@@ -42,7 +42,7 @@ docker compose config
 Confirm:
 
 - Service `streamlit` exposes port `8501`
-- Volume target is `/app/data/04_index_backup_10docs_215chunks`
+- Volume target is `/app/data/04_index_production`
 - `RAG_RELEASE_TARGET` defaults to `active`
 
 ### 3. Build the image
@@ -57,7 +57,7 @@ docker compose build
 docker compose run --rm streamlit validate-release-posture
 ```
 
-Expected: non-zero exit if the index is missing or wrong; success lines including `release_posture_id=foodflow-10doc-release-v1` and the production fingerprint when the mount is valid.
+Expected: non-zero exit if the index is missing or wrong; success lines including `release_posture_id=foodflow-10doc-release-v2`, `index_matches_canonical_corpus=yes` and the corpus fingerprint when the mount is valid; otherwise the output ends with the command that builds the index.
 
 ### 5. Start the stack
 
@@ -107,7 +107,7 @@ This removes containers and networks but **does not** delete the host index dire
 
 ```bash
 export OPENAI_API_KEY="your-key-here"
-export RAG_ACTIVE_INDEX_HOST_PATH="./data/04_index_backup_10docs_215chunks"  # optional
+export RAG_ACTIVE_INDEX_HOST_PATH="./data/04_index_production"  # optional
 
 docker compose config
 docker compose build
@@ -135,26 +135,26 @@ docker compose down
 |---------|----------------|
 | `production index mount missing` | Volume not mounted or wrong `RAG_ACTIVE_INDEX_HOST_PATH` |
 | `production index mount is empty` | Host directory exists but has no files |
-| `chroma.sqlite3 not found` | Incomplete extraction or wrong archive layout |
-| `release posture validation failed` | Fingerprint/count/config mismatch |
+| `chroma.sqlite3 not found` | The build did not finish, or the wrong host directory is mounted |
+| `release posture validation failed` | The index does not match the canonical corpus, or the frozen config differs; the output names the mismatch and the build command |
 | `Set OPENAI_API_KEY in the environment` | Compose variable unset (`docker compose config` / `up` fails early) |
 
 ## Troubleshooting
 
 ### Missing index
 
-Provision the host directory per `docs/07_index_provisioning.md`, then re-run `docker compose run --rm streamlit validate-release-posture`.
+Build the host directory per `docs/07_index_provisioning.md`, then re-run `docker compose run --rm streamlit validate-release-posture`.
 
 ### Incorrect mount
 
 Verify the host path:
 
 ```powershell
-Test-Path .\data\04_index_backup_10docs_215chunks\manifest.json
-Test-Path .\data\04_index_backup_10docs_215chunks\chroma.sqlite3
+Test-Path .\data\04_index_production\manifest.json
+Test-Path .\data\04_index_production\chroma.sqlite3
 ```
 
-On Windows, prefer relative paths like `.\data\04_index_backup_10docs_215chunks` for `RAG_ACTIVE_INDEX_HOST_PATH`.
+On Windows, prefer relative paths like `.\data\04_index_production` for `RAG_ACTIVE_INDEX_HOST_PATH`.
 
 ### Missing API key
 
@@ -194,4 +194,4 @@ docker compose run --rm streamlit sh
 
 - Do **not** copy the production index into the Docker build context or image.
 - Do **not** set `RAG_INDEX_DIR` expecting it to change production retrieval in the UI.
-- Do **not** mount `data/04_index` (rollback) unless explicitly testing emergency rollback with `RAG_RELEASE_TARGET=rollback` and a matching archive.
+- Do **not** mount any other index (for example a historical local archive such as `data/04_index`): the release descriptor accepts only an index that matches the canonical corpus.

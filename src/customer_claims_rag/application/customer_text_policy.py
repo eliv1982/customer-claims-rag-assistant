@@ -7,16 +7,17 @@ The rules fall into semantic groups of bounded patterns (not an exact-string bla
 
 * internal vocabulary / AI voice / operator instructions / circular support references;
 * operational commitments the application cannot back: refund or compensation promises,
-  completed refunds, guaranteed outcomes, fixed refund/response deadlines, and claims that a case
-  was registered, transferred, escalated or that staff were notified;
+  completed refunds, guaranteed outcomes, fixed refund/response deadlines, claims that a case
+  was registered, transferred, escalated or that staff were notified, and promises that the
+  application will itself review, reply or get in touch later (``FUTURE_COMMITMENT_CODE``);
 * admission of fault or liability;
 * medical diagnosis, causal attribution and treatment advice;
 * requests for sensitive payment / authentication data;
 * markup (HTML tags, script-like URL schemes, Markdown links) that has no place in plain support text.
 
-Neutral wording must keep passing: "вопрос о возврате требует проверки", "возможность возврата
-зависит от результатов проверки", empathy without admission, and a recommendation to seek
-professional medical help.
+Neutral wording must keep passing: "сообщение получено", "обращение требует проверки", "вопрос о
+возврате требует проверки", "возможность возврата зависит от результатов проверки", empathy
+without admission, and a recommendation to seek professional medical help.
 
 The module is stdlib-only on purpose. ``tests/unit/test_customer_text_policy.py`` pins the
 prompt/policy contract: wording the system prompt prescribes must pass, wording it forbids must fail.
@@ -97,8 +98,52 @@ _rule("ic-text-leaked", r"(?:в\s+доступных\s+материалах|в\s
 _rule("generic-error-text", r"(?:сейчас\s+)?не\s+удалось\s+подготовить\s+(?:подтвержд\w+\s+)?ответ")
 _rule("generic-error-text", r"повторите\s+запрос\s+или\s+обратитесь")
 _rule("ic-text-leaked", r"вопрос\s+требует\s+дополнительной\s+проверки\s*\.$")
-_rule("vague-review-promise", r"мы\s+проверим\s+информацию")
-_rule("vague-result-promise", r"сообщим\s+о\s+результате")
+
+# ── Future operational commitments ──────────────────────────────────────────────────────────────
+# The application does not itself check, review, reply to or contact anyone after the draft is
+# shown, so customer text must not promise that any of that will happen. It may state what is
+# known ("сообщение получено") and that a matter needs review ("обращение требует проверки",
+# "возможность возврата зависит от результатов проверки"). One group, three bounded shapes:
+# a first-person future action verb (with or without "мы"), "будем" + such a verb, and the
+# passive-future form for the matter itself ("обращение будет рассмотрено", "проверка будет
+# проводиться"). A company-policy fact ("срок рассмотрения по политике компании — до 5 рабочих
+# дней") is not matched here; fixed periods stay governed by the deadline rule below.
+# ``tests/unit/test_corpus_kb_policy.py`` applies this same code to the canonical knowledge base.
+FUTURE_COMMITMENT_CODE = "future-operational-promise"
+_FUTURE_ACTION = (
+    r"(?:проверим|перепроверим|рассмотрим|изучим|проанализируем|разберем(?:ся)?|сверим|сопоставим|"
+    r"обработаем|сообщим|проинформируем|уведомим|ответим|свяжемся|вернемся|уточним|приступим|"
+    r"займемся|дадим\s+ответ|вышлем\s+ответ|направим\s+ответ|"
+    # registration / acceptance / transfer promised for later
+    r"зарегистрируем|зафиксируем|передадим|эскалируем|примем\s+(?:\w+\s+){0,2}в\s+работу|"
+    r"направим\s+(?:\w+\s+){0,2}(?:обращени\w+|запрос\w*|жалоб\w+|информаци\w+|данные|кейс|специалист\w*|сотрудник\w*))"
+)
+_FUTURE_ACTION_INFINITIVE = (
+    r"(?:проверять|рассматривать|изучать|анализировать|сообщать|информировать|уведомлять|"
+    r"связываться|обрабатывать|разбираться|держать)"
+)
+_REVIEWED = (
+    r"(?:проверен\w*|перепроверен\w*|рассмотрен\w*|изучен\w*|проанализирован\w*|разобран\w*|"
+    r"обработан\w*|сверен\w*)"
+)
+_MATTER_NOUN = (
+    r"(?:обращени\w+|заявк\w+|запрос\w*|жалоб\w+|претензи\w+|сообщени\w+|случай|ситуаци\w+|вопрос\w*|"
+    r"заказ\w*|статус\w*|детали|данные|обстоятельств\w+|информаци\w+)"
+)
+_rule(
+    FUTURE_COMMITMENT_CODE,
+    # 'мы проверим', 'проверим обстоятельства', 'после проверки сообщим', 'мы свяжемся после проверки',
+    # 'мы зарегистрируем обращение', 'передадим сотруднику'
+    rf"\b{_FUTURE_ACTION}\b",
+    # 'будем проверять', 'будем держать вас в курсе', 'будем на связи'
+    rf"\bбудем\s+(?:\w+\s+){{0,2}}{_FUTURE_ACTION_INFINITIVE}\b",
+    r"\bбудем\s+на\s+связи\b",
+    # 'обращение будет рассмотрено', 'статус оплаты и доставки будет проверен'
+    rf"\b{_MATTER_NOUN}\s+(?:[\w-]+\s+){{0,3}}(?:будет|будут)\s+(?:[\w-]+\s+){{0,2}}{_REVIEWED}\b",
+    # 'проверка будет проводиться', 'дальнейшее рассмотрение будет вестись'
+    r"\b(?:проверк\w+|рассмотрени\w+|разбор\w*|обработк\w+)\s+(?:[\w-]+\s+){0,2}(?:будет|будут)\s+"
+    r"(?:[\w-]+\s+){0,2}(?:проводиться|проведен\w*|вестись|осуществля\w+|осуществлен\w*|выполня\w+|выполнен\w*)\b",
+)
 
 # ── Claims that the application registered / transferred / escalated / notified ─────────────────
 # The application does not register, transfer or notify anything, so customer text must only

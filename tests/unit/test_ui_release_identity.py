@@ -9,15 +9,15 @@ from customer_claims_rag.ui.release_identity import (
     shorten_fingerprint,
 )
 
-FINGERPRINT = "bf3df0d4631f29f322760b50735382039f67d3ee7c6860b25b1ce221312074f3"
+FINGERPRINT = "feedbeef" * 8
 
 
 def _sample_diagnostics() -> ReleasePostureDiagnostics:
     return ReleasePostureDiagnostics(
-        release_posture_id="foodflow-10doc-release-v1",
+        release_posture_id="foodflow-10doc-release-v2",
         selected_target="active",
         target_status="selected_production_release",
-        index_path_relative="data/04_index_backup_10docs_215chunks",
+        index_path_relative="data/04_index_production",
         corpus_fingerprint=FINGERPRINT,
         chunk_count=215,
         document_count=10,
@@ -50,8 +50,8 @@ def test_map_diagnostics_uses_runtime_values_not_hardcoded_strings() -> None:
 def test_format_release_identity_lines_exclude_paths_and_secrets() -> None:
     view = map_diagnostics_to_release_view(_sample_diagnostics(), service_ready=True)
     rendered = "\n".join(format_release_identity_lines(view))
-    assert "foodflow-10doc-release-v1" in rendered
-    assert "bf3df0d4" in rendered
+    assert "foodflow-10doc-release-v2" in rendered
+    assert "feedbeef" in rendered
     assert "source-authority-v1" in rendered
     assert "OPENAI" not in rendered
     assert "sk-" not in rendered
@@ -62,4 +62,4 @@ def test_format_release_identity_lines_exclude_paths_and_secrets() -> None:
 
 
 def test_shorten_fingerprint() -> None:
-    assert shorten_fingerprint(FINGERPRINT) == "bf3df0d4…"
+    assert shorten_fingerprint(FINGERPRINT) == "feedbeef…"

@@ -1,4 +1,4 @@
-"""Committed static inputs: the frozen retrieval baseline and the real-tokenizer topology.
+"""Committed static inputs: the frozen retrieval baseline and the real-tokenizer topologies.
 
 ``FROZEN_RETRIEVAL_BASELINE`` is a sanitized copy of the 60-case retrieval run that the
 A/B experiments are measured against. The real file
@@ -20,8 +20,10 @@ from customer_claims_rag.evaluation.models import EvaluationRun
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 FROZEN_RETRIEVAL_BASELINE = FIXTURES_DIR / "frozen_retrieval_baseline_v1.json"
 FROZEN_RETRIEVAL_BASELINE_PROVENANCE = FIXTURES_DIR / "frozen_retrieval_baseline_v1.provenance.json"
-# chunk_id -> token_count of the release corpus under real cl100k_base (real-tokenizer lane)
-REAL_TOKENIZER_TOPOLOGY = FIXTURES_DIR / "real_tokenizer_release_chunk_topology_v1.json"
+# chunk_id -> token_count under real cl100k_base (real-tokenizer lane): the canonical production
+# corpus, and the historical 15-document corpus the retrieval experiments ran on
+CANONICAL_TOPOLOGY = FIXTURES_DIR / "canonical_corpus_chunk_topology_v2.json"
+HISTORICAL_TOPOLOGY = FIXTURES_DIR / "historical_15doc_chunk_topology_v1.json"
 
 
 def load_frozen_retrieval_baseline() -> EvaluationRun:

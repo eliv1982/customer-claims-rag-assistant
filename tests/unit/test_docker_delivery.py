@@ -16,9 +16,8 @@ DOCKERFILE_PATH = PROJECT_ROOT / "Dockerfile"
 ENTRYPOINT_PATH = PROJECT_ROOT / "scripts" / "docker-entrypoint.sh"
 DESCRIPTOR_PATH = PROJECT_ROOT / "configs" / "release" / "production_posture.json"
 
-ACTIVE_INDEX_CONTAINER_PATH = "/app/data/04_index_backup_10docs_215chunks"
-ACTIVE_FINGERPRINT = "bf3df0d4631f29f322760b50735382039f67d3ee7c6860b25b1ce221312074f3"
-RELEASE_ID = "foodflow-10doc-release-v1"
+ACTIVE_INDEX_CONTAINER_PATH = "/app/data/04_index_production"
+RELEASE_ID = "foodflow-10doc-release-v2"
 
 SECRET_PATTERNS = (
     re.compile(r"sk-[A-Za-z0-9]{20,}"),
@@ -41,7 +40,7 @@ def test_docker_runtime_files_exist(path: Path) -> None:
 
 def test_dockerignore_excludes_production_index_and_secrets() -> None:
     content = DOCKERIGNORE_PATH.read_text(encoding="utf-8")
-    assert "data/04_index_backup_10docs_215chunks" in content
+    assert "data/04_index_production" in content
     assert "data/04_index" in content
     assert ".env" in content
     assert ".venv" in content
@@ -49,7 +48,7 @@ def test_dockerignore_excludes_production_index_and_secrets() -> None:
 
 def test_gitignore_excludes_production_index() -> None:
     content = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
-    assert "data/04_index_backup_10docs_215chunks/" in content
+    assert "data/04_index_production/" in content
 
 
 def test_compose_mount_destination_matches_descriptor() -> None:
@@ -69,9 +68,10 @@ def test_compose_defaults_to_active_release_target() -> None:
     assert release_target == "${RAG_RELEASE_TARGET:-active}"
 
 
-def test_compose_does_not_mount_rollback_index_by_default() -> None:
+def test_compose_mounts_only_the_production_index() -> None:
+    """Historical local archives (data/04_index, backups) are never mounted into the container."""
     compose_text = COMPOSE_PATH.read_text(encoding="utf-8")
-    assert "data/04_index" not in compose_text.replace("04_index_backup_10docs_215chunks", "")
+    assert "data/04_index" not in compose_text.replace("04_index_production", "")
 
 
 def test_descriptor_active_index_path_matches_container_mount() -> None:
@@ -80,7 +80,7 @@ def test_descriptor_active_index_path_matches_container_mount() -> None:
     descriptor = json.loads(DESCRIPTOR_PATH.read_text(encoding="utf-8"))
     assert descriptor["release_posture_id"] == RELEASE_ID
     active_path = descriptor["targets"]["active"]["index_path"]
-    assert active_path == "data/04_index_backup_10docs_215chunks"
+    assert active_path == "data/04_index_production"
     assert f"/app/{active_path}" == ACTIVE_INDEX_CONTAINER_PATH
 
 
@@ -90,6 +90,7 @@ def test_entrypoint_runs_release_validation_before_streamlit() -> None:
     assert '["$1" = "streamlit"]' in content or '[ "$1" = "streamlit" ]' in content
     assert "exec" in content
     assert "chroma.sqlite3" in content
+    assert f'INDEX_DIR="{ACTIVE_INDEX_CONTAINER_PATH}"' in content
 
 
 def test_dockerfile_uses_non_root_user_and_streamlit_port() -> None:

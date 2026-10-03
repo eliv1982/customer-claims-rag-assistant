@@ -5,19 +5,34 @@ from __future__ import annotations
 import hashlib
 import json
 import struct
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
+from customer_claims_rag.config import INDEX_FORMAT_VERSION, METADATA_SCHEMA_VERSION
 from customer_claims_rag.models import ChunkRecord
-from customer_claims_rag.retrieval.fingerprint import sort_chunks_deterministic
-from customer_claims_rag.retrieval.metadata_mapper import canonical_metadata_for_fingerprint
+from customer_claims_rag.retrieval.fingerprint import (
+    digest_fingerprint_payload,
+    fingerprint_payload_from_entries,
+    sort_chunks_deterministic,
+)
+from customer_claims_rag.retrieval.metadata_mapper import (
+    canonical_metadata_for_fingerprint,
+    canonical_metadata_from_vector_metadata,
+)
 
 
 def _canonical_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+def _digest_chunk_payload_entries(entries: list[dict[str, Any]]) -> str:
+    return hashlib.sha256(_canonical_json({"chunks": entries}).encode("utf-8")).hexdigest()
+
+
 def compute_chunk_payload_digest(chunks: list[ChunkRecord]) -> str:
-    """Hash chunk payloads in deterministic chunk_id order."""
+    """Hash chunk payloads in deterministic chunk_id order.
+
+    Independent of any embedding model: this is the identity of the chunk topology.
+    """
     ordered = sort_chunks_deterministic(chunks)
     entries = [
         {
@@ -29,7 +44,59 @@ def compute_chunk_payload_digest(chunks: list[ChunkRecord]) -> str:
         }
         for chunk in ordered
     ]
-    return hashlib.sha256(_canonical_json({"chunks": entries}).encode("utf-8")).hexdigest()
+    return _digest_chunk_payload_entries(entries)
+
+
+def _records_in_chunk_id_order(records: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return sorted(records, key=lambda record: str(record["chunk_id"]))
+
+
+def compute_chunk_payload_digest_from_records(records: Sequence[Mapping[str, Any]]) -> str:
+    """``compute_chunk_payload_digest`` recomputed from exported vector-store records.
+
+    ``records`` have the shape of ``ChromaVectorStore.export_collection_records()``. For records
+    written by ``add_chunks`` the result equals the digest computed from the chunks at build time;
+    a record that lacks a field of the payload raises ``KeyError`` naming it.
+    """
+    entries = []
+    for record in _records_in_chunk_id_order(records):
+        metadata = canonical_metadata_from_vector_metadata(record["metadata"])
+        entries.append(
+            {
+                "chunk_id": str(record["chunk_id"]),
+                "document_id": metadata["document_id"],
+                "text": str(record["document"]),
+                "metadata": metadata,
+                "logical_source_path": metadata["source_path"].replace("\\", "/"),
+            }
+        )
+    return _digest_chunk_payload_entries(entries)
+
+
+def compute_corpus_fingerprint_from_records(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    embedding_model: str,
+    index_format_version: str = INDEX_FORMAT_VERSION,
+    metadata_schema_version: str = METADATA_SCHEMA_VERSION,
+) -> str:
+    """``compute_corpus_fingerprint`` recomputed from exported vector-store records."""
+    entries = [
+        {
+            "chunk_id": str(record["chunk_id"]),
+            "content": str(record["document"]),
+            "metadata": canonical_metadata_from_vector_metadata(record["metadata"]),
+        }
+        for record in _records_in_chunk_id_order(records)
+    ]
+    return digest_fingerprint_payload(
+        fingerprint_payload_from_entries(
+            entries,
+            embedding_model=embedding_model,
+            index_format_version=index_format_version,
+            metadata_schema_version=metadata_schema_version,
+        )
+    )
 
 
 def _serialize_embedding_vector(vector: Sequence[float]) -> bytes:

@@ -60,23 +60,23 @@ def test_default_production_target_is_active(tmp_path: Path, monkeypatch) -> Non
     assert context.resolved_target.target_name == "active"
 
 
-def test_rag_release_target_rollback_selects_rollback(tmp_path: Path, monkeypatch) -> None:
+def test_rag_release_target_selects_the_named_target(tmp_path: Path, monkeypatch) -> None:
     stage_test_production_posture(tmp_path)
-    rollback_dir = tmp_path / "rollback-index"
-    rollback_dir.mkdir()
-    (rollback_dir / CHROMA_SQLITE_FILENAME).write_bytes(b"rollback-db")
+    secondary_dir = tmp_path / "secondary-index"
+    secondary_dir.mkdir()
+    (secondary_dir / CHROMA_SQLITE_FILENAME).write_bytes(b"secondary-db")
 
     descriptor_path = tmp_path / "configs" / "release" / "production_posture.json"
     payload = json.loads(descriptor_path.read_text(encoding="utf-8"))
-    payload["targets"]["rollback"]["index_path"] = "rollback-index"
+    payload["targets"]["secondary"]["index_path"] = "secondary-index"
     descriptor_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     monkeypatch.setattr(env_bootstrap, "project_root", lambda: tmp_path)
-    monkeypatch.setenv("RAG_RELEASE_TARGET", "rollback")
+    monkeypatch.setenv("RAG_RELEASE_TARGET", "secondary")
 
     context = resolve_production_release_posture(project_root=tmp_path)
-    assert context.resolved_target.target_name == "rollback"
-    assert context.resolved_target.index_dir == rollback_dir.resolve()
+    assert context.resolved_target.target_name == "secondary"
+    assert context.resolved_target.index_dir == secondary_dir.resolve()
 
 
 def test_unknown_release_target_fails(tmp_path: Path, monkeypatch) -> None:
@@ -221,7 +221,7 @@ def test_descriptor_rejects_unsafe_index_paths(tmp_path: Path, index_path: str) 
         load_release_posture_descriptor(descriptor_path)
 
 
-def test_active_and_rollback_same_path_rejected(tmp_path: Path) -> None:
+def test_two_targets_sharing_one_index_path_rejected(tmp_path: Path) -> None:
     descriptor_path = tmp_path / "descriptor.json"
     write_test_release_descriptor(
         descriptor_path,
@@ -232,7 +232,7 @@ def test_active_and_rollback_same_path_rejected(tmp_path: Path) -> None:
         supported_document_ids=["01_service_overview"],
     )
     payload = json.loads(descriptor_path.read_text(encoding="utf-8"))
-    payload["targets"]["rollback"]["index_path"] = "shared-index"
+    payload["targets"]["secondary"]["index_path"] = "shared-index"
     descriptor_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     descriptor = ReleasePostureDescriptor.model_validate(payload)
     with pytest.raises(ReleasePostureError, match="same physical index path"):
@@ -258,6 +258,8 @@ def test_cli_validator_ignores_stale_rag_index_dir(tmp_path: Path, monkeypatch) 
     stage_test_production_posture(tmp_path)
     monkeypatch.setattr(env_bootstrap, "project_root", lambda: tmp_path)
     monkeypatch.setenv("RAG_INDEX_DIR", "data/04_index")
+    # The stale variable is ignored: the descriptor's own index validates statically. A static check
+    # cannot establish readiness, so the exit is "not established", never "blocked" and never 0.
     assert (
         validate_cli.main(
             [
@@ -266,5 +268,5 @@ def test_cli_validator_ignores_stale_rag_index_dir(tmp_path: Path, monkeypatch) 
                 "--skip-vector-store",
             ]
         )
-        == 0
+        == validate_cli.EXIT_READINESS_NOT_ESTABLISHED
     )

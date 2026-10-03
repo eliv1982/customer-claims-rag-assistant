@@ -145,7 +145,7 @@ class TestRiskClassificationNonDelivery:
                     query="Оплаченный заказ не был доставлен")
         )
         assert view.claim_category == "Недоставка оплаченного заказа"
-        assert "мы проверим" in view.customer_draft.lower()
+        assert "требуют проверки" in view.customer_draft.lower()
 
     def test_non_delivery_template_no_order_number(self) -> None:
         """Template must not invent an order number."""
@@ -436,7 +436,7 @@ class TestPrimaryAndFallbackPaths:
 
     def test_non_delivery_grounded_clean_uses_llm_output(self) -> None:
         risk = _make_risk(RiskLevel.HIGH, [RiskReasonCode.NON_DELIVERY])
-        clean = "Сожалеем о недоставке. Мы проверим статус заказа. [S1]"
+        clean = "Сожалеем о недоставке. Статус заказа требует проверки. [S1]"
         view = map_result_to_display(
             _result(_grounded(clean), risk, "grounded_answer",
                     query="заказ так и не приехал")
@@ -469,7 +469,7 @@ class TestPrimaryAndFallbackPaths:
 
     def test_missing_item_grounded_clean_uses_llm(self) -> None:
         risk = _make_risk(RiskLevel.MEDIUM, [RiskReasonCode.MISSING_ITEM])
-        clean = "Сожалеем, что позиция отсутствовала. Мы проверим состав. [S1]"
+        clean = "Сожалеем, что позиция отсутствовала. Состав заказа требует проверки. [S1]"
         view = map_result_to_display(
             _result(_grounded(clean), risk, "grounded_answer")
         )
@@ -498,7 +498,7 @@ class TestPrimaryAndFallbackPaths:
         """Valid grounded answer for refund demand must not be blindly replaced."""
         risk = _make_risk(RiskLevel.MEDIUM, [RiskReasonCode.REFUND_REQUEST])
         clean = (
-            "Мы проверим заказы и применимые условия возврата. "
+            "Заказы и применимые условия возврата требуют проверки. "
             "До завершения проверки подтвердить возврат нельзя. [S1]"
         )
         view = map_result_to_display(
@@ -561,7 +561,7 @@ class TestUnknownThematicQueries:
 
     def test_wrong_item_grounded_clean_passes_through(self) -> None:
         risk = _make_risk(RiskLevel.LOW)
-        clean = "Сожалеем, что привезли неверный заказ. Мы проверим детали. [S1]"
+        clean = "Сожалеем, что привезли неверный заказ. Детали требуют проверки. [S1]"
         view = map_result_to_display(
             _result(_grounded(clean), risk, "grounded_answer",
                     query="Привезли другое блюдо")
@@ -708,7 +708,7 @@ class TestEvidencePreservation:
             _result(
                 GroundedGenerationResult(
                     response_mode="grounded_answer",
-                    customer_response="Мы проверим заказ. [S1]",
+                    customer_response="Заказ требует проверки. [S1]",
                     citations=(_fake_citation("S1"), _fake_citation("S2")),
                 ),
                 risk, "grounded_answer",

@@ -36,7 +36,9 @@ from customer_claims_rag.retrieval.manifest import build_manifest, write_manifes
 from customer_claims_rag.retrieval.retriever import BaselineRetriever
 from customer_claims_rag.retrieval_config import RetrievalSettings
 from tests.release_posture_helpers import (
+    hex64,
     resolved_release_target_for_index,
+    write_consistent_index,
     stage_project_configs,
     write_test_release_descriptor,
 )
@@ -68,21 +70,14 @@ def _write_index(
     chunks,
 ) -> Path:
     index_dir = tmp_path / "index"
-    store = ChromaVectorStore(index_dir=index_dir, collection_name="customer_claims")
-    vectors = provider.embed_documents([chunk.content for chunk in chunks])
-    store.recreate_collection(embedding_dimension=provider.vector_dimension)
-    store.add_chunks(chunks, vectors)
-    manifest = build_manifest(
-        collection_name="customer_claims",
+    # Manifest and stored records agree, as after a real build: the release validator
+    # recomputes the identity from the records instead of trusting the manifest.
+    write_consistent_index(
+        index_dir,
+        list(chunks),
         embedding_model=provider.model_name,
-        corpus_fingerprint="integration-test-fingerprint",
-        chunk_count=len(chunks),
-        document_count=len({chunk.document_id for chunk in chunks}),
-        metadata_schema_version=METADATA_SCHEMA_VERSION,
         vector_dimension=provider.vector_dimension,
     )
-    write_manifest_atomic(index_dir, manifest)
-    store.close()
     return index_dir
 
 
@@ -99,7 +94,7 @@ def _write_empty_index(
         build_manifest(
             collection_name="customer_claims",
             embedding_model=provider.model_name,
-            corpus_fingerprint="empty-index",
+            corpus_fingerprint=hex64("empty-index"),
             chunk_count=0,
             document_count=0,
             metadata_schema_version=METADATA_SCHEMA_VERSION,
@@ -110,7 +105,7 @@ def _write_empty_index(
     return index_dir
 
 
-def _release_params_from_index(index_dir: Path) -> tuple[int, tuple[str, ...], str]:
+def _release_params_from_index(index_dir: Path) -> tuple[int, tuple[str, ...], str, str | None]:
     from customer_claims_rag.retrieval.adapters.chroma_store import ChromaVectorStore
     from customer_claims_rag.retrieval.manifest import load_manifest
 
@@ -118,7 +113,12 @@ def _release_params_from_index(index_dir: Path) -> tuple[int, tuple[str, ...], s
     store = ChromaVectorStore(index_dir=index_dir, collection_name="customer_claims")
     document_ids = tuple(sorted(store.list_document_ids()))
     store.close()
-    return manifest.chunk_count, document_ids, manifest.corpus_fingerprint
+    return (
+        manifest.chunk_count,
+        document_ids,
+        manifest.corpus_fingerprint,
+        manifest.chunk_payload_digest,
+    )
 
 
 def _application_settings(
@@ -134,10 +134,14 @@ def _application_settings(
     staged_frozen, staged_reranker = stage_project_configs(tmp_path)
     if frozen_config_path is None:
         frozen_config_path = staged_frozen
+    chunk_payload_digest: str | None = None
     if chunk_count is None or document_ids is None or corpus_fingerprint is None:
-        loaded_chunk_count, loaded_document_ids, loaded_fingerprint = _release_params_from_index(
-            index_dir
-        )
+        (
+            loaded_chunk_count,
+            loaded_document_ids,
+            loaded_fingerprint,
+            chunk_payload_digest,
+        ) = _release_params_from_index(index_dir)
         chunk_count = chunk_count if chunk_count is not None else loaded_chunk_count
         document_ids = document_ids if document_ids is not None else loaded_document_ids
         corpus_fingerprint = (
@@ -162,6 +166,7 @@ def _application_settings(
         document_count=len(document_ids),
         supported_document_ids=list(document_ids),
         expected_frozen_config_hash=expected_frozen_config_hash,
+        chunk_payload_digest=chunk_payload_digest,
     )
     return ApplicationSettings(
         retrieval=RetrievalSettings(
@@ -185,6 +190,7 @@ def _application_settings(
             document_count=len(document_ids),
             supported_document_ids=document_ids,
             embedding_model=EMBEDDING_MODEL,
+            chunk_payload_digest=chunk_payload_digest,
         ),
         release_descriptor_path=descriptor_path,
         project_root=tmp_path,
@@ -610,3 +616,32 @@ def test_missing_index_does_not_mutate_production_index(
 
     after = {path.name for path in production_index.iterdir()} if production_index.is_dir() else set()
     assert after == before
+
+
+def test_a_modified_store_is_rejected_at_startup_before_the_pipeline_is_returned(tmp_path: Path) -> None:
+    """The startup path recomputes the stored identity: an edited chunk never reaches retrieval."""
+    import chromadb
+
+    provider = FakeEmbeddingProvider(model_name=EMBEDDING_MODEL, vector_dimension=8)
+    chunks = _packaging_chunks()
+    index_dir = _write_index(tmp_path, provider, chunks)
+    settings = _application_settings(tmp_path, index_dir)  # pins read from the genuine index
+
+    collection = chromadb.PersistentClient(path=str(index_dir)).get_collection("customer_claims")
+    chunk_id = chunks[0].chunk_id
+    vector = collection.get(ids=[chunk_id], include=["embeddings"])["embeddings"][0]
+    collection.update(ids=[chunk_id], documents=["a rule nobody approved"], embeddings=[list(vector)])
+
+    generator_calls: list[object] = []
+
+    def tracking_generator_factory(generation_settings):
+        generator_calls.append(generation_settings)
+        return MagicMock(spec=GroundedGenerator)
+
+    with pytest.raises(ReleasePostureError, match="stored chunk payload digest mismatch"):
+        build_customer_claims_pipeline(
+            settings,
+            embedding_provider_factory=_embedding_factory(provider),
+            grounded_generator_factory=tracking_generator_factory,
+        )
+    assert generator_calls == []

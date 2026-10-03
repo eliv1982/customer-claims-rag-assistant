@@ -38,6 +38,10 @@ from tests.tokenizer_lanes import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CLEAN_MARKDOWN_DIR = PROJECT_ROOT / "data" / "02_clean_markdown"
+# Frozen copy of the 15 documents as they were when the retrieval experiments ran
+# (experiments/corpus/historical_pre_2d2_15doc_v1/snapshot_manifest.json). The live corpus
+# has moved on; evidence about the old one is checked against this copy.
+HISTORICAL_CORPUS_DIR = PROJECT_ROOT / "experiments" / "corpus" / "historical_pre_2d2_15doc_v1"
 
 DUMMY_OPENAI_API_KEY = "sk-test-dummy-key-not-a-real-credential"
 _APP_ENV_PREFIXES = ("OPENAI_", "RAG_", "GENERATION_")
@@ -181,6 +185,22 @@ def corpus_sandbox(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """
     root = tmp_path_factory.mktemp("corpus_sandbox")
     shutil.copytree(CLEAN_MARKDOWN_DIR, root / "data" / "02_clean_markdown")
+    shutil.copytree(PROJECT_ROOT / "experiments" / "corpus", root / "experiments" / "corpus")
+    return root
+
+
+@pytest.fixture(scope="session")
+def historical_corpus_sandbox(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """``corpus_sandbox`` with the frozen historical corpus in place of the live one.
+
+    The sandbox keeps the logical layout (``data/02_clean_markdown/<id>.md``), so chunk source
+    paths, and therefore every fingerprint, are the ones the tracked experiment artifacts record.
+    """
+    root = tmp_path_factory.mktemp("historical_corpus_sandbox")
+    clean = root / "data" / "02_clean_markdown"
+    clean.mkdir(parents=True)
+    for source in sorted(HISTORICAL_CORPUS_DIR.glob("*.md")):
+        shutil.copy(source, clean / source.name)
     shutil.copytree(PROJECT_ROOT / "experiments" / "corpus", root / "experiments" / "corpus")
     return root
 

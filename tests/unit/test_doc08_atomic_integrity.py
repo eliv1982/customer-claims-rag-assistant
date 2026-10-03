@@ -27,13 +27,10 @@ from customer_claims_rag.ingestion.corpus_overlay import (
     logical_source_path,
     normalize_overlay_corpus_source_paths,
 )
-from customer_claims_rag.retrieval.manifest import load_manifest
-from tests.local_artifacts import requires_local_artifacts
 
 ROOT = project_root()
 OVERLAY = ROOT / "experiments/corpus/doc08_atomic_risk_units_v1/08_escalation_and_risk_rules.md"
 CANONICAL = ROOT / "data/02_clean_markdown"
-PRODUCTION_INDEX = ROOT / "data/04_index"
 REFERENCE = ROOT / DEFAULT_REFERENCE_ARTIFACT
 FROZEN_Q = ROOT / "tests/01_test_questions.md"
 FROZEN_E = ROOT / "tests/02_expected_answers.md"
@@ -70,23 +67,23 @@ def _case_result(*, test_id: str, docs: list[str], primary_hit_at_4: bool) -> Ca
     )
 
 
-def test_overlay_fingerprint_stable_across_temp_roots(corpus_sandbox: Path) -> None:
-    canonical = corpus_sandbox / CANONICAL.relative_to(ROOT)
-    overlay = corpus_sandbox / OVERLAY.relative_to(ROOT)
-    temp_a = corpus_sandbox / ".tmp" / "corpus_overlay" / "_repro_test_a"
-    temp_b = corpus_sandbox / ".tmp" / "corpus_overlay" / "_repro_test_b"
+def test_overlay_fingerprint_stable_across_temp_roots(historical_corpus_sandbox: Path) -> None:
+    canonical = historical_corpus_sandbox / CANONICAL.relative_to(ROOT)
+    overlay = historical_corpus_sandbox / OVERLAY.relative_to(ROOT)
+    temp_a = historical_corpus_sandbox / ".tmp" / "corpus_overlay" / "_repro_test_a"
+    temp_b = historical_corpus_sandbox / ".tmp" / "corpus_overlay" / "_repro_test_b"
     temp_a.mkdir(parents=True, exist_ok=True)
     temp_b.mkdir(parents=True, exist_ok=True)
     build_a = build_baseline_and_overlay_chunks(
         canonical_dir=canonical,
         overlay_document_path=overlay,
-        permitted_root=corpus_sandbox,
+        permitted_root=historical_corpus_sandbox,
         staging_parent=temp_a,
     )
     build_b = build_baseline_and_overlay_chunks(
         canonical_dir=canonical,
         overlay_document_path=overlay,
-        permitted_root=corpus_sandbox,
+        permitted_root=historical_corpus_sandbox,
         staging_parent=temp_b,
     )
     try:
@@ -105,11 +102,11 @@ def test_overlay_fingerprint_stable_across_temp_roots(corpus_sandbox: Path) -> N
         cleanup_overlay_temp_dir(build_b.temp_input_dir)
 
 
-def test_overlay_content_change_changes_fingerprint(corpus_sandbox: Path) -> None:
+def test_overlay_content_change_changes_fingerprint(historical_corpus_sandbox: Path) -> None:
     build = build_baseline_and_overlay_chunks(
-        canonical_dir=corpus_sandbox / CANONICAL.relative_to(ROOT),
-        overlay_document_path=corpus_sandbox / OVERLAY.relative_to(ROOT),
-        permitted_root=corpus_sandbox,
+        canonical_dir=historical_corpus_sandbox / CANONICAL.relative_to(ROOT),
+        overlay_document_path=historical_corpus_sandbox / OVERLAY.relative_to(ROOT),
+        permitted_root=historical_corpus_sandbox,
     )
     try:
         base_fp = compute_overlay_corpus_fingerprint(build.candidate_chunks)
@@ -129,17 +126,6 @@ def test_overlay_content_change_changes_fingerprint(corpus_sandbox: Path) -> Non
 def test_logical_source_path_is_platform_independent() -> None:
     assert logical_source_path(DOC08_DOCUMENT_ID) == (
         "data/02_clean_markdown/08_escalation_and_risk_rules.md"
-    )
-
-
-@requires_local_artifacts(
-    PRODUCTION_INDEX / "manifest.json",
-    why="manifest of the provisioned production index (built with live OpenAI embeddings)",
-)
-def test_production_fingerprint_unchanged() -> None:
-    manifest = load_manifest(PRODUCTION_INDEX)
-    assert manifest.corpus_fingerprint == (
-        "b9526128dad23e71e812fbd8f26452b8d6efa29e4faac898fa11f279b310e827"
     )
 
 

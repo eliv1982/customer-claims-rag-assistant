@@ -37,6 +37,7 @@ from customer_claims_rag.release.posture import (
     load_release_posture_descriptor,
 )
 from tests.release_posture_helpers import (
+    hex64,
     resolved_release_target_for_index,
     stage_project_configs,
     write_test_release_descriptor,
@@ -219,6 +220,10 @@ def test_application_settings_from_env_reuses_nested_loaders(
         collection_name="customer_claims",
         embedding_model="text-embedding-3-small",
         vector_dimension=1536,
+        corpus_id="test-corpus",
+        corpus_manifest_path=tmp_path / "configs" / "corpus" / "test_corpus.json",
+        corpus_manifest_relative="configs/corpus/test_corpus.json",
+        expected_chunk_payload_digest="0" * 64,
     )
     retrieval_settings = _retrieval_settings(tmp_path)
     retrieval_mock = MagicMock(return_value=retrieval_settings)
@@ -799,7 +804,7 @@ def _write_empty_index(tmp_path: Path, provider) -> Path:
         build_manifest(
             collection_name="customer_claims",
             embedding_model=provider.model_name,
-            corpus_fingerprint="empty-index",
+            corpus_fingerprint=hex64("empty-index"),
             chunk_count=0,
             document_count=0,
             metadata_schema_version=METADATA_SCHEMA_VERSION,

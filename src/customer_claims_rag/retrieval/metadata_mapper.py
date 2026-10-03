@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,55 @@ def canonical_metadata_for_fingerprint(chunk: ChunkRecord) -> dict[str, Any]:
     return payload
 
 
+def canonical_metadata_from_vector_metadata(stored: Mapping[str, Any]) -> dict[str, Any]:
+    """The fingerprint metadata subset, rebuilt from a stored record.
+
+    The inverse view of ``chunk_to_vector_metadata`` for exactly the keys that
+    ``canonical_metadata_for_fingerprint`` hashes, so that for every chunk
+    ``canonical_metadata_from_vector_metadata(chunk_to_vector_metadata(chunk))`` equals
+    ``canonical_metadata_for_fingerprint(chunk)``. Raises ``KeyError`` naming the first field a
+    record lacks (an index written before the field existed).
+    """
+    payload: dict[str, Any] = {
+        "document_id": str(stored["document_id"]),
+        "source_path": _normalize_source_path(str(stored["source_path"])),
+        "chunk_type": str(stored["chunk_type"]),
+        "heading": str(stored["heading"]),
+        "heading_path": _deserialize_heading_path(str(stored["heading_path"])),
+        "section": _optional_str(stored.get("section")),
+        "subsection": _optional_str(stored.get("subsection")),
+        "topic": _optional_str(stored.get("topic")),
+        "risk_level": _optional_str(stored.get("risk_level")),
+        "title": str(stored["title"]),
+        "category": str(stored["category"]),
+        "document_type": str(stored["document_type"]),
+        "status": str(stored["status"]),
+        "version": str(stored["version"]),
+        "priority": str(stored["document_priority"]),
+        "language": str(stored["language"]),
+    }
+    related = _decode_json_list(stored.get("related_documents"))
+    if related:
+        payload["related_documents"] = sorted(related)
+    keywords = _decode_json_list(stored.get("keywords"))
+    if keywords:
+        payload["keywords"] = sorted(keywords)
+    return payload
+
+
+def _optional_str(value: Any) -> str | None:
+    return None if value is None else str(value)
+
+
+def _decode_json_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    parsed = json.loads(str(value))
+    if not isinstance(parsed, list):
+        raise ValueError("list metadata must be a JSON list")
+    return [str(item) for item in parsed]
+
+
 def chunk_to_vector_metadata(chunk: ChunkRecord) -> dict[str, str | int | float | bool]:
     """Convert a chunk to Chroma-compatible scalar metadata."""
     metadata = chunk.metadata
@@ -70,6 +120,9 @@ def chunk_to_vector_metadata(chunk: ChunkRecord) -> dict[str, str | int | float 
         "document_priority": chunk.document_priority,
         "status": metadata.status,
         "language": metadata.language,
+        # Part of the corpus fingerprint payload, so the stored record must carry it for the
+        # fingerprint to be recomputable from the store (release/index_integrity.py).
+        "version": metadata.version,
     }
     if metadata.section is not None:
         store_metadata["section"] = metadata.section

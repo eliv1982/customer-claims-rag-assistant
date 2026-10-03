@@ -1,16 +1,18 @@
 #!/bin/sh
 set -e
 
-INDEX_DIR="/app/data/04_index_backup_10docs_215chunks"
+INDEX_DIR="/app/data/04_index_production"
 
 run_production_preflight() {
     if [ ! -d "$INDEX_DIR" ]; then
         echo "error: production index mount missing at ${INDEX_DIR}" >&2
+        echo "build it on the host from the repository (see docs/07_index_provisioning.md): validate-release-posture prints the exact command" >&2
         exit 1
     fi
 
     if [ -z "$(ls -A "$INDEX_DIR" 2>/dev/null || true)" ]; then
         echo "error: production index mount is empty at ${INDEX_DIR}" >&2
+        echo "build it on the host from the repository (see docs/07_index_provisioning.md): validate-release-posture prints the exact command" >&2
         exit 1
     fi
 

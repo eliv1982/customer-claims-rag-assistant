@@ -13,8 +13,8 @@
 | `data/01_raw/` | Исходные тексты документов базы знаний (`.txt`) |
 | `data/02_clean_markdown/` | Очищенные версии документов в Markdown (`.md`) |
 | `data/03_chunks/` | Сгенерированные чанки (JSONL) и статистика; не источник истины |
-| `data/04_index/` | Emergency rollback/archive vector index (15 documents); **not** production default |
-| `data/04_index_backup_10docs_215chunks/` | **Active production index** для release posture `foodflow-10doc-release-v1` (10 documents, 215 chunks); separately provisioned local artifact; не коммитится |
+| `data/04_index/` | Default output of `build-index` / `search-index` / evaluation CLIs; на maintainer-машине может содержать historical 15-document index; **не** production index |
+| `data/04_index_production/` | **Production index** для release posture `foodflow-10doc-release-v2` (10 documents, 215 chunks); строится из репозитория командой из `docs/07_index_provisioning.md`; не коммитится |
 | `data/05_evaluation/` | Сгенерированные JSON-результаты retrieval evaluation; не источник истины |
 | `docs/` | Проектная документация: область проекта, инвентаризация, отчеты, стратегии |
 | `prompts/` | Системный промпт и шаблон RAG-запроса |
@@ -37,9 +37,9 @@
 
 **Application layer (functional MVP)** — реализованы grounded generation, deterministic risk/handoff, citations и fallback handling; production composition root (`build_customer_claims_pipeline`), frozen retrieval `vector top-24 → source-authority-v1 → final top-12`, single-shot CLI (`answer-claim`) и локальный Streamlit UI.
 
-**10-document production release posture (stage 4C.4-B)** — активирован formal release descriptor `foodflow-10doc-release-v1` (documents 01–10, index `data/04_index_backup_10docs_215chunks`, frozen pool@24 contract). Production startup fail-closed; rollback — emergency-only на 15-document archive (`data/04_index`). Подробности: `docs/06_release_posture.md`.
+**10-document production release posture (stage 4C.4-B, пересобран в 2D2)** — release descriptor `foodflow-10doc-release-v2` (canonical corpus `configs/corpus/foodflow_production_v1.json`: documents 01–10, index `data/04_index_production`, frozen pool@24 contract). Index воспроизводится из репозитория (`build-index --corpus-manifest ...`); production startup fail-closed и пересчитывает identity из хранимых записей. Rollback — операция над репозиторием (checkout предыдущего релиза и rebuild), не архив. Подробности: `docs/06_release_posture.md`.
 
-**Expanded corpus index (stage 4C.1)** — historical 15-document index (`data/04_index`, 333 chunks) сохранён как emergency rollback/archive; **не** selected production release.
+**Expanded corpus index (stage 4C.1)** — historical 15-document index (333 chunks) — исторический evidence (локальный архив, больше не часть release posture); **не** production.
 
 **Expanded corpus frozen regression (stage 4C.2)** — frozen 60-question regression выполнен для historical 10-document и 15-document index arms; артефакт `expanded_corpus_frozen_regression_v1`.
 
@@ -53,7 +53,7 @@
 
 **Еще не реализованы:** authentication, chat history, document upload из UI, feedback collection, query rewriting, remote/public deployment. Клиентские черновики являются предварительными и проверяются сотрудником перед отправкой. Более естественные category-specific шаблоны и SLA-aware ответы — post-MVP improvements (`итеративная калибровка шаблонов по результатам пилотной эксплуатации`). Система не обучается самостоятельно на обращениях.
 
-Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/`, `data/04_index/` (rollback archive) и provisioned production index — только локальные generated/deployment артефакты. **Свежий clone не содержит production index** — его нужно provision'ить отдельно (`docs/07_index_provisioning.md`).
+Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/` и `data/04_index*/` — только локальные generated артефакты. **Свежий clone не содержит production index** — его нужно собрать из репозитория (`docs/07_index_provisioning.md`; нужен `OPENAI_API_KEY`).
 
 ## Запуск с нуля (Windows / PowerShell)
 
@@ -119,7 +119,7 @@ OPENAI_API_KEY=
 
 Проект автоматически загружает `.env` из корня репозитория при запуске CLI, `answer-claim`, Streamlit UI и чтении `ApplicationSettings` / `RetrievalSettings`. Уже установленные переменные процесса имеют **приоритет** над значениями из `.env`. Отсутствие `.env` не является ошибкой.
 
-Production retrieval использует `configs/release/production_posture.json` (default target `active`). Индекс `data/04_index_backup_10docs_215chunks` — локальный deployment artifact; после provisioning проверьте:
+Production retrieval использует `configs/release/production_posture.json` (default target `active`). Индекс `data/04_index_production` — локальный build artifact; после сборки проверьте:
 
 ```powershell
 validate-release-posture
@@ -156,11 +156,11 @@ OpenAI API key для этой команды **не требуется**.
 
 ### Сборка vector index (dev/evaluation)
 
-> **Важно:** active production index этой командой **не создаётся**. Provision production index согласно `docs/07_index_provisioning.md`. Не пересобирайте `data/04_index/` без отдельного осознанного решения — этот каталог является emergency rollback/archive.
+> **Важно:** production index создаётся только командой с `--corpus-manifest` (см. `docs/07_index_provisioning.md`). Generic `build-index --rebuild` без manifest индексирует **все** документы директории и release-валидацию не пройдёт.
 
 Требуется заполненный `OPENAI_API_KEY` в `.env` или в environment процесса.
 
-Используйте явный disposable path для dev/evaluation, чтобы не затрагивать rollback archive:
+Используйте явный disposable path для dev/evaluation, чтобы не затрагивать локальные индексы:
 
 ```powershell
 python -m customer_claims_rag.cli.build_index `
@@ -182,7 +182,7 @@ python -m customer_claims_rag.cli.build_index `
 По умолчанию:
 
 - вход: `data/02_clean_markdown/` (через `CorpusBuilder`);
-- index (build CLI default при отсутствии `--index-dir`): `data/04_index/` — **не** использовать без явного намерения;
+- index (build CLI default при отсутствии `--index-dir`): `data/04_index/` — dev/evaluation default, **не** production index;
 - collection: `customer_claims`;
 - embedding model: `text-embedding-3-small`.
 
@@ -208,7 +208,7 @@ python -m customer_claims_rag.cli.search_index "Заказ отмечен дос
 
 ### Production claim answer (single-shot)
 
-Требуется provisioned production index (`data/04_index_backup_10docs_215chunks` per release descriptor), заполненный `OPENAI_API_KEY` и generation env vars (см. `.env.example`). Production index path задаётся **только** через `configs/release/production_posture.json`; `RAG_INDEX_DIR` на answer/UI flow **не влияет**.
+Требуется собранный production index (`data/04_index_production` per release descriptor), заполненный `OPENAI_API_KEY` и generation env vars (см. `.env.example`). Production index path задаётся **только** через `configs/release/production_posture.json`; `RAG_INDEX_DIR` на answer/UI flow **не влияет**.
 
 Команда принимает одно обращение, выполняет production pipeline один раз и печатает стабильный JSON в stdout:
 
@@ -232,7 +232,7 @@ JSON содержит customer-safe поля: `answer`, `response_mode`, `genera
 python -m pip install -e ".[ui]"
 ```
 
-Требования те же, что и для `answer-claim`: заполненный `.env`, provisioned production index, generation env vars из `.env.example`. UI **не пересобирает** индекс и не загружает документы.
+Требования те же, что и для `answer-claim`: заполненный `.env`, собранный production index, generation env vars из `.env.example`. UI **не пересобирает** индекс и не загружает документы.
 
 Запуск:
 
@@ -255,9 +255,9 @@ python -m streamlit run src/customer_claims_rag/ui/streamlit_app.py
 
 ### Docker (рекомендуемый способ демонстрации)
 
-Требования: Docker Desktop / Docker Engine + Compose, provisioned production index на хосте, `OPENAI_API_KEY` в environment процесса.
+Требования: Docker Desktop / Docker Engine + Compose, собранный production index на хосте, `OPENAI_API_KEY` в environment процесса.
 
-1. Provision index: `docs/07_index_provisioning.md`
+1. Собрать index на хосте: `docs/07_index_provisioning.md`
 2. Runbook: `docs/08_docker_runbook.md`
 
 Кратко (PowerShell):
@@ -269,7 +269,7 @@ docker compose run --rm streamlit validate-release-posture
 docker compose up
 ```
 
-Откройте http://localhost:8501. Индекс монтируется read-write в `/app/data/04_index_backup_10docs_215chunks`; в image он **не** копируется. `RAG_INDEX_DIR` на production UI flow **не влияет**; selector — `RAG_RELEASE_TARGET` + descriptor.
+Откройте http://localhost:8501. Индекс монтируется read-write в `/app/data/04_index_production`; в image он **не** копируется. `RAG_INDEX_DIR` на production UI flow **не влияет**; selector — `RAG_RELEASE_TARGET` + descriptor.
 
 Дополнительные параметры search-index (локальный Python, dev/evaluation):
 
@@ -281,15 +281,15 @@ python -m customer_claims_rag.cli.search_index "возврат" --top-k 4 --fetc
 
 ### Generated artifacts
 
-- **Production release index** (`data/04_index_backup_10docs_215chunks`) — separately provisioned local artifact; see `docs/07_index_provisioning.md` and `docs/06_release_posture.md`;
-- **Build/evaluation index** (`data/04_index/`) — default output path для `build-index` / `search-index` / evaluation CLIs; **также** используется как emergency rollback archive (`RAG_RELEASE_TARGET=rollback`);
+- **Production release index** (`data/04_index_production`) — build artifact, строится из репозитория; see `docs/07_index_provisioning.md` and `docs/06_release_posture.md`;
+- **Build/evaluation index** (`data/04_index/`) — default output path для `build-index` / `search-index` / evaluation CLIs (на maintainer-машине может содержать historical 15-document index для воспроизведения экспериментов);
 
-  > **Предупреждение:** generic build command (`build-index --rebuild`) выполняет destructive full rebuild в `data/04_index/`. Не запускайте его без осознанного намерения: он перезапишет rollback archive. Для одноразовой dev/evaluation сборки укажите явный путь: `build-index --rebuild --index-dir data/04_index_dev_tmp`. Замена rollback artifact — отдельное осознанное действие.
+  > **Предупреждение:** generic build command (`build-index --rebuild`) выполняет destructive full rebuild в `data/04_index/` (все документы директории). Для одноразовой dev/evaluation сборки укажите явный путь: `build-index --rebuild --index-dir data/04_index_dev_tmp`.
 
 - Chroma index и `manifest.json` создаются **внутри project root**;
 - нельзя направлять `--index-dir` в `data/01_raw/`, `data/02_clean_markdown/` или внутрь `--input-dir`;
 - generated contents **не коммитятся** (см. `.gitignore`);
-- `data/04_index/.gitkeep` сохраняет структуру rollback/archive каталога в git.
+- `data/04_index/.gitkeep` сохраняет структуру каталога в git.
 
 ### Остановка окружения
 
@@ -305,8 +305,8 @@ deactivate
 | `OPENAI_EMBEDDING_MODEL` | Модель embeddings | `text-embedding-3-small` |
 | `OPENAI_CHAT_MODEL` | Модель chat completion для generation | `gpt-4o-mini` |
 | `CUSTOMER_CLAIMS_PROJECT_ROOT` | Explicit project root for container/non-editable installs | unset (auto-detect from package layout) |
-| `RAG_RELEASE_TARGET` | Production release target (`active` / `rollback`) | `active` (descriptor default) |
-| `RAG_ACTIVE_INDEX_HOST_PATH` | Docker Compose **host** bind-mount path for active index only | `./data/04_index_backup_10docs_215chunks` |
+| `RAG_RELEASE_TARGET` | Production release target (в descriptor только `active`) | `active` (descriptor default) |
+| `RAG_ACTIVE_INDEX_HOST_PATH` | Docker Compose **host** bind-mount path for active index only | `./data/04_index_production` |
 | `RAG_INDEX_DIR` | Index path for **build/search/evaluation CLIs only** | `data/04_index` |
 | `RAG_COLLECTION_NAME` | Имя Chroma collection — **build/search/evaluation CLI only**; production pipeline использует frozen contract | `customer_claims` |
 | `RAG_TOP_K` | Максимум результатов поиска — **retrieval/evaluation CLI only**; production pipeline: final top-12 (frozen) | `4` |
@@ -441,7 +441,7 @@ Baseline evaluation использовал `threshold=0.0` для измерен
 | Симптом | Действие |
 |---------|----------|
 | `OPENAI_API_KEY is required` | Заполнить `OPENAI_API_KEY` в `.env` или export в PowerShell |
-| `index manifest not found` (production `answer-claim` / UI) | Выполнить provisioning согласно `docs/07_index_provisioning.md`, затем `validate-release-posture` |
+| `index manifest not found` (production `answer-claim` / UI) | Собрать index согласно `docs/07_index_provisioning.md`, затем `validate-release-posture` |
 | `index manifest not found` (dev/evaluation CLI) | Пересобрать отдельный индекс: `build-index --rebuild --index-dir data/04_index_dev_tmp` |
 | `embedding model mismatch` | Пересобрать index с тем же `--embedding-model`, что и search CLI |
 | `chunk count mismatch` | Выполнить rebuild после изменения corpus |

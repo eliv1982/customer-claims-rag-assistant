@@ -6,6 +6,7 @@ import json
 import statistics
 import tempfile
 from collections import Counter
+from collections.abc import Sequence
 from pathlib import Path
 
 from customer_claims_rag.config import LIMITS_BY_STRATEGY
@@ -44,6 +45,39 @@ class CorpusBuilder:
 
     def build_from_directory(self, input_dir: Path) -> tuple[list[DocumentRecord], list[ChunkRecord]]:
         documents = self.loader.load_directory(input_dir)
+        chunks: list[ChunkRecord] = []
+        for document in documents:
+            chunks.extend(self.chunker.chunk_document(document))
+        self.ensure_unique_chunk_ids(chunks)
+        return documents, chunks
+
+    def build_from_selection(
+        self,
+        input_dir: Path,
+        file_names: Sequence[str],
+    ) -> tuple[list[DocumentRecord], list[ChunkRecord]]:
+        """Build only the named documents of ``input_dir``, in the order given.
+
+        Unlike ``build_from_directory`` nothing is discovered: a file that is not named is never
+        read, and a named file that is missing or filtered out by status is an error. This is the
+        entry point for an explicit corpus selection (``ingestion/canonical_corpus.py``).
+        """
+        safe_dir = resolve_safe_path(input_dir, root=self.permitted_root)
+        documents: list[DocumentRecord] = []
+        for name in file_names:
+            record = self.loader.load_file(safe_dir / name)
+            if record is None:
+                raise IngestionError(
+                    f"selected document {name!r} was filtered out by its status; "
+                    "a corpus selection must name only loadable documents",
+                    file_path=str(safe_dir / name),
+                )
+            documents.append(record)
+        if not documents:
+            raise IngestionError("corpus selection is empty", file_path=str(safe_dir))
+        self.loader.validator.check_duplicate_document_ids(
+            [(record.metadata.document_id, record.source_path) for record in documents]
+        )
         chunks: list[ChunkRecord] = []
         for document in documents:
             chunks.extend(self.chunker.chunk_document(document))
@@ -179,6 +213,24 @@ class CorpusBuilder:
         stats_path: Path,
     ) -> tuple[list[DocumentRecord], list[ChunkRecord], CorpusStats]:
         documents, chunks = self.build_from_directory(input_dir)
+        return self.export_corpus(
+            documents,
+            chunks,
+            input_dir=input_dir,
+            output_path=output_path,
+            stats_path=stats_path,
+        )
+
+    def export_corpus(
+        self,
+        documents: list[DocumentRecord],
+        chunks: list[ChunkRecord],
+        *,
+        input_dir: Path,
+        output_path: Path,
+        stats_path: Path,
+    ) -> tuple[list[DocumentRecord], list[ChunkRecord], CorpusStats]:
+        """Write already built documents/chunks (JSONL + stats) atomically."""
         stats = self.compute_stats(documents, chunks)
         source_paths = [document.source_path for document in documents]
 

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 
 import pytest
 
 from customer_claims_rag.application.customer_text_policy import (
+    FUTURE_COMMITMENT_CODE,
     VIOLATION_CODES,
     detect_draft_violations,
     normalize_customer_text,
@@ -112,6 +114,52 @@ def test_registration_transfer_or_notification_claim_is_rejected(text: str) -> N
 
 
 # ---------------------------------------------------------------------------
+# Future operational promises: the application reviews, answers and contacts nobody later
+# ---------------------------------------------------------------------------
+
+_FUTURE_PROMISES = [
+    # first-person future review / check
+    "Мы проверим обращение.",
+    "Мы рассмотрим обращение.",
+    "Мы приоритетно проверим обращение.",
+    "Проверим обстоятельства заказа.",
+    "Сверим описание обращения с данными по доставке.",
+    "Мы будем проверять заказ.",
+    # later notification / contact
+    "После проверки сообщим результат.",
+    "После проверки сообщим, возможен ли возврат средств.",
+    "Мы сообщим после проверки.",
+    "Мы свяжемся после проверки.",
+    "О результатах сообщим отдельно.",
+    "Если потребуется дополнительная информация, уточним её отдельно.",
+    "Мы вернёмся с ответом.",
+    "Будем на связи.",
+    # passive-future form of the same promise
+    "Обращение будет рассмотрено.",
+    "Статус оплаты и доставки будет проверен.",
+    "Проверка будет проводиться по правилам сервиса.",
+    "Дальнейшее рассмотрение будет вестись по регламенту.",
+    # registration / acceptance / transfer promised for later
+    "Мы зарегистрируем ваше обращение.",
+    "Мы передадим обращение сотруднику.",
+    "Мы эскалируем обращение.",
+    "Мы примем обращение в работу.",
+]
+
+
+@pytest.mark.parametrize("text", _FUTURE_PROMISES)
+def test_future_operational_promise_is_rejected(text: str) -> None:
+    assert FUTURE_COMMITMENT_CODE in _codes(text)
+
+
+def test_future_operational_promise_cannot_hide_behind_invisible_characters() -> None:
+    assert FUTURE_COMMITMENT_CODE in _codes("Мы про​верим обращение.")  # zero-width space
+    assert FUTURE_COMMITMENT_CODE in _codes("Мы свя­жемся после проверки.")  # soft hyphen
+    assert FUTURE_COMMITMENT_CODE in _codes("МЫ РАССМОТРИМ ОБРАЩЕНИЕ.")
+    assert FUTURE_COMMITMENT_CODE in _codes("Мы разберём ситуацию.")  # ё folds to е
+
+
+# ---------------------------------------------------------------------------
 # Fault / liability
 # ---------------------------------------------------------------------------
 
@@ -208,15 +256,17 @@ def test_markup_in_draft_is_rejected(text: str) -> None:
 # ---------------------------------------------------------------------------
 
 _NEUTRAL = [
-    # non-committal refund / review wording
+    # facts the application knows and the need for review, with no promise of later action
+    "Сообщение получено.",
+    "Обращение требует проверки.",
+    "Вопрос требует проверки.",
+    "Обращение требует приоритетной проверки.",
     "Вопрос о возврате требует проверки.",
     "Возможность возврата зависит от результатов проверки.",
-    "После проверки сообщим, возможен ли возврат средств.",
-    "Мы проверим, возможен ли возврат.",
     "Возможность возврата будет определена после проверки каждого заказа.",
-    "Мы проверим статус и историю доставки по вашему заказу.",
+    "Статус и история доставки по вашему заказу требуют проверки.",
     # empathy and acknowledgement without admission
-    "Сожалеем, что так вышло. Мы проверим описанные обстоятельства.",
+    "Сожалеем, что так вышло. Описанные обстоятельства требуют проверки.",
     "Приносим извинения за доставленные неудобства.",
     "Понимаем, что ситуация неприятна, и благодарим за обращение.",
     "Мы получили ваше сообщение.",
@@ -265,8 +315,11 @@ def test_policy_exposes_every_rule_group() -> None:
         "deadline-commitment", "false-registration", "false-completed-transfer",
         "false-escalation", "false-notification", "fault-admission", "medical-diagnosis",
         "medical-treatment", "sensitive-data-request", "markup-in-draft",
+        FUTURE_COMMITMENT_CODE,
     }
     assert expected <= VIOLATION_CODES
+    # The two narrow phrase rules the future-promise group replaced must not linger beside it.
+    assert not {"vague-review-promise", "vague-result-promise"} & VIOLATION_CODES
 
 
 def test_citation_markers_are_stripped_before_customer_text() -> None:
@@ -287,8 +340,15 @@ def test_citation_markers_are_stripped_before_customer_text() -> None:
         ("[a", 10000),
         ("в течение 5 ", 1700),
         ("симптомы ", 2200),
+        ("обращение ", 4000),
+        ("будет ", 4000),
+        ("проверка будет ", 2500),
+        ("будем ", 4000),
     ],
-    ids=["words", "we", "refund", "our", "specify", "angle", "bracket", "period", "symptoms"],
+    ids=[
+        "words", "we", "refund", "our", "specify", "angle", "bracket", "period", "symptoms",
+        "matter", "will-be", "check-will-be", "we-will",
+    ],
 )
 def test_policy_is_bounded_on_adversarial_text(unit: str, repeat: int) -> None:
     text = unit * repeat
@@ -306,11 +366,12 @@ def test_policy_is_bounded_on_adversarial_text(unit: str, repeat: int) -> None:
 _PROMPT_PRESCRIBED = [
     "сожалеем, что так вышло",
     "просим указать номер заказа",
-    "мы проверим обращение",
+    "сообщение получено",
+    "обращение требует проверки",
     "вопрос требует проверки",
-    "после проверки сообщим, возможно ли решение",
-    "мы проверим, возможен ли возврат",
+    "возможность решения зависит от результатов проверки",
     "вопрос о возврате требует проверки",
+    "вопрос о компенсации требует проверки",
     "возможность возврата зависит от результатов проверки",
     "если самочувствие ухудшилось, рекомендуем обратиться за профессиональной медицинской помощью",
 ]
@@ -320,6 +381,12 @@ _PROMPT_FORBIDDEN = [
     ("обращение передано", {"false-completed-transfer"}),
     ("Ваше обращение было передано", {"false-completed-transfer"}),
     ("обращение будет эскалировано", {"false-escalation"}),
+    ("мы проверим", {FUTURE_COMMITMENT_CODE}),
+    ("мы рассмотрим", {FUTURE_COMMITMENT_CODE}),
+    ("после проверки сообщим", {FUTURE_COMMITMENT_CODE}),
+    ("мы сообщим после проверки", {FUTURE_COMMITMENT_CODE}),
+    ("мы свяжемся после проверки", {FUTURE_COMMITMENT_CODE}),
+    ("обращение будет рассмотрено", {FUTURE_COMMITMENT_CODE}),
     ("запрос отправлен", {"false-completed-transfer", "false-specialist-transfer"}),
     ("обращение зарегистрировано", {"false-registration"}),
     ("обращение принято в работу", {"false-registration"}),
@@ -360,6 +427,25 @@ def test_prompt_forbidden_wording_is_rejected_by_the_policy(
     assert phrase.lower() in prompt_text, "prompt no longer forbids this wording: update the contract"
     sentence = phrase[0].upper() + phrase[1:] + "."
     assert _codes(sentence) & expected
+
+
+def test_prompt_prescribes_no_future_promise_anywhere_outside_its_forbidden_list() -> None:
+    """The rule applies to every sentence of the prompt, not just to the phrases pinned above.
+
+    The only place the promise wording may appear is the section that lists what is forbidden.
+    """
+    text = PROMPT_PATH.read_text(encoding="utf-8")
+    sections = re.split(r"^#{2,3} ", text, flags=re.MULTILINE)
+    offenders = []
+    for section in sections:
+        title, _, body = section.partition("\n")
+        if title.startswith("Что запрещено"):
+            continue
+        for line in body.splitlines():
+            for sentence in re.split(r"(?<=[.!?;])\s+", line):
+                if FUTURE_COMMITMENT_CODE in _codes(sentence):
+                    offenders.append((title, sentence.strip()[:120]))
+    assert offenders == []
 
 
 def test_prompt_no_longer_prescribes_wording_the_policy_rejects(prompt_text: str) -> None:

@@ -1,10 +1,10 @@
 {
  "encoding": "cl100k_base",
- "purpose": "Golden chunk topology of the 15-document release corpus under the real cl100k_base vocabulary. Compared by tests/unit/test_real_tokenizer_golden.py in the real-tokenizer lane; the offline stand-in tokenizer cannot reproduce it.",
- "source": "data/02_clean_markdown/*.md, chunked by CorpusBuilder with its default settings",
- "authority": "The chunk count and corpus fingerprints these chunks must reproduce are recorded in configs/release/production_posture.json (10-document active target and 15-document archive).",
+ "purpose": "Golden chunk topology of the HISTORICAL 15-document corpus (experiments/corpus/historical_pre_2d2_15doc_v1) under the real cl100k_base vocabulary. Compared by tests/unit/test_real_tokenizer_golden.py in the real-tokenizer lane; the offline stand-in tokenizer cannot reproduce it. Historical evidence, not the production corpus.",
+ "source": "experiments/corpus/historical_pre_2d2_15doc_v1/*.md, chunked by CorpusBuilder with its default settings",
+ "authority": "The chunk counts and corpus fingerprints these chunks must reproduce are the `identities` of experiments/corpus/historical_pre_2d2_15doc_v1/snapshot_manifest.json (10-document release v1 and 15-document expansion), which match the tracked experiment artifacts in data/05_evaluation.",
  "token_counts_meaning": "chunk_id -> ChunkRecord.token_count, in corpus build order",
- "regeneration": "Only when the release corpus or the chunker is deliberately changed: rebuild the chunks with the real vocabulary, replace token_counts, and update the fingerprints in configs/release/production_posture.json in the same change.",
+ "regeneration": "Never: the snapshot is frozen. A change here means the chunker or the tokenizer changed, which is exactly what this table detects.",
  "chunk_count": 333,
  "token_counts": {
   "01_service_overview::chunk-001": 531,

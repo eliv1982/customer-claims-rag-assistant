@@ -29,7 +29,8 @@ from tests.local_artifacts import requires_local_artifacts
 ROOT = project_root()
 OVERLAY = ROOT / "experiments/corpus/doc08_atomic_risk_units_v1/08_escalation_and_risk_rules.md"
 CANONICAL = ROOT / "data/02_clean_markdown"
-PRODUCTION_INDEX = ROOT / "data/04_index"
+# the 15-document index the experiment baseline arm ran on (historical local archive)
+HISTORICAL_ARCHIVE_INDEX = ROOT / "data/04_index"
 CANDIDATE_INDEX = ROOT / "data/04_index_experiments/doc08_atomic_risk_units_v1"
 CONFIG = ROOT / "configs/experiments/doc08_atomic_risk_units_v1.json"
 FROZEN_Q = ROOT / "tests/01_test_questions.md"
@@ -40,11 +41,11 @@ ARTIFACT = ROOT / "data/05_evaluation/doc08_atomic_risk_units_v1.json"
 
 
 @pytest.fixture(scope="module")
-def overlay_build(corpus_sandbox: Path):
+def overlay_build(historical_corpus_sandbox: Path):
     result = build_baseline_and_overlay_chunks(
-        canonical_dir=corpus_sandbox / CANONICAL.relative_to(ROOT),
-        overlay_document_path=corpus_sandbox / OVERLAY.relative_to(ROOT),
-        permitted_root=corpus_sandbox,
+        canonical_dir=historical_corpus_sandbox / CANONICAL.relative_to(ROOT),
+        overlay_document_path=historical_corpus_sandbox / OVERLAY.relative_to(ROOT),
+        permitted_root=historical_corpus_sandbox,
     )
     yield result
     cleanup_overlay_temp_dir(result.temp_input_dir)
@@ -97,11 +98,11 @@ def test_no_copied_doc12_threat_example() -> None:
     assert "физически покажу" in doc12
 
 
-def test_deterministic_candidate_chunk_ids(overlay_build, corpus_sandbox: Path) -> None:
+def test_deterministic_candidate_chunk_ids(overlay_build, historical_corpus_sandbox: Path) -> None:
     second = build_baseline_and_overlay_chunks(
-        canonical_dir=corpus_sandbox / CANONICAL.relative_to(ROOT),
-        overlay_document_path=corpus_sandbox / OVERLAY.relative_to(ROOT),
-        permitted_root=corpus_sandbox,
+        canonical_dir=historical_corpus_sandbox / CANONICAL.relative_to(ROOT),
+        overlay_document_path=historical_corpus_sandbox / OVERLAY.relative_to(ROOT),
+        permitted_root=historical_corpus_sandbox,
     )
     try:
         ids_a = [c.chunk_id for c in overlay_build.candidate_doc08_chunks]
@@ -132,16 +133,6 @@ def test_extension_benchmark_schema() -> None:
         benchmark_id=config["extension_benchmark"]["benchmark_id"],
     )
     assert len(fp) == 64
-
-
-@requires_local_artifacts(
-    PRODUCTION_INDEX / "manifest.json",
-    why="manifest of the provisioned production index (built with live OpenAI embeddings)",
-)
-def test_production_index_fingerprint_unchanged() -> None:
-    manifest = load_manifest(PRODUCTION_INDEX)
-    assert manifest.chunk_count == 333
-    assert manifest.corpus_fingerprint == "b9526128dad23e71e812fbd8f26452b8d6efa29e4faac898fa11f279b310e827"
 
 
 def test_overlay_doc08_uses_logical_source_path(overlay_build) -> None:
@@ -175,14 +166,14 @@ def test_overlay_corpus_fingerprint_deterministic(overlay_build) -> None:
 
 
 @requires_local_artifacts(
-    PRODUCTION_INDEX / "manifest.json",
+    HISTORICAL_ARCHIVE_INDEX / "manifest.json",
     CANDIDATE_INDEX / "manifest.json",
-    why="manifests of the production index and the locally built doc08 experiment index",
+    why="manifests of the historical 15-document index and the locally built doc08 experiment index",
 )
-def test_candidate_index_separate_from_production() -> None:
-    prod = load_manifest(PRODUCTION_INDEX)
+def test_candidate_index_separate_from_the_historical_archive() -> None:
+    archive = load_manifest(HISTORICAL_ARCHIVE_INDEX)
     cand = load_manifest(CANDIDATE_INDEX)
-    assert cand.corpus_fingerprint != prod.corpus_fingerprint
+    assert cand.corpus_fingerprint != archive.corpus_fingerprint
     assert cand.corpus_fingerprint == (
         "d3c27f4a72e5f78582c6cc29b8cb6c9f26234f6582970ead602f44e5b375bad6"
     )

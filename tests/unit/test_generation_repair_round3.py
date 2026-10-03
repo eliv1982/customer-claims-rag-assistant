@@ -186,7 +186,7 @@ class TestDraftViolationDetection:
             "Приносим извинения за доставленные неудобства. "
             "Пожалуйста, сохраните упаковку и фото. "
             "Для проверки укажите номер заказа. "
-            "После проверки сообщим возможный вариант решения."
+            "Возможный вариант решения зависит от результатов проверки."
         )
         violations = detect_draft_violations(text)
         assert violations == []
@@ -197,7 +197,7 @@ class TestDraftViolationDetection:
             "Нам очень жаль слышать о вашем состоянии. "
             "Рекомендуем незамедлительно обратиться за медицинской помощью. "
             "Сохраните, пожалуйста, данные о заказе. "
-            "Мы приоритетно проверим обращение."
+            "Обращение требует приоритетной проверки."
         )
         violations = detect_draft_violations(text)
         assert violations == []
@@ -286,7 +286,7 @@ class TestMapResultBlocksContamination:
         clean_text = (
             "Благодарим за обращение. "
             "Для проверки статуса заказа №12345 нам потребуются дополнительные данные. [S1] "
-            "Статус оплаты и доставки будет проверен. "
+            "Статус оплаты и доставки требует проверки. "
             "Пожалуйста, укажите дату оформления заказа."
         )
         risk = _make_risk(RiskLevel.LOW)
@@ -321,7 +321,7 @@ class TestMapResultBlocksContamination:
         """A clean draft should pass through unchanged, draft_sanitized=False."""
         clean = (
             "Благодарим за обращение. Пожалуйста, сохраните упаковку и укажите номер заказа. "
-            "После проверки сообщим возможный вариант решения. [S1]"
+            "Возможный вариант решения зависит от результатов проверки. [S1]"
         )
         risk = _make_risk(RiskLevel.HIGH, [RiskReasonCode.PACKAGE_TAMPERING])
         result = _pipeline_result(
@@ -345,7 +345,7 @@ class TestCaseSpecificCategories:
         """M01: 'не был доставлен' doesn't trigger risk rules — keyword fallback fires."""
         risk = _make_risk(RiskLevel.LOW)  # No rule match → LOW
         result = _pipeline_result(
-            _grounded_result("Мы проверим ваш заказ. [S1]"),
+            _grounded_result("Ваш заказ требует проверки. [S1]"),
             risk,
             "grounded_answer",
             customer_query="Я оплатил заказ №12345, но он не был доставлен. Что делать?",
@@ -357,7 +357,7 @@ class TestCaseSpecificCategories:
         """M02: 'не хватало' doesn't trigger risk rule — keyword fallback fires."""
         risk = _make_risk(RiskLevel.LOW)
         result = _pipeline_result(
-            _grounded_result("Проверим состав заказа. [S1]"),
+            _grounded_result("Состав заказа требует проверки. [S1]"),
             risk,
             "grounded_answer",
             customer_query="В моем заказе не хватало двух позиций — суши и напитка.",

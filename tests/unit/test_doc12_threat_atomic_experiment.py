@@ -26,7 +26,6 @@ from customer_claims_rag.ingestion.corpus_overlay import (
     logical_source_path,
     verify_doc08_overlay_unchanged,
 )
-from tests.local_artifacts import requires_local_artifacts
 
 ROOT = project_root()
 DOC08_OVERLAY = ROOT / "experiments/corpus/doc08_atomic_risk_units_v1/08_escalation_and_risk_rules.md"
@@ -38,7 +37,6 @@ HOLDOUT_Q = ROOT / "tests/holdout/doc12_threat_holdout_v1_questions.md"
 HOLDOUT_E = ROOT / "tests/holdout/doc12_threat_holdout_v1_expected.md"
 BASELINE_INDEX = ROOT / "data/04_index_experiments/doc08_atomic_risk_units_v1"
 CANDIDATE_INDEX = ROOT / "data/04_index_experiments/doc12_threat_atomic_units_v1"
-PRODUCTION_INDEX = ROOT / "data/04_index"
 
 FORBIDDEN_OVERLAY_STRINGS = [
     "FF-EXT07",
@@ -49,12 +47,12 @@ FORBIDDEN_OVERLAY_STRINGS = [
 
 
 @pytest.fixture(scope="module")
-def multi_overlay_build(corpus_sandbox: Path):
+def multi_overlay_build(historical_corpus_sandbox: Path):
     result = build_doc12_experimental_corpora(
-        canonical_dir=corpus_sandbox / CANONICAL.relative_to(ROOT),
-        doc08_overlay_path=corpus_sandbox / DOC08_OVERLAY.relative_to(ROOT),
-        doc12_overlay_path=corpus_sandbox / DOC12_OVERLAY.relative_to(ROOT),
-        permitted_root=corpus_sandbox,
+        canonical_dir=historical_corpus_sandbox / CANONICAL.relative_to(ROOT),
+        doc08_overlay_path=historical_corpus_sandbox / DOC08_OVERLAY.relative_to(ROOT),
+        doc12_overlay_path=historical_corpus_sandbox / DOC12_OVERLAY.relative_to(ROOT),
+        permitted_root=historical_corpus_sandbox,
     )
     yield result
     cleanup_overlay_temp_dir(result.temp_input_dir)
@@ -142,16 +140,16 @@ def test_no_extension_exact_strings_in_overlay() -> None:
         assert forbidden not in text
 
 
-def test_overlay_fingerprint_stable_across_temp_roots(corpus_sandbox: Path) -> None:
-    temp_a = corpus_sandbox / ".tmp" / "corpus_overlay" / "_doc12_repro_test_a"
-    temp_b = corpus_sandbox / ".tmp" / "corpus_overlay" / "_doc12_repro_test_b"
+def test_overlay_fingerprint_stable_across_temp_roots(historical_corpus_sandbox: Path) -> None:
+    temp_a = historical_corpus_sandbox / ".tmp" / "corpus_overlay" / "_doc12_repro_test_a"
+    temp_b = historical_corpus_sandbox / ".tmp" / "corpus_overlay" / "_doc12_repro_test_b"
     temp_a.mkdir(parents=True, exist_ok=True)
     temp_b.mkdir(parents=True, exist_ok=True)
     sources = dict(
-        canonical_dir=corpus_sandbox / CANONICAL.relative_to(ROOT),
-        doc08_overlay_path=corpus_sandbox / DOC08_OVERLAY.relative_to(ROOT),
-        doc12_overlay_path=corpus_sandbox / DOC12_OVERLAY.relative_to(ROOT),
-        permitted_root=corpus_sandbox,
+        canonical_dir=historical_corpus_sandbox / CANONICAL.relative_to(ROOT),
+        doc08_overlay_path=historical_corpus_sandbox / DOC08_OVERLAY.relative_to(ROOT),
+        doc12_overlay_path=historical_corpus_sandbox / DOC12_OVERLAY.relative_to(ROOT),
+        permitted_root=historical_corpus_sandbox,
     )
     first = build_doc12_experimental_corpora(**sources, staging_parent=temp_a)
     second = build_doc12_experimental_corpora(**sources, staging_parent=temp_b)
@@ -184,18 +182,6 @@ def test_non_doc12_chunks_byte_identical_to_baseline(multi_overlay_build) -> Non
         if c.document_id != DOC12_DOCUMENT_ID
     }
     assert baseline_non == candidate_non
-
-
-@requires_local_artifacts(
-    PRODUCTION_INDEX / "manifest.json",
-    why="manifest of the provisioned production index (built with live OpenAI embeddings)",
-)
-def test_production_index_unchanged() -> None:
-    from customer_claims_rag.retrieval.manifest import load_manifest
-
-    manifest = load_manifest(PRODUCTION_INDEX)
-    assert manifest.corpus_fingerprint == "b9526128dad23e71e812fbd8f26452b8d6efa29e4faac898fa11f279b310e827"
-    assert manifest.chunk_count == 333
 
 
 def test_config_schema() -> None:

@@ -58,8 +58,9 @@ def load_manifest(index_dir: Path) -> IndexManifest:
     path = manifest_path(index_dir)
     if not path.is_file():
         raise IndexManifestError(
-            f"index manifest not found at {path}; run index rebuild with "
-            f"`python -m customer_claims_rag.cli.build_index --rebuild`"
+            f"index manifest not found at {path}; the index was never built or is incomplete "
+            "(build it with `build-index --rebuild`; the production index with "
+            "`build-index --corpus-manifest <manifest> --rebuild`)"
         )
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))

@@ -9,8 +9,13 @@ from pathlib import Path
 import pytest
 
 from customer_claims_rag.config import EXPECTED_FAQ_COUNT
+from customer_claims_rag.ingestion.canonical_corpus import (
+    DEFAULT_CORPUS_MANIFEST_RELATIVE,
+    load_canonical_corpus_manifest,
+)
 from customer_claims_rag.ingestion.corpus_builder import CorpusBuilder
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ARCHIVE_MARKERS = ("УСТАРЕЛО", "АРХИВ", "УДАЛИТЬ")
 FAQ_PREAMBLE_PHRASE = "не заменяет профильные политики FoodFlow"
 FORBIDDEN_TRAILING_PHRASE = "не должны попадать в retrieval как самостоятельные инструкции"
@@ -78,8 +83,10 @@ def test_release_corpus_chunk_counts_under_real_cl100k(
         for document_id, count in per_document.items()
         if document_id[:2] in {f"{i:02d}" for i in range(1, 11)}
     )
-    assert baseline_total == 215
-    assert len(chunks) == 333
+    # The ten production documents are pinned by the canonical manifest, not by a number repeated here.
+    manifest = load_canonical_corpus_manifest(PROJECT_ROOT / DEFAULT_CORPUS_MANIFEST_RELATIVE)
+    assert baseline_total == manifest.expected.chunk_count
+    assert len(chunks) == manifest.expected.chunk_count + 20 + 23 + 22 + 25 + 28
 
 
 def test_faq_produces_45_chunks(builder: CorpusBuilder, clean_input: Path) -> None:
@@ -103,7 +110,11 @@ def test_forbidden_trailing_in_all_row_chunks(builder: CorpusBuilder, clean_inpu
         c for c in chunks
         if c.document_id == "09_response_style_and_templates" and "::forbidden-" in c.chunk_id
     ]
-    assert len(forbidden) == 11
+    # One atomic chunk per row of the forbidden-wording table of the templates document.
+    table = (clean_input / "09_response_style_and_templates.md").read_text(encoding="utf-8")
+    rows = [line for line in table.splitlines() if line.startswith("| **НЕДОПУСТИМО:**")]
+    assert len(rows) == 12
+    assert len(forbidden) == len(rows)
     assert all(FORBIDDEN_TRAILING_PHRASE in c.content for c in forbidden)
 
 

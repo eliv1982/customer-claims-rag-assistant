@@ -1,0 +1,118 @@
+{
+  "schema_version": "1.0.0",
+  "snapshot_id": "historical-pre-2d2-15doc-v1",
+  "description": "Frozen copy of the 15 cleaned Markdown documents exactly as they were when the retrieval experiments (stages 2C-4C) ran and when release posture foodflow-10doc-release-v1 was activated. data/02_clean_markdown has since moved on (customer-output policy corrections in stage 2D2), so the tracked experiment artifacts can no longer be reproduced from the live corpus; they are reproduced from this snapshot instead. HISTORICAL EVIDENCE ONLY: not the production corpus (see configs/corpus/foodflow_production_v1.json) and never to be edited.",
+  "source_commit": "211b80897047e7c746c5db5b419ecd4eedfcc2e1",
+  "tokenizer_encoding": "cl100k_base",
+  "documents": [
+    {
+      "file": "01_service_overview.md",
+      "sha256": "f81fa800cc3b29fb04af259b46f296ac005f12cad8af1438c39a8121d6990244"
+    },
+    {
+      "file": "02_delivery_rules.md",
+      "sha256": "afd88203a13565939fa5fec896d50cc04824aab578b93313e6e602ef072768e5"
+    },
+    {
+      "file": "03_order_changes_and_cancellations.md",
+      "sha256": "7712b849179ad140ed598f399c2f796d86d1696c17727bd0546ca10675d7f0c4"
+    },
+    {
+      "file": "04_refund_policy.md",
+      "sha256": "09a853a0581e75efc72b8b6e8655e76c8d47de919e20e63bc81df9c9330edc65"
+    },
+    {
+      "file": "05_compensation_policy.md",
+      "sha256": "078c2dc8c7e04013b21d3ecadfb2fd51c8bc8f36a551ddf7f25d61d4b38d09b3"
+    },
+    {
+      "file": "06_food_quality_and_packaging.md",
+      "sha256": "6574a18ab45bd2b06d4cabdcff2a4e1f5b01a2a8a7e1ea2595a1a5ae7b208885"
+    },
+    {
+      "file": "07_complaint_handling_procedure.md",
+      "sha256": "a4fca3204d0ebd1374405cb5314ddf9034665e9299e4c9d212e980bdb49416ad"
+    },
+    {
+      "file": "08_escalation_and_risk_rules.md",
+      "sha256": "f5e03e68278f1680a8b8b8e54f51794a8ef9fac9dbbbb1e1410b8fcfd78fa0ae"
+    },
+    {
+      "file": "09_response_style_and_templates.md",
+      "sha256": "92c63356388cd8a490c7fe4f318b969773d652d371988386d556bdb9944c3c65"
+    },
+    {
+      "file": "10_customer_faq.md",
+      "sha256": "9b0e27c05b6bcacb3a8b868dd32cb16960af480868006b53f80d64f3e8636327"
+    },
+    {
+      "file": "11_payment_security_and_dispute_handling.md",
+      "sha256": "b0d5b5af643520f8b23fef7112d477a4640dc714d33f951d5b4ed0d58e5e0b97"
+    },
+    {
+      "file": "12_staff_safety_and_threat_handling.md",
+      "sha256": "54a12a20fb52b13fc1c54c923fb2daeff45bf2519b5c7831bcb6b11706da06c3"
+    },
+    {
+      "file": "13_physical_hazard_and_foreign_body_protocol.md",
+      "sha256": "d768c2f59f92dadfd5bc42119734dbc13136494ec0bbc8a291357b082773be50"
+    },
+    {
+      "file": "14_evidence_standards_and_incomplete_information.md",
+      "sha256": "807fb9a6d7f4cfa7f98f8cdcf7163164259a9b8e245b47f7b063b8ad64c16a14"
+    },
+    {
+      "file": "15_conflicting_rules_and_remedy_priority.md",
+      "sha256": "92337a1487a118745072f113e625c9ce113568f27f3ce73cb6f22f443277ad56"
+    }
+  ],
+  "identities": {
+    "release_10doc_v1": {
+      "document_ids": [
+        "01_service_overview",
+        "02_delivery_rules",
+        "03_order_changes_and_cancellations",
+        "04_refund_policy",
+        "05_compensation_policy",
+        "06_food_quality_and_packaging",
+        "07_complaint_handling_procedure",
+        "08_escalation_and_risk_rules",
+        "09_response_style_and_templates",
+        "10_customer_faq"
+      ],
+      "chunk_count": 215,
+      "chunk_payload_digest": "650faf82f7ba1c8fae80e27a6ead9bb7d917ac8120da49e688df8c708ec18fe6",
+      "embedding_model": "text-embedding-3-small",
+      "corpus_fingerprint": "bf3df0d4631f29f322760b50735382039f67d3ee7c6860b25b1ce221312074f3"
+    },
+    "expanded_15doc": {
+      "document_ids": [
+        "01_service_overview",
+        "02_delivery_rules",
+        "03_order_changes_and_cancellations",
+        "04_refund_policy",
+        "05_compensation_policy",
+        "06_food_quality_and_packaging",
+        "07_complaint_handling_procedure",
+        "08_escalation_and_risk_rules",
+        "09_response_style_and_templates",
+        "10_customer_faq",
+        "11_payment_security_and_dispute_handling",
+        "12_staff_safety_and_threat_handling",
+        "13_physical_hazard_and_foreign_body_protocol",
+        "14_evidence_standards_and_incomplete_information",
+        "15_conflicting_rules_and_remedy_priority"
+      ],
+      "chunk_count": 333,
+      "chunk_payload_digest": "33124468501ba7fce0cc16141d65f9d7dca464152c7e32d48d4ef1c5d7cd2770",
+      "embedding_model": "text-embedding-3-small",
+      "corpus_fingerprint": "b9526128dad23e71e812fbd8f26452b8d6efa29e4faac898fa11f279b310e827"
+    }
+  },
+  "evidence": [
+    "data/05_evaluation/expanded_corpus_frozen_regression_v1.json",
+    "data/05_evaluation/doc08_atomic_risk_units_v1.json",
+    "data/05_evaluation/doc12_threat_atomic_units_v1.json",
+    "tests/09_expanded_corpus_frozen_regression_results.md"
+  ]
+}
