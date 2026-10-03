@@ -16,6 +16,7 @@ from customer_claims_rag.generation.prompt_builder import PromptBuilder
 from customer_claims_rag.generation.risk_integration_models import RiskAwareGenerationOutcome
 from customer_claims_rag.risk import assess_deterministic_risk, handoff_flags_for_level
 from customer_claims_rag.risk.models import RiskAssessmentRequest, RiskLevel
+from customer_claims_rag.application.customer_output import OUTCOME_NOTICES, RISK_LEVEL_LABELS
 from customer_claims_rag.ui.display import (
     INPUT_ERROR_MESSAGE,
     LOADING_MESSAGE,
@@ -24,8 +25,6 @@ from customer_claims_rag.ui.display import (
     STARTUP_ERROR_MESSAGE,
     STARTUP_INDEX_ERROR_MESSAGE,
     UNEXPECTED_ERROR_MESSAGE,
-    _OUTCOME_NOTICES,
-    _RISK_LABELS,
     generation_outcome_notice,
     startup_error_view,
     startup_error_view_for_exception,
@@ -147,11 +146,11 @@ def test_retrieval_empty_fallback_customer_text_is_russian() -> None:
 
 
 def test_risk_escalation_and_source_labels_are_russian() -> None:
-    for label in _RISK_LABELS.values():
+    for label in RISK_LEVEL_LABELS.values():
         assert _contains_cyrillic(label)
     assert _contains_cyrillic(HIGH_HANDOFF_NOTICE)
     assert _contains_cyrillic(CRITICAL_HANDOFF_NOTICE)
-    for outcome, notice in _OUTCOME_NOTICES.items():
+    for outcome, notice in OUTCOME_NOTICES.items():
         if notice is not None:
             assert _contains_cyrillic(notice), outcome
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from customer_claims_rag.risk.assessment_status import RiskAssessmentStatus
 from customer_claims_rag.risk.reason_codes import RiskReasonCode
 
 if TYPE_CHECKING:
@@ -36,6 +37,13 @@ def apply_risk_floor(
     return max_risk_level(deterministic_floor, proposed_level)
 
 
+def default_assessment_status(explicit_match: bool) -> RiskAssessmentStatus:
+    """Status implied by ``explicit_match`` when none is stated explicitly."""
+    if explicit_match:
+        return RiskAssessmentStatus.RULE_MATCH
+    return RiskAssessmentStatus.NO_SIGNAL
+
+
 def build_risk_explanation(
     *,
     risk_floor: RiskLevel,
@@ -44,12 +52,17 @@ def build_risk_explanation(
     signal_count: int,
     handoff_required: bool,
     priority_handoff: bool,
+    assessment_status: RiskAssessmentStatus | None = None,
 ) -> str:
-    """Build a stable machine-readable explanation string."""
+    """Build a stable machine-readable explanation string.
+
+    The status suffix is emitted only for ``UNSUPPORTED_LANGUAGE``; the other statuses are
+    already implied by ``explicit_match`` and keep their historical canonical form.
+    """
     codes_part = (
         ",".join(code.value for code in reason_codes) if reason_codes else "none"
     )
-    return (
+    explanation = (
         f"risk_floor={risk_floor.value};"
         f"explicit_match={'true' if explicit_match else 'false'};"
         f"reason_codes={codes_part};"
@@ -57,6 +70,9 @@ def build_risk_explanation(
         f"handoff_required={'true' if handoff_required else 'false'};"
         f"priority_handoff={'true' if priority_handoff else 'false'}"
     )
+    if assessment_status is RiskAssessmentStatus.UNSUPPORTED_LANGUAGE:
+        explanation += f";assessment_status={assessment_status.value}"
+    return explanation
 
 
 def order_reason_codes(
@@ -112,11 +128,15 @@ def collect_result_invariant_errors(
     reason_codes: tuple[RiskReasonCode, ...],
     risk_signals: tuple[RiskSignal, ...],
     explanation: str,
+    assessment_status: RiskAssessmentStatus | None = None,
 ) -> list[str]:
     """Return human-readable invariant violations; empty list means valid."""
     from customer_claims_rag.risk.models import RiskLevel, max_risk_level
 
     errors: list[str] = []
+
+    if assessment_status is None:
+        assessment_status = default_assessment_status(explicit_match)
 
     if len(reason_codes) != len(set(reason_codes)):
         errors.append("reason_codes must not contain duplicates")
@@ -125,22 +145,36 @@ def collect_result_invariant_errors(
     if len(signal_keys) != len(set(signal_keys)):
         errors.append("risk_signals must not contain duplicate (reason_code, level, rule_id)")
 
+    if explicit_match and assessment_status is not RiskAssessmentStatus.RULE_MATCH:
+        errors.append("explicit match requires assessment_status=rule_match")
+    if not explicit_match and assessment_status is RiskAssessmentStatus.RULE_MATCH:
+        errors.append("assessment_status=rule_match requires an explicit match")
+
     if not explicit_match:
+        unsupported = assessment_status is RiskAssessmentStatus.UNSUPPORTED_LANGUAGE
         if risk_floor is not RiskLevel.LOW:
             errors.append("no explicit match requires risk_floor=low")
         if reason_codes:
             errors.append("no explicit match requires empty reason_codes")
         if risk_signals:
             errors.append("no explicit match requires empty risk_signals")
-        if handoff_required or priority_handoff:
+        if unsupported:
+            # Not classified, but unassessable input must be reviewed by a person.
+            if not handoff_required or priority_handoff:
+                errors.append(
+                    "unsupported_language requires handoff_required=true "
+                    "and priority_handoff=false",
+                )
+        elif handoff_required or priority_handoff:
             errors.append("no explicit match requires no handoff flags")
         expected_explanation = build_risk_explanation(
             risk_floor=RiskLevel.LOW,
             explicit_match=False,
             reason_codes=(),
             signal_count=0,
-            handoff_required=False,
+            handoff_required=unsupported,
             priority_handoff=False,
+            assessment_status=assessment_status,
         )
         if explanation != expected_explanation:
             errors.append("explanation must match canonical deterministic value")

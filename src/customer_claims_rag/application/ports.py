@@ -9,6 +9,7 @@ from customer_claims_rag.generation.risk_integration_models import (
     RiskAwareGroundedGenerationResult,
 )
 from customer_claims_rag.retrieval.models import SearchResult
+from customer_claims_rag.risk.models import DeterministicRiskResult
 
 
 class RetrievalPort(Protocol):
@@ -20,10 +21,15 @@ class RetrievalPort(Protocol):
 
 
 class RiskAwareGenerationPort(Protocol):
-    """Risk-aware grounded generation contract at the application boundary."""
+    """Risk-aware grounded generation contract at the application boundary.
+
+    The pipeline computes the deterministic risk assessment once per request, before
+    retrieval, and hands that single authoritative result to the generator.
+    """
 
     def generate(
         self,
         request: GroundedGenerationRequest,
+        risk_assessment: DeterministicRiskResult,
     ) -> RiskAwareGroundedGenerationResult:
         ...

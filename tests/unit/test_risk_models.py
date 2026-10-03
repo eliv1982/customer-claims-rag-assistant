@@ -451,3 +451,167 @@ def test_direct_construction_rejects_non_canonical_risk_signals_order() -> None:
             risk_signals=(official, tampering),
             explanation=canonical.explanation,
         )
+
+
+# ---------------------------------------------------------------------------
+# Stage 2B: input bound and explicit assessment status
+# ---------------------------------------------------------------------------
+
+from customer_claims_rag.generation.handoff import (  # noqa: E402
+    UNSUPPORTED_LANGUAGE_HANDOFF_NOTICE,
+    build_handoff_notice,
+)
+from customer_claims_rag.risk.assessment_status import RiskAssessmentStatus  # noqa: E402
+from customer_claims_rag.risk.validator import build_unsupported_language_result  # noqa: E402
+
+
+def test_risk_request_accepts_exactly_4000_characters() -> None:
+    request = RiskAssessmentRequest(customer_query="а" * 4000)
+    assert len(request.customer_query) == 4000
+
+
+def test_risk_request_rejects_4001_characters() -> None:
+    with pytest.raises(ValidationError, match="4000"):
+        RiskAssessmentRequest(customer_query="а" * 4001)
+
+
+def test_oversized_request_never_reaches_any_safety_rule(monkeypatch: pytest.MonkeyPatch) -> None:
+    from customer_claims_rag.risk import rules
+
+    def _must_not_run(_: str) -> str:
+        raise AssertionError("safety rules ran on an oversized request")
+
+    monkeypatch.setattr(rules, "normalize_for_matching", _must_not_run)
+
+    with pytest.raises(ValidationError):
+        rules.assess_deterministic_risk(RiskAssessmentRequest(customer_query="а" * 4001))
+
+
+def test_status_defaults_follow_explicit_match_for_historical_constructors() -> None:
+    no_signal = build_deterministic_risk_result([])
+    matched = build_deterministic_risk_result(
+        [_signal(RiskReasonCode.MISSING_ITEM, RiskLevel.MEDIUM, "missing_item")],
+    )
+    assert no_signal.assessment_status is RiskAssessmentStatus.NO_SIGNAL
+    assert matched.assessment_status is RiskAssessmentStatus.RULE_MATCH
+
+    rebuilt = DeterministicRiskResult(
+        risk_floor=matched.risk_floor,
+        explicit_match=matched.explicit_match,
+        handoff_required=matched.handoff_required,
+        priority_handoff=matched.priority_handoff,
+        reason_codes=matched.reason_codes,
+        risk_signals=matched.risk_signals,
+        explanation=matched.explanation,
+    )
+    assert rebuilt.assessment_status is RiskAssessmentStatus.RULE_MATCH
+
+
+def test_no_signal_is_not_an_affirmative_low_conclusion() -> None:
+    """A LOW floor without a rule match is the absence of a signal, not a LOW verdict."""
+    no_signal = build_deterministic_risk_result([])
+    assert no_signal.risk_floor is RiskLevel.LOW
+    assert no_signal.explicit_match is False
+    assert no_signal.assessment_status is RiskAssessmentStatus.NO_SIGNAL
+    assert no_signal.risk_signals == ()
+    assert no_signal.reason_codes == ()
+
+
+def test_affirmative_low_rule_match_is_distinguishable_from_no_signal() -> None:
+    low_signal = _signal(RiskReasonCode.MISSING_ITEM, RiskLevel.LOW, "hypothetical_low_rule")
+    matched_low = build_deterministic_risk_result([low_signal])
+    no_signal = build_deterministic_risk_result([])
+
+    assert matched_low.risk_floor is RiskLevel.LOW
+    assert no_signal.risk_floor is RiskLevel.LOW
+    assert matched_low.explicit_match is True
+    assert matched_low.assessment_status is RiskAssessmentStatus.RULE_MATCH
+    assert no_signal.assessment_status is RiskAssessmentStatus.NO_SIGNAL
+    assert matched_low != no_signal
+
+
+def test_no_signal_explanation_keeps_its_historical_canonical_form() -> None:
+    assert build_deterministic_risk_result([]).explanation == (
+        "risk_floor=low;explicit_match=false;reason_codes=none;"
+        "signal_count=0;handoff_required=false;priority_handoff=false"
+    )
+
+
+def test_unsupported_language_result_is_unclassified_but_requires_manual_review() -> None:
+    result = build_unsupported_language_result()
+
+    assert result.assessment_status is RiskAssessmentStatus.UNSUPPORTED_LANGUAGE
+    assert result.explicit_match is False
+    assert result.risk_signals == ()
+    assert result.reason_codes == ()
+    assert result.handoff_required is True
+    assert result.priority_handoff is False
+    assert result.explanation.endswith(";assessment_status=unsupported_language")
+    assert build_handoff_notice(result) == UNSUPPORTED_LANGUAGE_HANDOFF_NOTICE
+
+
+def test_unsupported_language_result_json_round_trip() -> None:
+    result = build_unsupported_language_result()
+    restored = DeterministicRiskResult.model_validate(result.model_dump(mode="json"))
+    assert restored == result
+    assert restored.assessment_status is RiskAssessmentStatus.UNSUPPORTED_LANGUAGE
+
+
+def test_status_must_agree_with_explicit_match() -> None:
+    matched = build_deterministic_risk_result(
+        [_signal(RiskReasonCode.MISSING_ITEM, RiskLevel.MEDIUM, "missing_item")],
+    )
+    with pytest.raises(RiskValidationError, match="rule_match"):
+        DeterministicRiskResult(
+            risk_floor=matched.risk_floor,
+            explicit_match=True,
+            handoff_required=matched.handoff_required,
+            priority_handoff=matched.priority_handoff,
+            reason_codes=matched.reason_codes,
+            risk_signals=matched.risk_signals,
+            explanation=matched.explanation,
+            assessment_status=RiskAssessmentStatus.NO_SIGNAL,
+        )
+    with pytest.raises(RiskValidationError, match="explicit match"):
+        DeterministicRiskResult(
+            risk_floor=RiskLevel.LOW,
+            explicit_match=False,
+            handoff_required=False,
+            priority_handoff=False,
+            explanation=build_deterministic_risk_result([]).explanation,
+            assessment_status=RiskAssessmentStatus.RULE_MATCH,
+        )
+
+
+def test_unsupported_language_requires_handoff_without_priority() -> None:
+    template = build_unsupported_language_result()
+    with pytest.raises(RiskValidationError, match="handoff_required=true"):
+        DeterministicRiskResult(
+            risk_floor=RiskLevel.LOW,
+            explicit_match=False,
+            handoff_required=False,
+            priority_handoff=False,
+            explanation=template.explanation,
+            assessment_status=RiskAssessmentStatus.UNSUPPORTED_LANGUAGE,
+        )
+    with pytest.raises(RiskValidationError, match="priority_handoff=false"):
+        DeterministicRiskResult(
+            risk_floor=RiskLevel.LOW,
+            explicit_match=False,
+            handoff_required=True,
+            priority_handoff=True,
+            explanation=template.explanation,
+            assessment_status=RiskAssessmentStatus.UNSUPPORTED_LANGUAGE,
+        )
+
+
+def test_no_signal_still_forbids_handoff_flags() -> None:
+    with pytest.raises(RiskValidationError, match="no handoff flags"):
+        DeterministicRiskResult(
+            risk_floor=RiskLevel.LOW,
+            explicit_match=False,
+            handoff_required=True,
+            priority_handoff=False,
+            explanation=build_deterministic_risk_result([]).explanation,
+            assessment_status=RiskAssessmentStatus.NO_SIGNAL,
+        )

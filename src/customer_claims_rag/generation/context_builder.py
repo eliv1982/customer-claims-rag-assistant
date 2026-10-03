@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from pydantic import ValidationError
+
 from customer_claims_rag.exceptions import GenerationValidationError
 from customer_claims_rag.generation.models import ContextItem, ContextPackage
 from customer_claims_rag.retrieval.models import SearchResult
@@ -19,8 +21,8 @@ def build_context_package(results: Sequence[SearchResult]) -> ContextPackage:
 
     items: list[ContextItem] = []
     for index, result in enumerate(ordered, start=1):
-        items.append(
-            ContextItem(
+        try:
+            item = ContextItem(
                 citation_key=f"S{index}",
                 rank=result.rank,
                 document_id=result.document_id,
@@ -29,8 +31,20 @@ def build_context_package(results: Sequence[SearchResult]) -> ContextPackage:
                 source_path=result.source_path,
                 content=result.content,
             )
-        )
+        except ValidationError as exc:
+            message = _invalid_context_item_message(result.rank, exc)
+            raise GenerationValidationError(message) from exc
+        items.append(item)
     return ContextPackage(items=items)
+
+
+def _invalid_context_item_message(rank: int, exc: ValidationError) -> str:
+    """Name the offending fields only; the retrieved text is never copied into the message."""
+    problems = "; ".join(
+        f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+        for error in exc.errors(include_input=False, include_url=False, include_context=False)
+    )
+    return f"invalid context item at rank {rank}: {problems}"
 
 
 def _validate_unique_ranks_and_chunk_ids(results: Sequence[SearchResult]) -> None:

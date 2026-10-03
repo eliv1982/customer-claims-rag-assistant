@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape as html_escape
+
 from pydantic import ValidationError
 
 import streamlit as st
@@ -9,9 +11,13 @@ import streamlit as st
 from customer_claims_rag.exceptions import GenerationError, RetrievalError
 from customer_claims_rag.ui.diagnostics_resource import load_validated_release_diagnostics
 from customer_claims_rag.ui.display import (
+    FAILURE_SOURCE_LABELS,
     LOADING_MESSAGE,
+    PROVENANCE_LABELS,
     ClaimErrorView,
     ClaimSuccessView,
+    DisplayCitation,
+    escape_markdown_text,
     process_claim,
     startup_error_view_for_exception,
 )
@@ -23,8 +29,10 @@ from customer_claims_rag.ui.release_identity import (
 
 # ---------------------------------------------------------------------------
 # CSS visual polish
-# No orphan HTML wrapper divs — all content styled via CSS selectors or
-# via inline single-element st.markdown("<div>TEXT</div>") calls.
+# No orphan HTML wrapper divs — all content styled via CSS selectors.
+# Untrusted text (customer draft, model text, retrieved headings) never goes through an
+# unsafe_allow_html call: it is escaped with escape_markdown_text and rendered by native
+# Streamlit elements. unsafe_allow_html is reserved for static markup (CSS, dividers, badges).
 # ---------------------------------------------------------------------------
 
 _PAGE_CSS = """
@@ -62,46 +70,14 @@ _PAGE_CSS = """
     font-size: 0.97rem;
 }
 
-/* ── Customer draft card ─────────────────────────────────────────── */
-.draft-card {
-    background: #edf6ee;
-    border: 1px solid #aed4b1;
-    border-left: 4px solid #3a8f42;
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-bottom: 12px;
-    font-size: 1rem;
-    line-height: 1.7;
-    color: #1a3a1d;
-}
-.draft-card-warning {
-    background: #fdf6e3;
-    border: 1px solid #e8cf8a;
-    border-left: 4px solid #c4920a;
-    border-radius: 8px;
-    padding: 16px 20px;
-    margin-bottom: 12px;
-    font-size: 1rem;
-    line-height: 1.7;
-    color: #4a3800;
-}
-.draft-card-oos {
-    background: #eef0fa;
-    border: 1px solid #9fa8da;
-    border-left: 4px solid #5c6bc0;
-    border-radius: 8px;
-    padding: 14px 20px;
-    margin-bottom: 12px;
-    font-size: 1rem;
-    color: #263578;
-}
-
 /* ── Risk badge ──────────────────────────────────────────────────── */
 .risk-badge-neutral  { background:#388e3c; color:#fff; padding:3px 12px; border-radius:4px;
                        font-size:0.82rem; font-weight:600; display:inline-block; }
 .risk-badge-warning  { background:#c0690a; color:#fff; padding:3px 12px; border-radius:4px;
                        font-size:0.82rem; font-weight:600; display:inline-block; }
 .risk-badge-critical { background:#b71c1c; color:#fff; padding:3px 12px; border-radius:4px;
+                       font-size:0.82rem; font-weight:600; display:inline-block; }
+.risk-badge-undetermined { background:#546e7a; color:#fff; padding:3px 12px; border-radius:4px;
                        font-size:0.82rem; font-weight:600; display:inline-block; }
 
 /* ── Section labels ──────────────────────────────────────────────── */
@@ -140,9 +116,54 @@ def _render_release_identity_expander(*, service_ready: bool) -> None:
             st.caption(line)
 
 
+_BADGE_TONES = frozenset({"neutral", "warning", "critical", "undetermined"})
+
+
 def _risk_badge(label: str, tone: str) -> str:
-    css_class = f"risk-badge-{tone}"
-    return f'<span class="{css_class}">{label}</span>'
+    css_class = f"risk-badge-{tone if tone in _BADGE_TONES else 'undetermined'}"
+    return f'<span class="{css_class}">{html_escape(label)}</span>'
+
+
+def _render_draft(view: ClaimSuccessView) -> None:
+    text = escape_markdown_text(view.customer_draft)
+    if view.provenance == "out_of_scope":
+        st.info(text)
+    elif view.provenance == "llm_draft":
+        st.success(text)
+    else:
+        # A deterministic template or fallback, not the model's own answer.
+        st.warning(text)
+
+
+def _render_source(source: DisplayCitation) -> None:
+    st.markdown(f"**{escape_markdown_text(source.key)}** — {escape_markdown_text(source.heading)}")
+    st.caption(f"Документ: {escape_markdown_text(source.document_id)}")
+
+
+def _render_sources(view: ClaimSuccessView) -> None:
+    if view.citations:
+        # Only an accepted model draft has sources that support the text.
+        with st.expander("Основания и источники", expanded=False):
+            st.caption("Фрагменты базы знаний, на которые опирается ответ.")
+            for citation in view.citations:
+                _render_source(citation)
+    elif view.retrieved_materials:
+        with st.expander("Найденные материалы (не подтверждают ответ)", expanded=False):
+            st.caption(
+                "Материалы найдены поиском. Текст ответа на них не опирался — "
+                "используйте для ручной проверки."
+            )
+            for material in view.retrieved_materials:
+                _render_source(material)
+    else:
+        with st.expander("Основания и источники", expanded=False):
+            if view.provenance == "llm_draft":
+                st.caption("Источники не указаны.")
+            else:
+                st.caption(
+                    "Источники не указаны. Ответ подготовлен по проверенному шаблону, "
+                    "а не по материалам базы знаний."
+                )
 
 
 def _render_success(view: ClaimSuccessView) -> None:
@@ -151,32 +172,7 @@ def _render_success(view: ClaimSuccessView) -> None:
     # ── Card 1: Customer draft ─────────────────────────────────────
     st.markdown('<p class="section-label">Черновик ответа клиенту</p>', unsafe_allow_html=True)
     st.caption("Проверьте и при необходимости отредактируйте перед отправкой.")
-
-    outcome = view.generation_outcome
-
-    if outcome == "out_of_scope":
-        st.markdown(
-            f'<div class="draft-card-oos">{view.customer_draft}</div>',
-            unsafe_allow_html=True,
-        )
-    elif view.draft_sanitized:
-        st.markdown(
-            f'<div class="draft-card-warning">{view.customer_draft}</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        draft_text = view.customer_draft or ""
-        if draft_text:
-            st.markdown(
-                f'<div class="draft-card">{draft_text}</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                '<div class="draft-card-warning">Текст ответа не был подготовлен. '
-                "Обращение требует ручной проверки.</div>",
-                unsafe_allow_html=True,
-            )
+    _render_draft(view)
 
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
@@ -189,14 +185,19 @@ def _render_success(view: ClaimSuccessView) -> None:
         col_risk, col_route = st.columns([1, 2])
 
         with col_risk:
-            st.markdown("**Уровень риска**")
+            st.markdown("**Оценка риска**")
             st.markdown(_risk_badge(view.risk_label, view.risk_tone), unsafe_allow_html=True)
+            if view.risk_note:
+                st.caption(view.risk_note)
             esc_text = "Да" if view.requires_escalation else "Нет"
             st.caption(f"Требуется эскалация: **{esc_text}**")
 
         with col_route:
             st.markdown("**Рекомендуемый маршрут обработки**")
             st.markdown(view.routing_recommendation)
+
+    if view.failure_source and view.outcome_notice:
+        st.warning(f"⚠️ {view.outcome_notice}")
 
     if view.handoff_notice:
         if view.priority_handoff:
@@ -212,43 +213,19 @@ def _render_success(view: ClaimSuccessView) -> None:
     st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
 
     # ── Card 3: Sources / retrieved materials ──────────────────────
-    if outcome not in {"out_of_scope"}:
-        if view.citations:
-            with st.expander("Основания и источники", expanded=False):
-                st.caption("Фрагменты базы знаний, на которые опирается ответ.")
-                for citation in view.citations:
-                    st.markdown(
-                        f"**{citation.key}** — {citation.heading}  \n"
-                        f"<span style='color:#78909c;font-size:0.85rem;'>"
-                        f"Документ: {citation.document_id}</span>",
-                        unsafe_allow_html=True,
-                    )
-        elif view.retrieved_materials:
-            with st.expander("Найденные материалы для проверки", expanded=False):
-                st.caption(
-                    "Материалы найдены retrieval. Ответ на них не опирался — "
-                    "используйте для ручной проверки."
-                )
-                for mat in view.retrieved_materials:
-                    st.markdown(
-                        f"**{mat.key}** — {mat.heading}  \n"
-                        f"<span style='color:#78909c;font-size:0.85rem;'>"
-                        f"Документ: {mat.document_id}</span>",
-                        unsafe_allow_html=True,
-                    )
-        else:
-            with st.expander("Основания и источники", expanded=False):
-                st.caption("Источники не указаны.")
+    if view.provenance != "out_of_scope":
+        _render_sources(view)
 
     # ── Technical section (always collapsed) ──────────────────────
     with st.expander("Техническая информация", expanded=False):
         st.caption(f"Режим ответа: {view.response_mode}")
         st.caption(f"Исход генерации: {view.generation_outcome}")
-        if view.draft_sanitized:
-            if outcome == "generation_error_fallback":
-                st.caption("Подтверждённый ответ не был получен. Используется проверенный шаблон.")
-            else:
-                st.caption("Используется проверенный шаблон ответа для данной категории.")
+        st.caption(f"Статус оценки риска: {view.assessment_status.value}")
+        st.caption(f"Происхождение текста: {PROVENANCE_LABELS[view.provenance]}")
+        if view.failure_source:
+            st.caption(f"Источник сбоя: {FAILURE_SOURCE_LABELS[view.failure_source]}")
+        if view.policy_violations:
+            st.caption("Нарушения проверки текста: " + ", ".join(view.policy_violations))
         if view.outcome_notice:
             st.caption(view.outcome_notice)
         _render_release_identity_expander(service_ready=True)

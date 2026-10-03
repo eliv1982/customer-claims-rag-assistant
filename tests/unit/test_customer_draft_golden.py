@@ -25,11 +25,11 @@ from customer_claims_rag.generation.risk_integration_models import (
 from customer_claims_rag.risk.models import DeterministicRiskResult, RiskLevel, RiskSignal
 from customer_claims_rag.risk.reason_codes import RiskReasonCode
 from customer_claims_rag.risk.validator import build_deterministic_risk_result
-from customer_claims_rag.ui.display import (
-    _CATEGORY_DRAFT_TEMPLATES,
-    _HARD_TEMPLATE_CATEGORIES,
-    map_result_to_display,
+from customer_claims_rag.application.customer_templates import (
+    CATEGORY_DRAFT_TEMPLATES,
+    HARD_TEMPLATE_CATEGORIES,
 )
+from customer_claims_rag.ui.display import map_result_to_display
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +125,7 @@ class TestM01NonDelivery:
 
     def test_m01_ic_uses_nondelivery_template(self) -> None:
         view = self._view()
-        expected = _CATEGORY_DRAFT_TEMPLATES["Недоставка оплаченного заказа"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Недоставка оплаченного заказа"]
         assert view.customer_draft == expected
 
     def test_m01_has_regret(self) -> None:
@@ -204,7 +204,7 @@ class TestM02IncompleteOrder:
 
     def test_m02_ic_uses_missing_item_template(self) -> None:
         view = self._view()
-        expected = _CATEGORY_DRAFT_TEMPLATES["Неполный заказ (недокомплект)"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Неполный заказ (недокомплект)"]
         assert view.customer_draft == expected
 
     def test_m02_has_regret(self) -> None:
@@ -253,7 +253,7 @@ class TestM03PackageTampering:
 
     def test_m03_ic_uses_package_tampering_template(self) -> None:
         view = self._view()
-        expected = _CATEGORY_DRAFT_TEMPLATES["Нарушение целостности упаковки"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Нарушение целостности упаковки"]
         assert view.customer_draft == expected
 
     def test_m03_says_do_not_consume(self) -> None:
@@ -309,19 +309,19 @@ class TestM04HealthHarm:
     def test_m04_always_uses_health_template_for_grounded(self) -> None:
         """Health harm category always uses the safe template even for grounded_answer."""
         view = self._view("grounded_answer")
-        expected = _CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
         assert view.customer_draft == expected
 
     def test_m04_always_uses_health_template_for_ic(self) -> None:
         view = self._view("insufficient_context")
-        expected = _CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
         assert view.customer_draft == expected
 
     def test_m04_always_uses_health_template_for_error(self) -> None:
         """Even generation_error_fallback must give the health template for M04."""
         risk = _make_risk(RiskLevel.CRITICAL, [RiskReasonCode.HEALTH_SYMPTOMS_AFTER_CONSUMPTION])
         view = map_result_to_display(_result(_error(), risk, "generation_error_fallback"))
-        expected = _CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
         assert view.customer_draft == expected
 
     def test_m04_has_regret(self) -> None:
@@ -359,7 +359,7 @@ class TestM04HealthHarm:
         assert "ассистент" not in lower
 
     def test_m04_health_harm_category_is_hard_template(self) -> None:
-        assert "Жалоба на здоровье после употребления продукта" in _HARD_TEMPLATE_CATEGORIES
+        assert "Жалоба на здоровье после употребления продукта" in HARD_TEMPLATE_CATEGORIES
 
 
 # ---------------------------------------------------------------------------
@@ -380,7 +380,7 @@ class TestM05RefundDemand:
 
     def test_m05_ic_uses_refund_template(self) -> None:
         view = self._view()
-        expected = _CATEGORY_DRAFT_TEMPLATES["Требование возврата средств"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Требование возврата средств"]
         assert view.customer_draft == expected
 
     def test_m05_checks_orders_history(self) -> None:

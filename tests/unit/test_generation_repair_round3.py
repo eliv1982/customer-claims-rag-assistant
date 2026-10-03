@@ -28,13 +28,13 @@ from customer_claims_rag.risk.models import (
 )
 from customer_claims_rag.risk.reason_codes import RiskReasonCode
 from customer_claims_rag.risk.validator import build_deterministic_risk_result
-from customer_claims_rag.ui.display import (
-    _OOS_STAFF_ACTIONS,
-    _STAFF_ACTIONS_BY_CATEGORY,
-    detect_draft_violations,
-    map_result_to_display,
-    sanitize_customer_draft,
+from customer_claims_rag.application.claim_guidance import (
+    OOS_STAFF_ACTIONS,
+    STAFF_ACTIONS_BY_CATEGORY,
 )
+from customer_claims_rag.application.customer_templates import sanitize_customer_draft
+from customer_claims_rag.application.customer_text_policy import detect_draft_violations
+from customer_claims_rag.ui.display import map_result_to_display
 
 
 # ---------------------------------------------------------------------------
@@ -454,7 +454,7 @@ class TestOOSStaffActions:
         risk = _make_risk(RiskLevel.LOW)
         result = _pipeline_result(_oos_result(), risk, "out_of_scope")
         view = map_result_to_display(result)
-        assert view.staff_actions == _OOS_STAFF_ACTIONS
+        assert view.staff_actions == OOS_STAFF_ACTIONS
 
     def test_oos_staff_actions_mention_prepared_response(self) -> None:
         """OOS staff should be told to use a prepared/templated response."""

@@ -60,9 +60,17 @@ class RiskAwareGroundedGenerator:
     def generate(
         self,
         request: GroundedGenerationRequest,
+        risk_assessment: DeterministicRiskResult | None = None,
     ) -> RiskAwareGroundedGenerationResult:
-        risk_request = RiskAssessmentRequest(customer_query=request.customer_query)
-        risk_assessment = self._risk_assessor(risk_request)
+        """Generate a grounded answer and attach the deterministic risk assessment.
+
+        The application pipeline assesses risk once per request, before retrieval, and passes
+        that result in; it is used as is and never recomputed. Only a standalone caller that
+        passes no assessment gets one computed here from the request text.
+        """
+        if risk_assessment is None:
+            risk_request = RiskAssessmentRequest(customer_query=request.customer_query)
+            risk_assessment = self._risk_assessor(risk_request)
 
         try:
             generation = self._grounded_generator.generate(request)

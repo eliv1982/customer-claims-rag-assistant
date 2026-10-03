@@ -6,6 +6,7 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
+from customer_claims_rag.application.customer_output import NO_SIGNAL_RISK_LABEL
 from customer_claims_rag.application.models import CustomerClaimsRequest, CustomerClaimsResult
 from customer_claims_rag.cli import answer_claim
 from customer_claims_rag.exceptions import EmbeddingError, IndexManifestError
@@ -152,10 +153,16 @@ def test_format_answer_payload_maps_contract_fields() -> None:
     )
     payload = answer_claim.format_answer_payload(result)
     assert payload == {
-        "answer": "Ответ по правилам [S1].",
+        # The customer-safe text the UI shows: citation markers stripped, provenance explicit.
+        "answer": "Ответ по правилам.",
+        "answer_provenance": "llm_draft",
         "response_mode": "grounded_answer",
         "generation_outcome": "grounded_answer",
-        "risk_level": "high",
+        "failure_source": None,
+        "assessment_status": "rule_match",
+        "risk_floor": "high",
+        "risk_label": "Высокий",
+        "risk_note": None,
         "handoff_required": True,
         "priority_handoff": False,
         "handoff_notice": HIGH_HANDOFF_NOTICE,
@@ -166,7 +173,10 @@ def test_format_answer_payload_maps_contract_fields() -> None:
                 "document_id": "06_food_quality_and_packaging",
             },
         ],
+        "retrieved_materials": [],
     }
+    # The ambiguous legacy field is gone: a consumer can no longer read "low" for no-signal input.
+    assert "risk_level" not in payload
 
 
 def test_run_answer_success_grounded_with_citations(
@@ -223,7 +233,9 @@ def test_run_answer_high_risk_includes_handoff(wired_run_answer, capsys) -> None
     )
     assert code == 0
     assert payload is not None
-    assert payload["risk_level"] == "high"
+    assert payload["risk_floor"] == "high"
+    assert payload["assessment_status"] == "rule_match"
+    assert payload["risk_label"] == "Высокий"
     assert payload["handoff_required"] is True
     assert payload["priority_handoff"] is False
     assert payload["handoff_notice"] == HIGH_HANDOFF_NOTICE
@@ -241,23 +253,28 @@ def test_run_answer_critical_priority_handoff(wired_run_answer, capsys) -> None:
     )
     assert code == 0
     assert payload is not None
-    assert payload["risk_level"] == "critical"
+    assert payload["risk_floor"] == "critical"
+    assert payload["assessment_status"] == "rule_match"
+    assert payload["risk_label"] == "Критический"
     assert payload["handoff_required"] is True
     assert payload["priority_handoff"] is True
     assert payload["handoff_notice"] == CRITICAL_HANDOFF_NOTICE
 
 
 @pytest.mark.parametrize(
-    ("risk_assessment", "expected_level"),
+    ("risk_assessment", "expected_floor", "expected_status", "expected_label"),
     [
-        (_low_risk(), "low"),
-        (_medium_risk(), "medium"),
+        # No rule matched: the LOW floor is a neutral bound and must not read as "low risk".
+        (_low_risk(), "low", "no_signal", NO_SIGNAL_RISK_LABEL),
+        (_medium_risk(), "medium", "rule_match", "Средний"),
     ],
 )
 def test_run_answer_low_and_medium_without_handoff_notice(
     wired_run_answer,
     risk_assessment,
-    expected_level,
+    expected_floor,
+    expected_status,
+    expected_label,
     capsys,
 ) -> None:
     result = _pipeline_result(
@@ -271,7 +288,9 @@ def test_run_answer_low_and_medium_without_handoff_notice(
     )
     assert code == 0
     assert payload is not None
-    assert payload["risk_level"] == expected_level
+    assert payload["risk_floor"] == expected_floor
+    assert payload["assessment_status"] == expected_status
+    assert payload["risk_label"] == expected_label
     assert payload["handoff_notice"] is None
     assert payload["handoff_required"] is False
     assert payload["priority_handoff"] is False
@@ -462,3 +481,40 @@ def test_serialize_answer_payload_is_deterministic() -> None:
     assert first == second
     parsed = json.loads(first)
     assert list(parsed.keys()) == sorted(parsed.keys())
+
+
+# ---------------------------------------------------------------------------
+# Stage 2B / H5: the CLI gets the same input bound as every other caller
+# ---------------------------------------------------------------------------
+
+
+def test_run_answer_oversized_message_returns_exit_code_2(capsys) -> None:
+    factory_called = []
+
+    def factory(_settings: object) -> MagicMock:
+        factory_called.append(True)
+        return MagicMock()
+
+    code, payload = answer_claim.run_answer(
+        message="а" * 4001,
+        settings_loader=_mock_settings,
+        pipeline_factory=factory,
+    )
+    captured = capsys.readouterr()
+    assert code == 2
+    assert payload is None
+    assert captured.out == ""
+    assert "must not exceed 4000 characters" in captured.err
+    assert "empty or whitespace-only" not in captured.err
+    assert factory_called == []
+
+
+def test_run_answer_accepts_exactly_4000_characters(wired_run_answer, capsys) -> None:
+    result = _pipeline_result(
+        risk_assessment=_high_risk(),
+        generation=_grounded_generation(),
+        generation_outcome="grounded_answer",
+    )
+    code, payload, *_ = wired_run_answer(message="а" * 4000, result=result)
+    assert code == 0
+    assert payload is not None

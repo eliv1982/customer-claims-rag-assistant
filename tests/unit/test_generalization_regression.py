@@ -29,13 +29,13 @@ from customer_claims_rag.risk.reason_codes import RiskReasonCode
 from customer_claims_rag.risk.rules import assess_deterministic_risk, normalize_for_matching
 from customer_claims_rag.risk.models import RiskAssessmentRequest
 from customer_claims_rag.risk.validator import build_deterministic_risk_result
-from customer_claims_rag.ui.display import (
-    _CATEGORY_DRAFT_TEMPLATES,
-    _GENERIC_RISK_DRAFTS,
-    _HARD_TEMPLATE_CATEGORIES,
-    detect_draft_violations,
-    map_result_to_display,
+from customer_claims_rag.application.customer_templates import (
+    CATEGORY_DRAFT_TEMPLATES,
+    GENERIC_RISK_DRAFTS,
+    HARD_TEMPLATE_CATEGORIES,
 )
+from customer_claims_rag.application.customer_text_policy import detect_draft_violations
+from customer_claims_rag.ui.display import map_result_to_display
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ class TestRiskClassificationHealth:
                     query="Отравился после заказа")
         )
         _no_forbidden(view.customer_draft)
-        expected = _CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
         assert view.customer_draft == expected
 
     def test_mne_plokho_multi_sentence_is_critical(self) -> None:
@@ -211,7 +211,7 @@ class TestRiskClassificationHealth:
         assert risk.risk_floor == RiskLevel.CRITICAL
 
     def test_template_has_general_symptoms_not_specific(self) -> None:
-        template = _CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
+        template = CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
         lower = template.lower()
         assert "тошнот" not in lower, "Demo-specific symptom 'тошнота'"
         assert "рвот" not in lower, "Demo-specific symptom 'рвота'"
@@ -230,7 +230,7 @@ class TestRiskClassificationHealth:
         view = map_result_to_display(
             _result(_ic(), risk, "insufficient_context", query=query)
         )
-        expected = _CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
         assert view.customer_draft == expected, (
             f"Health query did not get safe template: {query!r}"
         )
@@ -247,7 +247,7 @@ class TestRiskClassificationHealth:
         view = map_result_to_display(
             _result(_grounded(clean), risk, "grounded_answer", query=query)
         )
-        expected = _CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
         assert view.customer_draft == expected
 
 
@@ -278,7 +278,7 @@ class TestRiskClassificationMissingItem:
                     query="В заказе не хватало одной позиции")
         )
         _no_forbidden(view.customer_draft)
-        expected = _CATEGORY_DRAFT_TEMPLATES["Неполный заказ (недокомплект)"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Неполный заказ (недокомплект)"]
         assert view.customer_draft == expected
 
     def test_single_item_missing_uses_template(self) -> None:
@@ -287,7 +287,7 @@ class TestRiskClassificationMissingItem:
             _result(_ic(), risk, "insufficient_context",
                     query="В заказе не было одного блюда")
         )
-        expected = _CATEGORY_DRAFT_TEMPLATES["Неполный заказ (недокомплект)"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Неполный заказ (недокомплект)"]
         assert view.customer_draft == expected
 
     def test_multiple_items_missing_same_template(self) -> None:
@@ -309,7 +309,7 @@ class TestRiskClassificationMissingItem:
 class TestRiskClassificationRefund:
     """Refund demand: different order counts must not leak demo-specific '5 заказов'."""
 
-    EXPECTED_TEMPLATE = _CATEGORY_DRAFT_TEMPLATES["Требование возврата средств"]
+    EXPECTED_TEMPLATE = CATEGORY_DRAFT_TEMPLATES["Требование возврата средств"]
 
     def _ic_view(self, query: str) -> object:
         risk = _make_risk(RiskLevel.MEDIUM, [RiskReasonCode.REFUND_REQUEST])
@@ -388,7 +388,7 @@ class TestPackagingVariants:
                     query="Контейнер был открыт")
         )
         _no_forbidden(view.customer_draft)
-        expected = _CATEGORY_DRAFT_TEMPLATES["Нарушение целостности упаковки"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Нарушение целостности упаковки"]
         assert view.customer_draft == expected
 
     def test_packaging_ic_uses_template(self) -> None:
@@ -396,7 +396,7 @@ class TestPackagingVariants:
         view = map_result_to_display(
             _result(_ic(), risk, "insufficient_context")
         )
-        assert view.customer_draft == _CATEGORY_DRAFT_TEMPLATES["Нарушение целостности упаковки"]
+        assert view.customer_draft == CATEGORY_DRAFT_TEMPLATES["Нарушение целостности упаковки"]
 
     def test_packaging_template_says_do_not_consume(self) -> None:
         risk = _make_risk(RiskLevel.HIGH, [RiskReasonCode.PACKAGE_TAMPERING])
@@ -412,8 +412,8 @@ class TestPackagingVariants:
             _result(_ic(), risk, "insufficient_context")
         )
         assert view.claim_category == "Испорченный или некачественный продукт"
-        assert "Испорченный или некачественный продукт" in _CATEGORY_DRAFT_TEMPLATES
-        assert view.customer_draft == _CATEGORY_DRAFT_TEMPLATES["Испорченный или некачественный продукт"]
+        assert "Испорченный или некачественный продукт" in CATEGORY_DRAFT_TEMPLATES
+        assert view.customer_draft == CATEGORY_DRAFT_TEMPLATES["Испорченный или некачественный продукт"]
 
     def test_food_spoilage_not_mixed_with_health(self) -> None:
         """Spoiled product without consumption / health symptoms stays at HIGH, not CRITICAL."""
@@ -458,13 +458,13 @@ class TestPrimaryAndFallbackPaths:
     def test_non_delivery_ic_uses_template(self) -> None:
         risk = _make_risk(RiskLevel.HIGH, [RiskReasonCode.NON_DELIVERY])
         view = map_result_to_display(_result(_ic(), risk, "insufficient_context"))
-        assert view.customer_draft == _CATEGORY_DRAFT_TEMPLATES["Недоставка оплаченного заказа"]
+        assert view.customer_draft == CATEGORY_DRAFT_TEMPLATES["Недоставка оплаченного заказа"]
         assert view.draft_sanitized is True
 
     def test_non_delivery_error_uses_template(self) -> None:
         risk = _make_risk(RiskLevel.HIGH, [RiskReasonCode.NON_DELIVERY])
         view = map_result_to_display(_result(_error_gen(), risk, "generation_error_fallback"))
-        assert view.customer_draft == _CATEGORY_DRAFT_TEMPLATES["Недоставка оплаченного заказа"]
+        assert view.customer_draft == CATEGORY_DRAFT_TEMPLATES["Недоставка оплаченного заказа"]
         assert view.draft_sanitized is True
 
     def test_missing_item_grounded_clean_uses_llm(self) -> None:
@@ -478,7 +478,7 @@ class TestPrimaryAndFallbackPaths:
     def test_missing_item_ic_uses_template(self) -> None:
         risk = _make_risk(RiskLevel.MEDIUM, [RiskReasonCode.MISSING_ITEM])
         view = map_result_to_display(_result(_ic(), risk, "insufficient_context"))
-        assert view.customer_draft == _CATEGORY_DRAFT_TEMPLATES["Неполный заказ (недокомплект)"]
+        assert view.customer_draft == CATEGORY_DRAFT_TEMPLATES["Неполный заказ (недокомплект)"]
 
     def test_health_grounded_always_template(self) -> None:
         """HARD override: even clean grounded answer uses health template."""
@@ -487,12 +487,12 @@ class TestPrimaryAndFallbackPaths:
         view = map_result_to_display(
             _result(_grounded(clean), risk, "grounded_answer")
         )
-        assert view.customer_draft == _CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
+        assert view.customer_draft == CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
 
     def test_refund_ic_uses_template(self) -> None:
         risk = _make_risk(RiskLevel.MEDIUM, [RiskReasonCode.REFUND_REQUEST])
         view = map_result_to_display(_result(_ic(), risk, "insufficient_context"))
-        assert view.customer_draft == _CATEGORY_DRAFT_TEMPLATES["Требование возврата средств"]
+        assert view.customer_draft == CATEGORY_DRAFT_TEMPLATES["Требование возврата средств"]
 
     def test_refund_grounded_clean_uses_llm(self) -> None:
         """Valid grounded answer for refund demand must not be blindly replaced."""
@@ -505,7 +505,7 @@ class TestPrimaryAndFallbackPaths:
             _result(_grounded(clean), risk, "grounded_answer")
         )
         assert view.draft_sanitized is False
-        assert view.customer_draft != _CATEGORY_DRAFT_TEMPLATES["Требование возврата средств"]
+        assert view.customer_draft != CATEGORY_DRAFT_TEMPLATES["Требование возврата средств"]
 
 
 # ---------------------------------------------------------------------------
@@ -613,14 +613,14 @@ class TestOutOfScopeGeneralization:
 
 class TestTemplateIntegrityNoDemoFacts:
 
-    @pytest.mark.parametrize("category,template", list(_CATEGORY_DRAFT_TEMPLATES.items()))
+    @pytest.mark.parametrize("category,template", list(CATEGORY_DRAFT_TEMPLATES.items()))
     def test_no_order_number_in_template(self, category: str, template: str) -> None:
         import re
         assert not re.search(r"№\s*\d+|\bзаказ\s*#\d+|\b\d{4,}\b", template), (
             f"Template '{category}' contains a specific order number"
         )
 
-    @pytest.mark.parametrize("category,template", list(_CATEGORY_DRAFT_TEMPLATES.items()))
+    @pytest.mark.parametrize("category,template", list(CATEGORY_DRAFT_TEMPLATES.items()))
     def test_no_specific_count_in_template(self, category: str, template: str) -> None:
         lower = template.lower()
         assert "пяти заказов" not in lower, f"Demo count in '{category}'"
@@ -628,7 +628,7 @@ class TestTemplateIntegrityNoDemoFacts:
         assert "трёх заказов" not in lower
         assert "двух позиций" not in lower, f"Demo count in '{category}'"
 
-    @pytest.mark.parametrize("category,template", list(_CATEGORY_DRAFT_TEMPLATES.items()))
+    @pytest.mark.parametrize("category,template", list(CATEGORY_DRAFT_TEMPLATES.items()))
     def test_no_specific_product_name_in_template(self, category: str, template: str) -> None:
         lower = template.lower()
         assert "суши" not in lower
@@ -636,11 +636,11 @@ class TestTemplateIntegrityNoDemoFacts:
         assert "пицц" not in lower
 
     def test_health_template_no_specific_symptoms(self) -> None:
-        t = _CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"].lower()
+        t = CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"].lower()
         assert "тошнот" not in t, "Demo symptom тошнота"
         assert "рвот" not in t, "Demo symptom рвота"
 
-    @pytest.mark.parametrize("category,template", list(_CATEGORY_DRAFT_TEMPLATES.items()))
+    @pytest.mark.parametrize("category,template", list(CATEGORY_DRAFT_TEMPLATES.items()))
     def test_no_violations_detected_in_templates(self, category: str, template: str) -> None:
         """All deterministic templates must pass the safety validator themselves."""
         violations = detect_draft_violations(template)
@@ -648,7 +648,7 @@ class TestTemplateIntegrityNoDemoFacts:
             f"Template '{category}' failed validator: {violations}"
         )
 
-    @pytest.mark.parametrize("risk_level,draft", list(_GENERIC_RISK_DRAFTS.items()))
+    @pytest.mark.parametrize("risk_level,draft", list(GENERIC_RISK_DRAFTS.items()))
     def test_no_violations_in_generic_risk_drafts(self, risk_level: RiskLevel, draft: str) -> None:
         violations = detect_draft_violations(draft)
         assert not violations, (
@@ -663,7 +663,7 @@ class TestTemplateIntegrityNoDemoFacts:
         self, risk_level: RiskLevel,
     ) -> None:
         """LOW/MEDIUM generic fallbacks must ask for details, not promise review/follow-up."""
-        draft = _GENERIC_RISK_DRAFTS[risk_level]
+        draft = GENERIC_RISK_DRAFTS[risk_level]
         lower = draft.lower()
         assert any(phrase in lower for phrase in ("уточните", "укажите")), (
             f"Generic draft for {risk_level} must request clarification: {draft!r}"
@@ -747,7 +747,7 @@ class TestTenScenarioRiskMatrix:
         view = self._view("Отравился после заказа.")
         assert view.claim_category == "Жалоба на здоровье после употребления продукта"
         _no_forbidden(view.customer_draft)
-        expected = _CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Жалоба на здоровье после употребления продукта"]
         assert view.customer_draft == expected
 
     # Scenario 2: мне плохо + заказывал (multi-sentence)
@@ -785,7 +785,7 @@ class TestTenScenarioRiskMatrix:
         assert risk.handoff_required is False
         view = self._view("В заказе не хватало одной позиции.")
         assert view.claim_category == "Неполный заказ (недокомплект)"
-        expected = _CATEGORY_DRAFT_TEMPLATES["Неполный заказ (недокомплект)"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Неполный заказ (недокомплект)"]
         assert view.customer_draft == expected
         _no_forbidden(view.customer_draft)
 
@@ -806,7 +806,7 @@ class TestTenScenarioRiskMatrix:
         assert risk.handoff_required is True
         view = self._view("Контейнер был открыт.")
         assert view.claim_category == "Нарушение целостности упаковки"
-        expected = _CATEGORY_DRAFT_TEMPLATES["Нарушение целостности упаковки"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Нарушение целостности упаковки"]
         assert view.customer_draft == expected
         _no_forbidden(view.customer_draft)
 
@@ -827,7 +827,7 @@ class TestTenScenarioRiskMatrix:
         assert risk.handoff_required is False
         view = self._view("Привезли другое блюдо, не то что я заказывал.")
         assert view.claim_category == "Неверная позиция в заказе"
-        expected = _CATEGORY_DRAFT_TEMPLATES["Неверная позиция в заказе"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Неверная позиция в заказе"]
         assert view.customer_draft == expected
         _no_forbidden(view.customer_draft)
 
@@ -958,7 +958,7 @@ class TestConsistencyRepair:
         assert detect_draft_violations(bad), "'старший специалист' not detected"
 
     def test_category_templates_no_sotrudnik(self) -> None:
-        for cat, tpl in _CATEGORY_DRAFT_TEMPLATES.items():
+        for cat, tpl in CATEGORY_DRAFT_TEMPLATES.items():
             lower = tpl.lower()
             assert "сотрудник" not in lower, f"Template {cat!r} contains сотрудник"
             assert "старш" not in lower, f"Template {cat!r} contains старш"
@@ -970,7 +970,7 @@ class TestConsistencyRepair:
         view = map_result_to_display(
             _result(_ic(), risk, "insufficient_context", query="Отравился после заказа")
         )
-        expected = _CATEGORY_DRAFT_TEMPLATES[
+        expected = CATEGORY_DRAFT_TEMPLATES[
             "Жалоба на здоровье после употребления продукта"
         ]
         assert view.customer_draft == expected
@@ -981,6 +981,6 @@ class TestConsistencyRepair:
         view = map_result_to_display(
             _result(_ic(), risk, "insufficient_context", query="Верните деньги")
         )
-        expected = _CATEGORY_DRAFT_TEMPLATES["Требование возврата средств"]
+        expected = CATEGORY_DRAFT_TEMPLATES["Требование возврата средств"]
         assert view.customer_draft == expected
         _no_forbidden(view.customer_draft)

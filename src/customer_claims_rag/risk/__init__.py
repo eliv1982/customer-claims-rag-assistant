@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from customer_claims_rag.risk.assessment_status import RiskAssessmentStatus
 from customer_claims_rag.risk.invariants import apply_risk_floor, build_risk_explanation
 from customer_claims_rag.risk.models import (
   DeterministicRiskResult,
@@ -15,6 +16,7 @@ from customer_claims_rag.risk.reason_codes import RiskReasonCode
 from customer_claims_rag.risk.rules import assess_deterministic_risk, normalize_for_matching
 from customer_claims_rag.risk.validator import (
   build_deterministic_risk_result,
+  build_unsupported_language_result,
   handoff_flags_for_level,
   validate_deterministic_risk_result,
 )
@@ -22,6 +24,7 @@ from customer_claims_rag.risk.validator import (
 __all__ = [
   "DeterministicRiskResult",
   "RiskAssessmentRequest",
+  "RiskAssessmentStatus",
   "RiskLevel",
   "RiskReasonCode",
   "RiskSignal",
@@ -29,6 +32,7 @@ __all__ = [
   "assess_deterministic_risk",
   "build_deterministic_risk_result",
   "build_risk_explanation",
+  "build_unsupported_language_result",
   "handoff_flags_for_level",
   "max_risk_level",
   "normalize_for_matching",

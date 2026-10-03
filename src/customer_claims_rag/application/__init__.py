@@ -1,5 +1,6 @@
 """Application layer for end-to-end customer claims handling."""
 
+from customer_claims_rag.application.customer_output import CustomerOutput, build_customer_output
 from customer_claims_rag.application.frozen_retrieval import FrozenRetrievalService
 from customer_claims_rag.application.factory import build_customer_claims_pipeline
 from customer_claims_rag.application.models import CustomerClaimsRequest, CustomerClaimsResult
@@ -17,10 +18,12 @@ __all__ = [
     "CustomerClaimsPipeline",
     "CustomerClaimsRequest",
     "CustomerClaimsResult",
+    "CustomerOutput",
     "FrozenRetrievalConfig",
     "FrozenRetrievalService",
     "RetrievalPort",
     "RiskAwareGenerationPort",
     "build_customer_claims_pipeline",
+    "build_customer_output",
     "load_frozen_retrieval_config",
 ]

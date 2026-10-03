@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from customer_claims_rag.exceptions import RiskValidationError
+from customer_claims_rag.risk.assessment_status import RiskAssessmentStatus
 from customer_claims_rag.risk.invariants import (
     build_risk_explanation,
     collect_result_invariant_errors,
@@ -30,9 +31,37 @@ def validate_deterministic_risk_result(result: DeterministicRiskResult) -> None:
         reason_codes=result.reason_codes,
         risk_signals=result.risk_signals,
         explanation=result.explanation,
+        assessment_status=result.assessment_status,
     )
     if errors:
         raise RiskValidationError(errors[0])
+
+
+def build_unsupported_language_result() -> DeterministicRiskResult:
+    """Build the result for text the Russian deterministic rules cannot assess.
+
+    The case is deliberately not classified: ``risk_floor=low`` is only the neutral lower bound,
+    and the status plus ``handoff_required=True`` tell downstream code to route it to a person.
+    """
+    explanation = build_risk_explanation(
+        risk_floor=RiskLevel.LOW,
+        explicit_match=False,
+        reason_codes=(),
+        signal_count=0,
+        handoff_required=True,
+        priority_handoff=False,
+        assessment_status=RiskAssessmentStatus.UNSUPPORTED_LANGUAGE,
+    )
+    return DeterministicRiskResult(
+        risk_floor=RiskLevel.LOW,
+        explicit_match=False,
+        handoff_required=True,
+        priority_handoff=False,
+        reason_codes=(),
+        risk_signals=(),
+        explanation=explanation,
+        assessment_status=RiskAssessmentStatus.UNSUPPORTED_LANGUAGE,
+    )
 
 
 def build_deterministic_risk_result(
@@ -56,6 +85,7 @@ def build_deterministic_risk_result(
             reason_codes=(),
             risk_signals=(),
             explanation=explanation,
+            assessment_status=RiskAssessmentStatus.NO_SIGNAL,
         )
 
     seen: set[tuple[RiskReasonCode, RiskLevel, str]] = set()
@@ -95,6 +125,7 @@ def build_deterministic_risk_result(
         reason_codes=ordered_codes,
         risk_signals=ordered_signals,
         explanation=explanation,
+        assessment_status=RiskAssessmentStatus.RULE_MATCH,
     )
     validate_deterministic_risk_result(result)
     return result

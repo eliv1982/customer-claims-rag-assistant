@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from customer_claims_rag.application.customer_output import NO_SIGNAL_RISK_LABEL
 from customer_claims_rag.application.models import CustomerClaimsRequest, CustomerClaimsResult
 from customer_claims_rag.exceptions import IndexManifestError, ReleasePostureError
 from customer_claims_rag.generation.fallback import (
@@ -21,6 +22,7 @@ from customer_claims_rag.generation.models import Citation, GroundedGenerationRe
 from customer_claims_rag.generation.risk_integration_models import (
     RiskAwareGroundedGenerationResult,
 )
+from customer_claims_rag.risk.assessment_status import RiskAssessmentStatus
 from customer_claims_rag.risk.models import RiskAssessmentRequest
 from customer_claims_rag.risk import assess_deterministic_risk
 from customer_claims_rag.risk.models import RiskAssessmentRequest
@@ -161,7 +163,7 @@ def test_map_result_to_display_insufficient_context() -> None:
 
 def test_map_result_to_display_generation_error_fallback() -> None:
     from customer_claims_rag.generation.handoff import build_handoff_notice
-    from customer_claims_rag.ui.display import _GENERIC_RISK_DRAFTS
+    from customer_claims_rag.application.customer_templates import GENERIC_RISK_DRAFTS
 
     risk = _high_risk()
     response = RiskAwareGroundedGenerationResult(
@@ -186,7 +188,8 @@ def test_map_result_to_display_generation_error_fallback() -> None:
 @pytest.mark.parametrize(
     ("risk_assessment", "expected_label", "expected_tone"),
     [
-        (_low_risk(), "Низкий", "neutral"),
+        # No rule matched: the LOW floor is only a neutral bound, never an affirmative "Низкий".
+        (_low_risk(), NO_SIGNAL_RISK_LABEL, "undetermined"),
         (_medium_risk(), "Средний", "neutral"),
     ],
 )
@@ -213,7 +216,7 @@ def test_map_result_high_risk_with_handoff_notice() -> None:
         generation_outcome="grounded_answer",
     )
     view = map_result_to_display(result)
-    assert view.risk_level == "high"
+    assert view.risk_floor == "high"
     assert view.risk_tone == "warning"
     assert view.handoff_notice == HIGH_HANDOFF_NOTICE
     assert view.priority_handoff is False
@@ -226,7 +229,7 @@ def test_map_result_critical_priority_handoff() -> None:
         generation_outcome="grounded_answer",
     )
     view = map_result_to_display(result)
-    assert view.risk_level == "critical"
+    assert view.risk_floor == "critical"
     assert view.risk_tone == "critical"
     assert view.priority_handoff is True
     assert view.handoff_notice == CRITICAL_HANDOFF_NOTICE
@@ -432,8 +435,9 @@ def test_vague_order_query_requests_clarification() -> None:
     assert "возврат" not in draft.lower(), f"Draft must not promise refund: {draft!r}"
     assert "компенсац" not in draft.lower(), f"Draft must not promise compensation: {draft!r}"
 
-    # Service classification preserved: low risk, no escalation
-    assert view.risk_level == "low"
+    # Neutral floor preserved, but no rule matched: shown as undetermined, not as "low risk"
+    assert view.risk_floor == "low"
+    assert view.assessment_status is RiskAssessmentStatus.NO_SIGNAL
     assert view.requires_escalation is False
     assert view.priority_handoff is False
 
@@ -504,8 +508,9 @@ def test_vague_order_grounded_answer_with_generic_promise_replaced() -> None:
     assert "возврат" not in draft.lower(), f"Draft must not promise refund: {draft!r}"
     assert "компенсац" not in draft.lower(), f"Draft must not promise compensation: {draft!r}"
 
-    # Service classification preserved: low risk, no escalation, no handoff
-    assert view.risk_level == "low"
+    # Neutral floor preserved, but no rule matched: shown as undetermined, not as "low risk"
+    assert view.risk_floor == "low"
+    assert view.assessment_status is RiskAssessmentStatus.NO_SIGNAL
     assert view.requires_escalation is False
     assert view.priority_handoff is False
 
@@ -543,7 +548,8 @@ def test_delivery_address_grounded_answer_not_replaced() -> None:
     assert "изменить адрес" in view.customer_draft.lower()
     assert not _re.search(r"\[S\d+\]", view.customer_draft)
     assert "Мы проверим информацию" not in view.customer_draft
-    assert view.risk_level == "low"
+    assert view.risk_floor == "low"
+    assert view.assessment_status is RiskAssessmentStatus.NO_SIGNAL
     assert view.requires_escalation is False
 
 
@@ -553,7 +559,7 @@ def test_non_delivery_refund_request_uses_non_delivery_category() -> None:
 
     from customer_claims_rag.generation.handoff import build_handoff_notice
     from customer_claims_rag.risk.reason_codes import RiskReasonCode
-    from customer_claims_rag.ui.display import _CATEGORY_DRAFT_TEMPLATES
+    from customer_claims_rag.application.customer_templates import CATEGORY_DRAFT_TEMPLATES
 
     query = "Я оплатил заказ, но его не доставили. Прошу вернуть деньги."
     risk = assess_deterministic_risk(RiskAssessmentRequest(customer_query=query))
@@ -575,8 +581,8 @@ def test_non_delivery_refund_request_uses_non_delivery_category() -> None:
 
     assert isinstance(view, ClaimSuccessView)
     assert view.claim_category == "Недоставка оплаченного заказа"
-    assert view.customer_draft == _CATEGORY_DRAFT_TEMPLATES["Недоставка оплаченного заказа"]
-    assert view.risk_level == "high"
+    assert view.customer_draft == CATEGORY_DRAFT_TEMPLATES["Недоставка оплаченного заказа"]
+    assert view.risk_floor == "high"
     assert view.requires_escalation is True
     assert view.handoff_notice is not None
     assert view.draft_sanitized is True
@@ -586,3 +592,31 @@ def test_non_delivery_refund_request_uses_non_delivery_category() -> None:
     for forbidden in ("insufficient_context", "response_mode", "generation_outcome"):
         assert forbidden not in view.customer_draft.lower()
     assert view.citations == ()
+
+
+# ---------------------------------------------------------------------------
+# Stage 2B / H5: oversized input is rejected below the UI and reported clearly
+# ---------------------------------------------------------------------------
+
+
+def test_process_claim_oversized_message_returns_specific_input_error() -> None:
+    from customer_claims_rag.ui.display import INPUT_TOO_LONG_MESSAGE
+
+    pipeline = MagicMock()
+    view = process_claim(pipeline, "а" * 4001)
+    assert view == ClaimErrorView(INPUT_TOO_LONG_MESSAGE, "input")
+    assert "4000" in INPUT_TOO_LONG_MESSAGE
+    assert INPUT_TOO_LONG_MESSAGE != INPUT_ERROR_MESSAGE
+    pipeline.handle.assert_not_called()
+
+
+def test_process_claim_accepts_exactly_4000_characters() -> None:
+    result = _pipeline_result(
+        risk_assessment=_low_risk(),
+        generation=_grounded_generation(),
+        generation_outcome="grounded_answer",
+    )
+    pipeline = _mock_pipeline(result)
+    view = process_claim(pipeline, "а" * 4000)
+    assert isinstance(view, ClaimSuccessView)
+    pipeline.handle.assert_called_once()
