@@ -8,9 +8,11 @@ from pathlib import Path
 import pytest
 
 from customer_claims_rag.cli import build_index as cli_module
+from customer_claims_rag.ingestion.corpus_builder import CorpusBuilder
 from customer_claims_rag.retrieval.adapters.fake_embeddings import FakeEmbeddingProvider
 from customer_claims_rag.retrieval.adapters.chroma_store import ChromaVectorStore
 from customer_claims_rag.retrieval.manifest import load_manifest
+from customer_claims_rag.token_counter import TiktokenCounter
 
 
 def _fake_provider_factory(*, model_name: str, api_key: str | None = None):
@@ -21,23 +23,13 @@ def _fake_store_factory(*, index_dir: Path, collection_name: str):
     return ChromaVectorStore(index_dir=index_dir, collection_name=collection_name)
 
 
-BASELINE_CHUNK_COUNT = 215
-RELEASE_EXPANSION_DOC11_CHUNK_COUNT = 20
-RELEASE_EXPANSION_DOC12_CHUNK_COUNT = 23
-RELEASE_EXPANSION_DOC13_CHUNK_COUNT = 22
-RELEASE_EXPANSION_DOC14_CHUNK_COUNT = 25
-RELEASE_EXPANSION_DOC15_CHUNK_COUNT = 28
-EXPECTED_CORPUS_CHUNK_COUNT = (
-    BASELINE_CHUNK_COUNT
-    + RELEASE_EXPANSION_DOC11_CHUNK_COUNT
-    + RELEASE_EXPANSION_DOC12_CHUNK_COUNT
-    + RELEASE_EXPANSION_DOC13_CHUNK_COUNT
-    + RELEASE_EXPANSION_DOC14_CHUNK_COUNT
-    + RELEASE_EXPANSION_DOC15_CHUNK_COUNT
-)
-
-
 def test_cli_successful_build(temp_project: Path, monkeypatch, capsys) -> None:
+    # The count the CLI must report is whatever the corpus builder produces for this
+    # corpus; the absolute golden count under real cl100k lives in test_corpus_builder.
+    _, built_chunks = CorpusBuilder(
+        token_counter=TiktokenCounter(), permitted_root=temp_project.resolve()
+    ).build_from_directory(temp_project / "data" / "02_clean_markdown")
+    expected_chunk_count = len(built_chunks)
     monkeypatch.chdir(temp_project)
     code = cli_module.run_build(
         input_dir=temp_project / "data" / "02_clean_markdown",
@@ -53,9 +45,9 @@ def test_cli_successful_build(temp_project: Path, monkeypatch, capsys) -> None:
     captured = capsys.readouterr()
     assert code == 0
     assert "Status: success" in captured.out
-    assert f"Chunks: {EXPECTED_CORPUS_CHUNK_COUNT}" in captured.out
+    assert f"Chunks: {expected_chunk_count}" in captured.out
     manifest = load_manifest(temp_project / "data" / "04_index")
-    assert manifest.chunk_count == EXPECTED_CORPUS_CHUNK_COUNT
+    assert manifest.chunk_count == expected_chunk_count
 
 
 def test_cli_missing_rebuild_flag(temp_project: Path, monkeypatch, capsys) -> None:

@@ -19,24 +19,22 @@ from customer_claims_rag.evaluation.ab_rebuild import (
 )
 from customer_claims_rag.evaluation.ab_reporting import render_ab_markdown
 from customer_claims_rag.evaluation.models import EvaluationRun
+from tests.frozen_fixtures import FROZEN_RETRIEVAL_BASELINE as FROZEN_BASELINE
+from tests.frozen_fixtures import load_frozen_retrieval_baseline
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# Tracked artifact: a clone always has it, so a missing file is a failure, not a skip.
 FROZEN_AB = PROJECT_ROOT / "data" / "05_evaluation" / "reranking_ab_source_authority_v1.json"
-FROZEN_BASELINE = PROJECT_ROOT / "data" / "05_evaluation" / "retrieval_results.json"
 
 
 @pytest.fixture
 def frozen_ab_run() -> AbEvaluationRun:
-    if not FROZEN_AB.exists():
-        pytest.skip("frozen A/B artifact not available")
     return load_ab_artifact(FROZEN_AB)
 
 
 @pytest.fixture
 def frozen_baseline_run() -> EvaluationRun:
-    return EvaluationRun.model_validate(
-        json.loads(FROZEN_BASELINE.read_text(encoding="utf-8"))
-    )
+    return load_frozen_retrieval_baseline()
 
 
 def test_json_round_trip(frozen_ab_run: AbEvaluationRun) -> None:
@@ -80,8 +78,6 @@ def test_rebuild_does_not_call_retriever(
 
 
 def test_rebuild_cli_without_retrieval(tmp_path: Path) -> None:
-    if not FROZEN_AB.exists():
-        pytest.skip("frozen A/B artifact not available")
     output_json = tmp_path / "rebuilt.json"
     output_md = tmp_path / "report.md"
     blocked = MagicMock(side_effect=AssertionError("retrieval blocked"))
@@ -126,12 +122,9 @@ def test_candidate_order_unchanged_by_rebuild(
 
 def test_artifact_has_no_secrets_or_absolute_paths(
     frozen_ab_run: AbEvaluationRun,
-    tmp_path: Path,
+    frozen_baseline_run: EvaluationRun,
 ) -> None:
-    rebuilt = rebuild_ab_artifact(
-        frozen_ab_run,
-        EvaluationRun.model_validate(json.loads(FROZEN_BASELINE.read_text(encoding="utf-8"))),
-    )
+    rebuilt = rebuild_ab_artifact(frozen_ab_run, frozen_baseline_run)
     text = json.dumps(rebuilt.model_dump(mode="json"))
     assert "OPENAI" not in text
     assert "api_key" not in text.lower()

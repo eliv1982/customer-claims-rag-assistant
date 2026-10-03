@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -29,18 +30,35 @@ from customer_claims_rag.retrieval.lexical.bm25 import LexicalHit
 from customer_claims_rag.retrieval.lexical.corpus_loader import LexicalChunk
 from customer_claims_rag.retrieval.lexical.preprocessor import TOKENIZER_VERSION
 from customer_claims_rag.retrieval.manifest import load_manifest
+from tests.local_artifacts import requires_local_artifacts
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT = PROJECT_ROOT / "data" / "05_evaluation" / "hybrid_lexical_vector_v1.json"
-INDEX_DIR = PROJECT_ROOT / "data" / "04_index"
+POSTURE = PROJECT_ROOT / "configs" / "release" / "production_posture.json"
+# The frozen hybrid artifact was measured on the 10-document release index, which the
+# release posture names as its active target (data/04_index holds the 15-document archive).
+INDEX_DIR = PROJECT_ROOT / json.loads(POSTURE.read_text(encoding="utf-8"))["targets"]["active"]["index_path"]
+EXACT_POOLS_MISSING = "tracked hybrid artifact lacks exact lexical pools"
 
 
 @pytest.fixture
 def frozen_run() -> HybridEvaluationRun:
-    if not ARTIFACT.exists():
-        pytest.skip("frozen hybrid artifact not present")
+    # Tracked artifact: a missing or unreadable file is a failure, not a skip.
     return HybridEvaluationRun.model_validate(
         json.loads(ARTIFACT.read_text(encoding="utf-8"))
+    )
+
+
+def assert_local_index_matches_frozen_artifact(run: HybridEvaluationRun, manifest) -> None:
+    """A local index that exists but does not match the frozen artifact is stale state: fail."""
+    assert run.experiment.config_hash == FROZEN_HYBRID_CONFIG_HASH, (
+        f"tracked hybrid artifact config hash {run.experiment.config_hash} does not match "
+        f"FROZEN_HYBRID_CONFIG_HASH {FROZEN_HYBRID_CONFIG_HASH}"
+    )
+    assert manifest.corpus_fingerprint == run.lexical_index.corpus_fingerprint, (
+        f"stale local index: manifest corpus fingerprint {manifest.corpus_fingerprint} differs "
+        f"from the frozen hybrid artifact's {run.lexical_index.corpus_fingerprint}; "
+        "rebuild or restore the release index"
     )
 
 
@@ -238,18 +256,12 @@ def test_corpus_fingerprint_mismatch_rejects_replay(frozen_run: HybridEvaluation
             )
 
 
-@pytest.mark.skipif(not INDEX_DIR.exists(), reason="local Chroma index required")
+@requires_local_artifacts(
+    INDEX_DIR / "manifest.json",
+    why="local Chroma index (built with live OpenAI embeddings) matching the frozen hybrid artifact",
+)
 def test_run_exact_lexical_pool_reconstruction_live(frozen_run: HybridEvaluationRun) -> None:
-    if frozen_run.experiment.config_hash != FROZEN_HYBRID_CONFIG_HASH:
-        pytest.skip("artifact config hash mismatch")
-    if not INDEX_DIR.exists():
-        pytest.skip("local Chroma index required")
-    manifest = load_manifest(INDEX_DIR)
-    if manifest.corpus_fingerprint != frozen_run.lexical_index.corpus_fingerprint:
-        pytest.skip(
-            "exact replay requires the frozen hybrid artifact corpus fingerprint; "
-            "production index differs"
-        )
+    assert_local_index_matches_frozen_artifact(frozen_run, load_manifest(INDEX_DIR))
     updated, before, after = run_exact_lexical_pool_reconstruction(
         artifact_path=ARTIFACT,
         index_dir=INDEX_DIR,
@@ -259,9 +271,36 @@ def test_run_exact_lexical_pool_reconstruction_live(frozen_run: HybridEvaluation
     assert all(len(case.lexical_pool.candidates) <= 24 for case in updated.case_results)
 
 
+def test_stale_local_index_fails_instead_of_skipping(frozen_run: HybridEvaluationRun) -> None:
+    class Manifest:
+        corpus_fingerprint = "0" * 64
+
+    with pytest.raises(AssertionError, match="stale local index"):
+        assert_local_index_matches_frozen_artifact(frozen_run, Manifest())
+
+
+def test_stale_artifact_config_hash_fails_instead_of_skipping(
+    frozen_run: HybridEvaluationRun,
+) -> None:
+    class Manifest:
+        corpus_fingerprint = frozen_run.lexical_index.corpus_fingerprint
+
+    stale = frozen_run.model_copy(
+        update={"experiment": frozen_run.experiment.model_copy(update={"config_hash": "deadbeef"})}
+    )
+    with pytest.raises(AssertionError, match="config hash"):
+        assert_local_index_matches_frozen_artifact(stale, Manifest())
+
+
+def test_matching_local_index_is_accepted(frozen_run: HybridEvaluationRun) -> None:
+    class Manifest:
+        corpus_fingerprint = frozen_run.lexical_index.corpus_fingerprint
+
+    assert_local_index_matches_frozen_artifact(frozen_run, Manifest())
+
+
 def test_json_contains_exact_lexical_pools(frozen_run: HybridEvaluationRun) -> None:
-    if not _artifact_has_exact(frozen_run):
-        pytest.skip("exact lexical pools not yet reconstructed")
+    assert _artifact_has_exact(frozen_run), EXACT_POOLS_MISSING
     for case in frozen_run.case_results:
         assert case.lexical_pool is not None
         assert case.lexical_pool.exact
@@ -273,8 +312,7 @@ def test_diagnostics_rebuild_from_json_no_bm25(
     frozen_run: HybridEvaluationRun,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    if not _artifact_has_exact(frozen_run):
-        pytest.skip("exact lexical pools not yet reconstructed")
+    assert _artifact_has_exact(frozen_run), EXACT_POOLS_MISSING
 
     def _boom(*args, **kwargs):
         raise AssertionError("BM25 invoked during diagnostics rebuild")
@@ -291,8 +329,7 @@ def test_diagnostics_rebuild_from_json_no_bm25(
 def test_immutable_ranking_snapshot_unchanged_after_exact_apply(
     frozen_run: HybridEvaluationRun,
 ) -> None:
-    if not _artifact_has_exact(frozen_run):
-        pytest.skip("exact lexical pools not yet reconstructed")
+    assert _artifact_has_exact(frozen_run), EXACT_POOLS_MISSING
     before = extract_immutability_snapshot(frozen_run)
     rebuilt = rebuild_hybrid_diagnostics(frozen_run)
     after = extract_immutability_snapshot(rebuilt)
@@ -302,9 +339,9 @@ def test_immutable_ranking_snapshot_unchanged_after_exact_apply(
 def test_report_rebuild_from_json_no_bm25(
     frozen_run: HybridEvaluationRun,
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
-    if not _artifact_has_exact(frozen_run):
-        pytest.skip("exact lexical pools not yet reconstructed")
+    assert _artifact_has_exact(frozen_run), EXACT_POOLS_MISSING
 
     def _boom(*args, **kwargs):
         raise AssertionError("BM25 invoked during report rebuild")
@@ -313,17 +350,17 @@ def test_report_rebuild_from_json_no_bm25(
         "customer_claims_rag.retrieval.lexical.bm25.BM25Index.search",
         _boom,
     )
-    out_dir = PROJECT_ROOT / "tests" / "_pytest_hybrid_report_tmp.md"
-    try:
-        rebuild_report_from_artifact(
-            artifact_path=ARTIFACT,
-            output_markdown=out_dir,
-            project_root=PROJECT_ROOT,
-        )
-        text = out_dir.read_text(encoding="utf-8")
-        assert "Exact lexical top-24 pools were reconstructed once" in text
-    finally:
-        out_dir.unlink(missing_ok=True)
+    artifact = tmp_path / ARTIFACT.relative_to(PROJECT_ROOT)
+    artifact.parent.mkdir(parents=True)
+    shutil.copy2(ARTIFACT, artifact)
+    output_markdown = tmp_path / "hybrid_report.md"
+    rebuild_report_from_artifact(
+        artifact_path=artifact,
+        output_markdown=output_markdown,
+        project_root=tmp_path,
+    )
+    text = output_markdown.read_text(encoding="utf-8")
+    assert "Exact lexical top-24 pools were reconstructed once" in text
 
 
 def _artifact_has_exact(run: HybridEvaluationRun) -> bool:

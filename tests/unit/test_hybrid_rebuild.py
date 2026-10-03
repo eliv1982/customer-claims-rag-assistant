@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from unittest.mock import patch
 
@@ -34,13 +35,11 @@ def _artifact_has_exact(run: HybridEvaluationRun) -> bool:
 
 @pytest.fixture
 def frozen_run() -> HybridEvaluationRun:
-    if not ARTIFACT.exists():
-        pytest.skip("frozen hybrid artifact not present")
+    # Tracked artifact: a missing or incomplete file is a failure, not a skip.
     run = HybridEvaluationRun.model_validate(
         json.loads(ARTIFACT.read_text(encoding="utf-8"))
     )
-    if not _artifact_has_exact(run):
-        pytest.skip("exact lexical pools not yet reconstructed")
+    assert _artifact_has_exact(run), "tracked hybrid artifact lacks exact lexical pools"
     return run
 
 
@@ -103,27 +102,24 @@ def test_markdown_from_rebuilt_json(frozen_run: HybridEvaluationRun) -> None:
     assert "C:\\\\" not in markdown
 
 
-def test_rebuild_outputs_no_retrieval(frozen_run: HybridEvaluationRun) -> None:
-    out_dir = PROJECT_ROOT / "data" / "05_evaluation" / "_pytest_hybrid_rebuild_tmp"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    output_json = out_dir / "hybrid.json"
-    output_md = PROJECT_ROOT / "tests" / "_pytest_hybrid_rebuild_tmp.md"
-    try:
-        with patch(
-            "customer_claims_rag.evaluation.hybrid_reporting.rebuild_hybrid_diagnostics",
-            wraps=rebuild_hybrid_diagnostics,
-        ) as rebuild_mock:
-            rebuild_hybrid_outputs(
-                artifact_path=ARTIFACT,
-                output_json=output_json,
-                output_markdown=output_md,
-                project_root=PROJECT_ROOT,
-            )
-            rebuild_mock.assert_called_once()
-        restored = HybridEvaluationRun.model_validate(
-            json.loads(output_json.read_text(encoding="utf-8"))
+def test_rebuild_outputs_no_retrieval(frozen_run: HybridEvaluationRun, tmp_path: Path) -> None:
+    artifact = tmp_path / ARTIFACT.relative_to(PROJECT_ROOT)
+    artifact.parent.mkdir(parents=True)
+    shutil.copy2(ARTIFACT, artifact)
+    output_json = tmp_path / "hybrid.json"
+    output_md = tmp_path / "hybrid.md"
+    with patch(
+        "customer_claims_rag.evaluation.hybrid_reporting.rebuild_hybrid_diagnostics",
+        wraps=rebuild_hybrid_diagnostics,
+    ) as rebuild_mock:
+        rebuild_hybrid_outputs(
+            artifact_path=artifact,
+            output_json=output_json,
+            output_markdown=output_md,
+            project_root=tmp_path,
         )
-        assert restored.experiment.config_hash == frozen_run.experiment.config_hash
-    finally:
-        output_json.unlink(missing_ok=True)
-        output_md.unlink(missing_ok=True)
+        rebuild_mock.assert_called_once()
+    restored = HybridEvaluationRun.model_validate(
+        json.loads(output_json.read_text(encoding="utf-8"))
+    )
+    assert restored.experiment.config_hash == frozen_run.experiment.config_hash

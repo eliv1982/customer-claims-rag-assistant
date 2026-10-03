@@ -1,0 +1,27 @@
+{
+  "fixture": "frozen_retrieval_baseline_v1.json",
+  "purpose": "Static input for the automated A/B, pool-expansion, rebuild and reporting regression tests. It stands in for the gitignored maintainer artifact data/05_evaluation/retrieval_results.json so those tests run on a fresh clone. It is never produced by the code under test.",
+  "schema": "customer_claims_rag.evaluation.models.EvaluationRun",
+  "kind": "frozen retrieval-only baseline (60 cases, 10-document release corpus)",
+  "source_artifact": "data/05_evaluation/retrieval_results.json",
+  "generated_by": "evaluate-retrieval against a live OpenAI-embedded index (text-embedding-3-small)",
+  "source_git_commit": "46eb01cf84ca4e32b5641dc3ceef0b3ebe9356fa",
+  "source_timestamp": "2026-06-21T09:16:27.956555Z",
+  "evaluation_result_id": "2132c861d4d03b3b99fb5413ae69fd3f0b45f3326d7b71671b4ea3a2a8106e0a",
+  "index_fingerprint": "bf3df0d4631f29f322760b50735382039f67d3ee7c6860b25b1ce221312074f3",
+  "chunk_count": 215,
+  "document_count": 10,
+  "case_count": 60,
+  "content_sha256": "7875690fd70768090e172cacfb7ee4b2ff2b61be34f2e9abcf7e015bc5516964",
+  "content_sha256_basis": "SHA-256 of the file with line endings normalised to LF (a Windows checkout may hold CRLF)",
+  "derivation": "Byte-for-byte copy of the source artifact except CRLF line endings were normalised to LF. No field was edited, removed or re-serialised, so the recorded evaluation_result_id still reproduces from the content.",
+  "sanitization": "Scanned before freezing: no absolute paths, user names, API keys or environment values. Retrieved chunk text is not stored, only chunk ids, document ids, repository-relative source paths, headings and similarity values. tests/unit/test_frozen_baseline_fixture.py enforces this on every run.",
+  "why_the_complete_run_is_kept": "The regression tests assert behaviour over all 60 cases (one retrieval per case, case_count == 60, baseline identity per case, the evaluation_result_id and aggregate metrics of the baseline arm). A subset would change what they prove.",
+  "cross_checks": [
+    "evaluation_result_id equals baseline_identity.frozen_evaluation_result_id in the tracked data/05_evaluation/reranking_ab_source_authority_v1.json",
+    "evaluation_result_id, per-case metrics and aggregate metrics recompute from the stored chunks with the project's own functions",
+    "queries, expected risk and expected documents equal tests/01_test_questions.md and tests/02_expected_answers.md"
+  ],
+  "maintainer_artifact": "data/05_evaluation/retrieval_results.json may still exist locally. When it does, tests/unit/test_frozen_baseline_fixture.py (local_artifact) requires it to equal this fixture and fails if it has diverged; when it is absent that single test skips.",
+  "regeneration": "Only when the frozen baseline is deliberately replaced: copy the new retrieval_results.json over the fixture (LF endings), update content_sha256, evaluation_result_id, index_fingerprint and source_* here, and review the A/B artifacts that cite the old id."
+}

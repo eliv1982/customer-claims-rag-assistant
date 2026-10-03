@@ -16,6 +16,7 @@ from customer_claims_rag.evaluation.expanded_corpus_regression_reporting import 
 )
 from customer_claims_rag.evaluation.pool_expansion_metrics import compute_pool_expansion_config_hash
 from customer_claims_rag.evaluation.pool_expansion_metrics import load_pool_expansion_config
+from tests.local_artifacts import requires_local_artifacts
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PRODUCTION_CONFIG = PROJECT_ROOT / "configs" / "retrieval" / "vector_pool_expansion_v1.json"
@@ -56,6 +57,11 @@ def test_retrieval_metrics_unchanged_in_existing_artifact() -> None:
     assert candidate["mrr"] == pytest.approx(0.6456896551724138)
 
 
+@requires_local_artifacts(
+    INDEX_MANIFEST,
+    BACKUP_MANIFEST,
+    why="manifests of the provisioned production indexes (built with live OpenAI embeddings)",
+)
 def test_index_manifest_fingerprints_stable() -> None:
     production = json.loads(INDEX_MANIFEST.read_text(encoding="utf-8"))
     backup = json.loads(BACKUP_MANIFEST.read_text(encoding="utf-8"))

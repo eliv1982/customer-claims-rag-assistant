@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -18,9 +17,9 @@ from customer_claims_rag.evaluation.pool_expansion_models import PoolExpansionEv
 from customer_claims_rag.evaluation.pool_expansion_reporting import render_pool_expansion_markdown
 from customer_claims_rag.retrieval.models import SearchResponse, SearchResult
 from customer_claims_rag.retrieval.reranker import SourceAuthorityV1Reranker, compute_config_hash, load_reranker_config
+from tests.frozen_fixtures import load_frozen_retrieval_baseline
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-FROZEN_BASELINE = PROJECT_ROOT / "data" / "05_evaluation" / "retrieval_results.json"
 QUESTIONS = PROJECT_ROOT / "tests" / "01_test_questions.md"
 EXPECTED = PROJECT_ROOT / "tests" / "02_expected_answers.md"
 EXPERIMENT_CONFIG = PROJECT_ROOT / "configs" / "retrieval" / "vector_pool_expansion_v1.json"
@@ -109,7 +108,7 @@ def _chunk_type_for(chunk_id: str) -> str:
 
 @pytest.fixture
 def frozen_run() -> EvaluationRun:
-    return EvaluationRun.model_validate(json.loads(FROZEN_BASELINE.read_text(encoding="utf-8")))
+    return load_frozen_retrieval_baseline()
 
 
 def _build_evaluator(frozen_run: EvaluationRun, cases_count: int | None = None) -> PoolExpansionEvaluator:

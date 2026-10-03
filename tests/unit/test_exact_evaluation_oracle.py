@@ -19,9 +19,11 @@ from customer_claims_rag.evaluation.doc12_threat_atomic_models import (
     ReplayIntegrityResult,
 )
 from customer_claims_rag.evaluation.environment_provenance import (
+    MINIMUM_PYTHON,
     EnvironmentProvenanceError,
     capture_environment_provenance,
-    is_project_venv_interpreter,
+    is_isolated_virtualenv,
+    validate_project_venv,
 )
 from customer_claims_rag.evaluation.exact_vector_search import (
     ExactVectorSearchError,
@@ -148,23 +150,93 @@ def test_cosine_matches_chroma_distance_convention() -> None:
     assert max(0.0, 1.0 - similarity) == pytest.approx(1.0)
 
 
-def test_project_venv_permits_generation() -> None:
-    assert is_project_venv_interpreter(ROOT) is True
+def _simulate_external_virtualenv(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Pretend to run inside a virtualenv that is NOT under the repository."""
+    venv = tmp_path / "external-venv"
+    monkeypatch.setattr(sys, "prefix", str(venv))
+    monkeypatch.setattr(sys, "base_prefix", str(tmp_path / "base-python"))
+    monkeypatch.chdir(ROOT)
+    return venv
+
+
+class _Completed:
+    def __init__(self, stdout: str = "", returncode: int = 0) -> None:
+        self.stdout = stdout
+        self.stderr = ""
+        self.returncode = returncode
+
+
+def _stub_pip(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run(command, **_kwargs):
+        if "--version" in command:
+            return _Completed("pip 99.0 from /somewhere/site-packages/pip (python 3.12)")
+        return _Completed("No broken requirements found.")
+
+    monkeypatch.setattr(
+        "customer_claims_rag.evaluation.environment_provenance.subprocess.run", fake_run
+    )
+
+
+def test_external_virtualenv_permits_generation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    venv = _simulate_external_virtualenv(monkeypatch, tmp_path)
+    assert ROOT not in venv.parents
+    assert is_isolated_virtualenv() is True
+    validate_project_venv(ROOT)
+    _stub_pip(monkeypatch)
     payload = capture_environment_provenance(ROOT)
     assert payload["kind"] == "project_venv"
+    assert payload["pip_version"] == "pip 99.0"
     assert payload["pip_check_exit_code"] == 0
     assert "sys.executable" not in payload
-    assert "Cursor_Projects" not in json.dumps(payload)
+    assert str(tmp_path) not in json.dumps(payload)
 
 
-def test_global_python_blocks_artifact_generation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_global_python_blocks_artifact_generation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(ROOT)
     monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
-    monkeypatch.setattr(sys, "prefix", "/usr")
-    with pytest.raises(EnvironmentProvenanceError):
+    monkeypatch.setattr(sys, "prefix", str(tmp_path / "usr"))
+    monkeypatch.setattr(sys, "base_prefix", str(tmp_path / "usr"))
+    assert is_isolated_virtualenv() is False
+    with pytest.raises(EnvironmentProvenanceError, match="not an isolated virtual environment"):
         capture_environment_provenance(ROOT)
 
 
-def test_environment_provenance_has_no_absolute_paths_in_model() -> None:
+def test_unsupported_python_blocks_artifact_generation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _simulate_external_virtualenv(monkeypatch, tmp_path)
+    monkeypatch.setattr(sys, "version_info", (MINIMUM_PYTHON[0], MINIMUM_PYTHON[1] - 1, 9, "final", 0))
+    with pytest.raises(EnvironmentProvenanceError, match="Python 3.12\\+ is required"):
+        validate_project_venv(ROOT)
+
+
+def test_wrong_working_directory_blocks_artifact_generation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _simulate_external_virtualenv(monkeypatch, tmp_path)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(EnvironmentProvenanceError, match="not the repository root"):
+        validate_project_venv(ROOT)
+
+
+def test_minimum_python_matches_pyproject() -> None:
+    import tomllib
+
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert pyproject["project"]["requires-python"] == ">=" + ".".join(
+        str(part) for part in MINIMUM_PYTHON
+    )
+
+
+def test_environment_provenance_has_no_absolute_paths_in_model(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _simulate_external_virtualenv(monkeypatch, tmp_path)
+    _stub_pip(monkeypatch)
     payload = capture_environment_provenance(ROOT)
     model = EnvironmentProvenance(
         python_version=str(payload["python_version"]),

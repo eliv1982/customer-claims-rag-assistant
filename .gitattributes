@@ -1,0 +1,5 @@
+# Repository text is stored with LF. eol=lf also makes Windows checkouts LF
+# regardless of core.autocrlf, so shell scripts, golden files and digests behave
+# the same on every platform.
+* text=auto eol=lf
+*.png binary

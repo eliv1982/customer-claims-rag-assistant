@@ -108,6 +108,7 @@ def test_search_cli_does_not_leak_secret_without_verbose(temp_project: Path, mon
 
     monkeypatch.setattr(search_cli, "create_embedding_provider", leaking_factory)
     monkeypatch.setenv("OPENAI_API_KEY", SECRET)
+    monkeypatch.chdir(temp_project)
     code = search_cli.main(["query", "--index-dir", "data/04_index"])
     captured = capsys.readouterr()
     assert code != 0
@@ -122,6 +123,7 @@ def test_search_cli_does_not_leak_secret_with_verbose(temp_project: Path, monkey
 
     monkeypatch.setattr(search_cli, "run_search", explode)
     monkeypatch.setenv("OPENAI_API_KEY", SECRET)
+    monkeypatch.chdir(temp_project)
     code = search_cli.main(["query", "--verbose"])
     captured = capsys.readouterr()
     assert code != 0

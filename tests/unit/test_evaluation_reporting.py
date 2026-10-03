@@ -19,6 +19,7 @@ from customer_claims_rag.evaluation.reporting import (
 from customer_claims_rag.evaluation.result_id import compute_evaluation_result_id
 from customer_claims_rag.exceptions import EvaluationOutputError, RetrievalError
 from tests.evaluation_helpers import make_fake_evaluation_run, make_retrieved_chunk
+from tests.frozen_fixtures import load_frozen_retrieval_baseline
 
 
 def test_json_serializable_and_no_absolute_user_paths(temp_project: Path) -> None:
@@ -215,13 +216,8 @@ def test_primary_hit_at_4_excluded_from_failed_cases_section() -> None:
 
 
 def test_t016_and_t044_render_without_false_primary_annotation() -> None:
-    from customer_claims_rag.evaluation.models import EvaluationRun
-
-    project_root = Path(__file__).resolve().parents[2]
-    json_path = project_root / "data" / "05_evaluation" / "retrieval_results.json"
-    if not json_path.exists():
-        pytest.skip("real evaluation JSON unavailable")
-    run = EvaluationRun.model_validate(json.loads(json_path.read_text(encoding="utf-8")))
+    # The frozen 60-case run is committed (tests/fixtures), so this runs on a fresh clone.
+    run = load_frozen_retrieval_baseline()
     markdown = render_results_markdown(run)
     for test_id in ("T016", "T044"):
         line = next(line for line in markdown.splitlines() if line.startswith(f"- **{test_id}**"))

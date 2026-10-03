@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -25,6 +26,24 @@ ABSOLUTE_PATH_PATTERNS = (
 )
 
 REQUIRED_SCENARIOS = tuple(f"M{index:02d}" for index in range(10))
+
+# Digest rule: text evidence is hashed after line-ending normalization, binary
+# evidence (PNG) byte for byte. Without this a Windows checkout (CRLF) and a Linux
+# checkout (LF) of the same commit hash differently. The digests recorded in
+# evidence_manifest.json v1.0.0 were taken from a Windows checkout, i.e. they are
+# the CRLF form; a regenerated manifest may record the LF form instead (the
+# repository's canonical form, see .gitattributes). Either form is accepted.
+TEXT_EVIDENCE_SUFFIXES = frozenset({".json", ".md", ".txt"})
+
+
+def evidence_digests(path: Path) -> set[str]:
+    """SHA-256 digests under which ``path`` is accepted as matching the manifest."""
+    data = path.read_bytes()
+    if path.suffix.lower() not in TEXT_EVIDENCE_SUFFIXES:
+        return {hashlib.sha256(data).hexdigest()}
+    lf = data.replace(b"\r\n", b"\n")
+    crlf = lf.replace(b"\n", b"\r\n")
+    return {hashlib.sha256(lf).hexdigest(), hashlib.sha256(crlf).hexdigest()}
 
 
 @pytest.fixture(scope="module")
@@ -73,13 +92,29 @@ def test_manifest_referenced_files_exist(manifest: dict) -> None:
 
 
 def test_manifest_checksums_match_files(manifest: dict) -> None:
-    import hashlib
-
     for entry in manifest["entries"]:
         for relative_path, expected_digest in entry["sha256"].items():
             file_path = PROJECT_ROOT / relative_path
-            actual = hashlib.sha256(file_path.read_bytes()).hexdigest()
-            assert actual == expected_digest, f"checksum mismatch for {relative_path}"
+            assert expected_digest in evidence_digests(file_path), (
+                f"checksum mismatch for {relative_path}"
+            )
+
+
+def test_evidence_digest_is_line_ending_independent(tmp_path: Path) -> None:
+    lf_file = tmp_path / "evidence.json"
+    crlf_file = tmp_path / "evidence_crlf.json"
+    lf_file.write_bytes(b'{\n  "a": 1\n}\n')
+    crlf_file.write_bytes(b'{\r\n  "a": 1\r\n}\r\n')
+    assert evidence_digests(lf_file) == evidence_digests(crlf_file)
+    changed = tmp_path / "changed.json"
+    changed.write_bytes(b'{\n  "a": 2\n}\n')
+    assert evidence_digests(lf_file).isdisjoint(evidence_digests(changed))
+
+
+def test_binary_evidence_digest_is_byte_exact(tmp_path: Path) -> None:
+    png = tmp_path / "shot.png"
+    png.write_bytes(b"\x89PNG\r\n\x1a\n\r\nbody")
+    assert evidence_digests(png) == {hashlib.sha256(png.read_bytes()).hexdigest()}
 
 
 def test_committed_evidence_contains_no_obvious_secrets() -> None:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from copy import deepcopy
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -17,9 +16,10 @@ from customer_claims_rag.evaluation.parser import load_evaluation_corpus
 from customer_claims_rag.retrieval.models import SearchResponse, SearchResult
 from customer_claims_rag.retrieval.reranker import load_reranker_config
 from customer_claims_rag.retrieval.reranker import SourceAuthorityV1Reranker
+from tests.frozen_fixtures import FROZEN_RETRIEVAL_BASELINE as FROZEN_BASELINE
+from tests.frozen_fixtures import load_frozen_retrieval_baseline
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-FROZEN_BASELINE = PROJECT_ROOT / "data" / "05_evaluation" / "retrieval_results.json"
 QUESTIONS = PROJECT_ROOT / "tests" / "01_test_questions.md"
 EXPECTED = PROJECT_ROOT / "tests" / "02_expected_answers.md"
 CONFIG = PROJECT_ROOT / "configs" / "reranking" / "source_authority_v1.json"
@@ -89,7 +89,7 @@ def _chunk_type_for(chunk_id: str) -> str:
 
 @pytest.fixture
 def frozen_run() -> EvaluationRun:
-    return EvaluationRun.model_validate(json.loads(FROZEN_BASELINE.read_text(encoding="utf-8")))
+    return load_frozen_retrieval_baseline()
 
 
 def test_one_retrieval_call_per_case(frozen_run: EvaluationRun, monkeypatch) -> None:
@@ -331,7 +331,9 @@ def test_cli_rejects_overwriting_baseline_json(temp_project: Path, capsys) -> No
     assert "must not overwrite baseline artifact" in captured.err
 
 
-def test_protected_baseline_files_unchanged_after_ab_run(temp_project: Path, monkeypatch) -> None:
+def test_protected_baseline_files_unchanged_after_ab_run(
+    temp_project: Path, monkeypatch, dummy_openai_api_key: str
+) -> None:
     for relative in PROTECTED_BASELINE_PATHS:
         source = PROJECT_ROOT / relative
         if not source.exists():

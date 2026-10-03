@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -58,6 +59,27 @@ def test_document_ids_present(builder: CorpusBuilder, clean_input: Path) -> None
     loaded_ids = {doc.metadata.document_id for doc in documents}
     for doc_id in EXPECTED_DOC_IDS:
         assert doc_id in loaded_ids
+
+
+@pytest.mark.real_tiktoken
+def test_release_corpus_chunk_counts_under_real_cl100k(
+    builder: CorpusBuilder, clean_input: Path
+) -> None:
+    """Golden chunk counts of the release corpus; they exist only under real cl100k tokenization."""
+    _, chunks = builder.build_from_directory(clean_input)
+    per_document = Counter(chunk.document_id for chunk in chunks)
+    assert per_document["11_payment_security_and_dispute_handling"] == 20
+    assert per_document["12_staff_safety_and_threat_handling"] == 23
+    assert per_document["13_physical_hazard_and_foreign_body_protocol"] == 22
+    assert per_document["14_evidence_standards_and_incomplete_information"] == 25
+    assert per_document["15_conflicting_rules_and_remedy_priority"] == 28
+    baseline_total = sum(
+        count
+        for document_id, count in per_document.items()
+        if document_id[:2] in {f"{i:02d}" for i in range(1, 11)}
+    )
+    assert baseline_total == 215
+    assert len(chunks) == 333
 
 
 def test_faq_produces_45_chunks(builder: CorpusBuilder, clean_input: Path) -> None:
@@ -176,35 +198,37 @@ def test_does_not_write_to_project_data_dir(
     _assert_repo_chunk_artifacts_unchanged(project_root, before)
 
 
+def _project_with_existing_chunk_artifacts(root: Path) -> Path:
+    """A second project root that already holds chunk artifacts (stands in for the real repo)."""
+    chunks_dir = root / "data" / "03_chunks"
+    chunks_dir.mkdir(parents=True)
+    (chunks_dir / "chunks.jsonl").write_bytes(b'{"chunk_id": "pre-existing"}\n')
+    (chunks_dir / "chunk_stats.json").write_bytes(b'{"marker": "pre-existing"}\n')
+    return root
+
+
 def test_does_not_modify_existing_repo_chunk_artifacts(
     builder: CorpusBuilder,
     clean_input: Path,
     temp_project: Path,
-    project_root: Path,
+    tmp_path: Path,
 ) -> None:
-    repo_paths = _repo_chunk_artifact_paths(project_root)
-    if not repo_paths["chunks.jsonl"].exists():
-        pytest.skip("repo-root chunks.jsonl absent; immutability covered when present")
-    before = _snapshot_repo_chunk_artifacts(project_root)
+    other_project = _project_with_existing_chunk_artifacts(tmp_path / "other_project")
+    before = _snapshot_repo_chunk_artifacts(other_project)
     out = temp_project / "data" / "03_chunks" / "chunks.jsonl"
     stats = temp_project / "data" / "03_chunks" / "chunk_stats.json"
     builder.build_and_export(clean_input, out, stats)
     assert out.is_file()
-    _assert_repo_chunk_artifacts_unchanged(project_root, before)
+    _assert_repo_chunk_artifacts_unchanged(other_project, before)
 
 
-def test_assertion_detects_repo_chunk_content_change(project_root: Path) -> None:
-    paths = _repo_chunk_artifact_paths(project_root)
-    if not paths["chunks.jsonl"].exists():
-        pytest.skip("requires existing repo-root chunks.jsonl")
-    before = _snapshot_repo_chunk_artifacts(project_root)
-    original = paths["chunks.jsonl"].read_bytes()
-    try:
-        paths["chunks.jsonl"].write_bytes(b"CORPUS_BUILDER_ISOLATION_TEST_SENTINEL\n")
-        with pytest.raises(AssertionError, match="contents changed"):
-            _assert_repo_chunk_artifacts_unchanged(project_root, before)
-    finally:
-        paths["chunks.jsonl"].write_bytes(original)
+def test_assertion_detects_repo_chunk_content_change(tmp_path: Path) -> None:
+    project = _project_with_existing_chunk_artifacts(tmp_path / "other_project")
+    before = _snapshot_repo_chunk_artifacts(project)
+    paths = _repo_chunk_artifact_paths(project)
+    paths["chunks.jsonl"].write_bytes(b"CORPUS_BUILDER_ISOLATION_TEST_SENTINEL\n")
+    with pytest.raises(AssertionError, match="contents changed"):
+        _assert_repo_chunk_artifacts_unchanged(project, before)
 
 
 def test_assertion_detects_new_repo_chunk_file(tmp_path: Path) -> None:
@@ -398,7 +422,7 @@ def test_evidence_standards_document_terms(builder: CorpusBuilder, clean_input: 
     evidence_chunks = [
         c for c in chunks if c.document_id == "14_evidence_standards_and_incomplete_information"
     ]
-    assert len(evidence_chunks) == 25
+    assert evidence_chunks
     combined = "\n".join(c.content for c in evidence_chunks)
     combined_lower = combined.lower()
     for term in EVIDENCE_TERMS:
@@ -502,7 +526,7 @@ def test_remedy_priority_document_terms(builder: CorpusBuilder, clean_input: Pat
     remedy_chunks = [
         c for c in chunks if c.document_id == "15_conflicting_rules_and_remedy_priority"
     ]
-    assert len(remedy_chunks) == 28
+    assert remedy_chunks
     combined = "\n".join(c.content for c in remedy_chunks)
     combined_lower = combined.lower()
     for term in REMEDY_PRIORITY_TERMS:

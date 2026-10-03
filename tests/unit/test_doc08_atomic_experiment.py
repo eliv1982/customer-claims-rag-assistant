@@ -19,10 +19,12 @@ from customer_claims_rag.ingestion.corpus_overlay import (
     build_baseline_and_overlay_chunks,
     cleanup_overlay_temp_dir,
     compute_doc08_chunk_diff,
+    compute_doc08_fingerprint,
     compute_overlay_corpus_fingerprint,
     logical_source_path,
 )
 from customer_claims_rag.retrieval.manifest import load_manifest
+from tests.local_artifacts import requires_local_artifacts
 
 ROOT = project_root()
 OVERLAY = ROOT / "experiments/corpus/doc08_atomic_risk_units_v1/08_escalation_and_risk_rules.md"
@@ -38,11 +40,11 @@ ARTIFACT = ROOT / "data/05_evaluation/doc08_atomic_risk_units_v1.json"
 
 
 @pytest.fixture(scope="module")
-def overlay_build():
+def overlay_build(corpus_sandbox: Path):
     result = build_baseline_and_overlay_chunks(
-        canonical_dir=CANONICAL,
-        overlay_document_path=OVERLAY,
-        permitted_root=ROOT,
+        canonical_dir=corpus_sandbox / CANONICAL.relative_to(ROOT),
+        overlay_document_path=corpus_sandbox / OVERLAY.relative_to(ROOT),
+        permitted_root=corpus_sandbox,
     )
     yield result
     cleanup_overlay_temp_dir(result.temp_input_dir)
@@ -95,11 +97,11 @@ def test_no_copied_doc12_threat_example() -> None:
     assert "физически покажу" in doc12
 
 
-def test_deterministic_candidate_chunk_ids(overlay_build) -> None:
+def test_deterministic_candidate_chunk_ids(overlay_build, corpus_sandbox: Path) -> None:
     second = build_baseline_and_overlay_chunks(
-        canonical_dir=CANONICAL,
-        overlay_document_path=OVERLAY,
-        permitted_root=ROOT,
+        canonical_dir=corpus_sandbox / CANONICAL.relative_to(ROOT),
+        overlay_document_path=corpus_sandbox / OVERLAY.relative_to(ROOT),
+        permitted_root=corpus_sandbox,
     )
     try:
         ids_a = [c.chunk_id for c in overlay_build.candidate_doc08_chunks]
@@ -132,7 +134,10 @@ def test_extension_benchmark_schema() -> None:
     assert len(fp) == 64
 
 
-@pytest.mark.skipif(not PRODUCTION_INDEX.joinpath("manifest.json").exists(), reason="production index missing")
+@requires_local_artifacts(
+    PRODUCTION_INDEX / "manifest.json",
+    why="manifest of the provisioned production index (built with live OpenAI embeddings)",
+)
 def test_production_index_fingerprint_unchanged() -> None:
     manifest = load_manifest(PRODUCTION_INDEX)
     assert manifest.chunk_count == 333
@@ -144,12 +149,36 @@ def test_overlay_doc08_uses_logical_source_path(overlay_build) -> None:
     assert doc08_paths == {logical_source_path(DOC08_DOCUMENT_ID)}
 
 
+@pytest.mark.real_tiktoken
+def test_overlay_topology_matches_the_accepted_artifact(overlay_build) -> None:
+    """Chunk counts and fingerprints of both arms, as recorded when the experiment was run.
+
+    They hold only under real cl100k_base packing, so the default lane cannot check them.
+    """
+    artifact = json.loads(ARTIFACT.read_text(encoding="utf-8"))
+    baseline_arm, candidate_arm = artifact["baseline_arm"], artifact["candidate_arm"]
+    assert len(overlay_build.baseline_chunks) == baseline_arm["chunk_count"] == 333
+    assert len(overlay_build.candidate_chunks) == candidate_arm["chunk_count"] == 337
+    assert (
+        compute_overlay_corpus_fingerprint(overlay_build.candidate_chunks)
+        == candidate_arm["corpus_fingerprint"]
+    )
+    assert compute_doc08_fingerprint(overlay_build.baseline_chunks) == baseline_arm["doc08_fingerprint"]
+    assert compute_doc08_fingerprint(overlay_build.candidate_chunks) == candidate_arm["doc08_fingerprint"]
+    assert len(overlay_build.baseline_doc08_chunks) == 17
+    assert len(overlay_build.candidate_doc08_chunks) == 21
+
+
 def test_overlay_corpus_fingerprint_deterministic(overlay_build) -> None:
     fp = compute_overlay_corpus_fingerprint(overlay_build.candidate_chunks)
     assert len(fp) == 64
 
 
-@pytest.mark.skipif(not CANDIDATE_INDEX.joinpath("manifest.json").exists(), reason="candidate index missing")
+@requires_local_artifacts(
+    PRODUCTION_INDEX / "manifest.json",
+    CANDIDATE_INDEX / "manifest.json",
+    why="manifests of the production index and the locally built doc08 experiment index",
+)
 def test_candidate_index_separate_from_production() -> None:
     prod = load_manifest(PRODUCTION_INDEX)
     cand = load_manifest(CANDIDATE_INDEX)
@@ -166,7 +195,6 @@ def test_production_retrieval_config_hash_unchanged() -> None:
     assert compute_vector_pool_cap_config_hash(cfg) == expected
 
 
-@pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
 def test_artifact_has_per_arm_metadata() -> None:
     payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
     assert payload["baseline_arm"]["fetch_k"] == 48
@@ -178,7 +206,6 @@ def test_artifact_has_per_arm_metadata() -> None:
     assert payload["baseline_reproduction"]["passed"] is True
 
 
-@pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
 def test_baseline_reproduction_in_artifact() -> None:
     payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
     assert payload["frozen_baseline_primary_hit_at_12"] == pytest.approx(0.9137931034482759)
@@ -187,7 +214,6 @@ def test_baseline_reproduction_in_artifact() -> None:
     assert payload["frozen_reachability_baseline"]["primary_denominator"] == 57
 
 
-@pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
 def test_t044_acceptance_in_artifact() -> None:
     payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
     t044 = next(d for d in payload["required_diagnostics"] if d["case_id"] == "T044")
@@ -195,14 +221,12 @@ def test_t044_acceptance_in_artifact() -> None:
     assert t044["candidate_primary_hit_at_12"] is True
 
 
-@pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
 def test_t047_doc12_guardrail() -> None:
     payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
     t047 = next(d for d in payload["required_diagnostics"] if d["case_id"] == "T047")
     assert t047["candidate_final_rank_doc12"] == 1
 
 
-@pytest.mark.skipif(not ARTIFACT.exists(), reason="evaluation artifact missing")
 def test_verdict_is_raw_string() -> None:
     payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
     assert payload["verdict"] in {

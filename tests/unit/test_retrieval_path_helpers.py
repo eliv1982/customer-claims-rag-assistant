@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -83,12 +82,18 @@ def test_parent_traversal_rejected(temp_project: Path) -> None:
         )
 
 
-@pytest.mark.skipif(os.name != "posix", reason="symlink escape test requires POSIX")
-def test_symlink_escape_rejected(temp_project: Path, tmp_path: Path) -> None:
-    outside = tmp_path / "outside_index"
-    outside.mkdir()
+def test_symlink_escape_rejected(
+    temp_project: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    # temp_project IS tmp_path, so the target must come from a different temp dir to lie
+    # outside the project root.
+    outside = tmp_path_factory.mktemp("outside_index")
+    assert temp_project.resolve() not in outside.resolve().parents
     link = temp_project / "escaped_index"
-    link.symlink_to(outside, target_is_directory=True)
+    try:
+        link.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symlink creation not available in this environment: {exc}")
     with pytest.raises(RetrievalError, match="path traversal rejected"):
         validate_index_dir(link, project_root=temp_project.resolve())
 

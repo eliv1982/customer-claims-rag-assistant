@@ -252,10 +252,11 @@ def test_three_temp_roots_same_collection_digest_from_snapshot(tmp_path: Path) -
 
 
 def test_manifest_paths_are_repo_relative(tmp_path: Path) -> None:
-    repo_tmp = ROOT / ".tmp" / "pytest_snapshot_manifest"
-    repo_tmp.mkdir(parents=True, exist_ok=True)
-    npz_path = repo_tmp / "snapshot.npz"
-    manifest_path = repo_tmp / "snapshot.manifest.json"
+    project = tmp_path / "project"
+    snapshot_dir = project / ".tmp" / "snapshot_manifest"
+    snapshot_dir.mkdir(parents=True)
+    npz_path = snapshot_dir / "snapshot.npz"
+    manifest_path = snapshot_dir / "snapshot.manifest.json"
     chunks = _sample_chunks()
     provider = FakeEmbeddingProvider(vector_dimension=8)
     embeddings = provider.embed_documents([chunk.content for chunk in chunks])
@@ -270,8 +271,8 @@ def test_manifest_paths_are_repo_relative(tmp_path: Path) -> None:
         chunk_payload_digest=compute_chunk_payload_digest(ordered),
         candidate_experiment_id="test-exp",
         creation_source_commit="deadbeef",
-        project_root=ROOT,
+        project_root=project,
     )
     assert not manifest["snapshot_path"].startswith("C:")
-    assert "Cursor_Projects" not in manifest["snapshot_path"]
+    assert str(tmp_path) not in json.dumps(manifest)
     assert manifest["snapshot_path"].startswith("data/") or manifest["snapshot_path"].startswith(".tmp/")

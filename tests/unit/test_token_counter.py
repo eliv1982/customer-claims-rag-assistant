@@ -81,3 +81,22 @@ def test_fake_counter_overlap_tests() -> None:
     text = " ".join(["word"] * 1500)
     parts = fake.split_by_token_window(text, max_tokens=800, overlap_tokens=80)
     assert len(parts) > 1
+
+
+@pytest.mark.real_tiktoken
+def test_real_cl100k_vocabulary_counts_known_strings() -> None:
+    """Runs only with --real-tiktoken: the default suite uses the offline stand-in."""
+    counter = TiktokenCounter()
+    assert counter.encoding_name == "cl100k_base"
+    assert counter.count("hello world") == 2
+    assert counter.count("") == 0
+
+
+@pytest.mark.real_tiktoken
+def test_real_cl100k_split_respects_token_limit_on_cyrillic_and_emoji() -> None:
+    counter = TiktokenCounter()
+    text = ("FoodFlow доставка emoji 🍕 " * 200).strip()
+    parts = counter.split_by_token_window(text, max_tokens=40, overlap_tokens=0)
+    assert len(parts) > 1
+    assert "".join(parts) == text
+    assert all(counter.count(part) <= 40 for part in parts)

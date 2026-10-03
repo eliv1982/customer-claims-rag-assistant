@@ -386,7 +386,6 @@ def test_core_packages_do_not_import_streamlit() -> None:
 
 
 def test_streamlit_app_imports_with_ui_dependency() -> None:
-    pytest.importorskip("streamlit")
     import customer_claims_rag.ui.streamlit_app as streamlit_app
 
     assert callable(streamlit_app.main)

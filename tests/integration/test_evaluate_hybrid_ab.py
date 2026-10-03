@@ -204,11 +204,16 @@ def test_markdown_rebuild_from_artifact_shape(pool_artifact: dict, tmp_path: Pat
     assert FROZEN_RERANKER_CONFIG_HASH[:8] in markdown
 
 
-def test_cli_writes_outputs(pool_artifact: dict, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    out_dir = PROJECT_ROOT / "data" / "05_evaluation" / "_pytest_hybrid_tmp"
-    out_dir.mkdir(parents=True, exist_ok=True)
+def test_cli_writes_outputs(
+    pool_artifact: dict,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dummy_openai_api_key: str,
+) -> None:
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
     output_json = out_dir / "hybrid.json"
-    output_md = PROJECT_ROOT / "tests" / "_pytest_hybrid_tmp.md"
+    output_md = out_dir / "hybrid.md"
 
     def fake_from_paths(**kwargs):
         evaluator, _ = _build_evaluator(pool_artifact, tmp_path, case_limit=2)
@@ -241,12 +246,10 @@ def test_cli_writes_outputs(pool_artifact: dict, tmp_path: Path, monkeypatch: py
         embedding_model="text-embedding-3-small",
         output_json=output_json,
         output_markdown=output_md,
-        project_root_path=PROJECT_ROOT,
+        project_root_path=tmp_path.resolve(),
     )
     assert exit_code == 0
     assert output_json.exists()
     assert output_md.exists()
     restored = HybridEvaluationRun.model_validate(json.loads(output_json.read_text(encoding="utf-8")))
     assert restored.experiment.experiment_id == "hybrid-lexical-vector-v1"
-    output_json.unlink(missing_ok=True)
-    output_md.unlink(missing_ok=True)

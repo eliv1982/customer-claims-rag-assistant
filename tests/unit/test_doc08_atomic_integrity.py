@@ -28,6 +28,7 @@ from customer_claims_rag.ingestion.corpus_overlay import (
     normalize_overlay_corpus_source_paths,
 )
 from customer_claims_rag.retrieval.manifest import load_manifest
+from tests.local_artifacts import requires_local_artifacts
 
 ROOT = project_root()
 OVERLAY = ROOT / "experiments/corpus/doc08_atomic_risk_units_v1/08_escalation_and_risk_rules.md"
@@ -69,21 +70,23 @@ def _case_result(*, test_id: str, docs: list[str], primary_hit_at_4: bool) -> Ca
     )
 
 
-def test_overlay_fingerprint_stable_across_temp_roots() -> None:
-    temp_a = ROOT / ".tmp" / "corpus_overlay" / "_repro_test_a"
-    temp_b = ROOT / ".tmp" / "corpus_overlay" / "_repro_test_b"
+def test_overlay_fingerprint_stable_across_temp_roots(corpus_sandbox: Path) -> None:
+    canonical = corpus_sandbox / CANONICAL.relative_to(ROOT)
+    overlay = corpus_sandbox / OVERLAY.relative_to(ROOT)
+    temp_a = corpus_sandbox / ".tmp" / "corpus_overlay" / "_repro_test_a"
+    temp_b = corpus_sandbox / ".tmp" / "corpus_overlay" / "_repro_test_b"
     temp_a.mkdir(parents=True, exist_ok=True)
     temp_b.mkdir(parents=True, exist_ok=True)
     build_a = build_baseline_and_overlay_chunks(
-        canonical_dir=CANONICAL,
-        overlay_document_path=OVERLAY,
-        permitted_root=ROOT,
+        canonical_dir=canonical,
+        overlay_document_path=overlay,
+        permitted_root=corpus_sandbox,
         staging_parent=temp_a,
     )
     build_b = build_baseline_and_overlay_chunks(
-        canonical_dir=CANONICAL,
-        overlay_document_path=OVERLAY,
-        permitted_root=ROOT,
+        canonical_dir=canonical,
+        overlay_document_path=overlay,
+        permitted_root=corpus_sandbox,
         staging_parent=temp_b,
     )
     try:
@@ -102,11 +105,11 @@ def test_overlay_fingerprint_stable_across_temp_roots() -> None:
         cleanup_overlay_temp_dir(build_b.temp_input_dir)
 
 
-def test_overlay_content_change_changes_fingerprint() -> None:
+def test_overlay_content_change_changes_fingerprint(corpus_sandbox: Path) -> None:
     build = build_baseline_and_overlay_chunks(
-        canonical_dir=CANONICAL,
-        overlay_document_path=OVERLAY,
-        permitted_root=ROOT,
+        canonical_dir=corpus_sandbox / CANONICAL.relative_to(ROOT),
+        overlay_document_path=corpus_sandbox / OVERLAY.relative_to(ROOT),
+        permitted_root=corpus_sandbox,
     )
     try:
         base_fp = compute_overlay_corpus_fingerprint(build.candidate_chunks)
@@ -129,7 +132,10 @@ def test_logical_source_path_is_platform_independent() -> None:
     )
 
 
-@pytest.mark.skipif(not PRODUCTION_INDEX.joinpath("manifest.json").exists(), reason="production index missing")
+@requires_local_artifacts(
+    PRODUCTION_INDEX / "manifest.json",
+    why="manifest of the provisioned production index (built with live OpenAI embeddings)",
+)
 def test_production_fingerprint_unchanged() -> None:
     manifest = load_manifest(PRODUCTION_INDEX)
     assert manifest.corpus_fingerprint == (

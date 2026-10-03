@@ -6,8 +6,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
-
 from customer_claims_rag.env_bootstrap import project_root
 from customer_claims_rag.ingestion.corpus_builder import CorpusBuilder
 from customer_claims_rag.retrieval.adapters.chroma_store import ChromaVectorStore
@@ -193,32 +191,27 @@ def test_retriever_backend_rank_tie_break_is_stable(tmp_path: Path) -> None:
 
 
 def test_doc12_artifact_paths_are_repo_relative() -> None:
+    # Tracked artifact: a missing or outdated file is a failure, not a skip.
     artifact = ROOT / "data/05_evaluation/doc12_threat_atomic_units_v1.json"
-    if not artifact.is_file():
-        pytest.skip("artifact not generated yet")
     payload = json.loads(artifact.read_text(encoding="utf-8"))
-    if payload.get("replay_integrity") is None and payload.get("replay_stability") is None:
-        pytest.skip("artifact predates replay integrity repair")
+    assert payload.get("replay_integrity") is not None, "artifact predates replay integrity repair"
     for arm_key in ("baseline_arm", "candidate_arm"):
         index_dir = payload[arm_key]["index_dir"]
         assert not re.match(r"^[A-Za-z]:\\", index_dir)
         assert "Cursor_Projects" not in index_dir
     assert not re.match(r"^[A-Za-z]:\\", payload["reference_artifact_path"])
-    replay = payload.get("replay_integrity")
-    if replay is not None:
-        frozen = replay.get("frozen_snapshot_replay") or {}
-        if frozen.get("authoritative") is True and replay.get("exact_replay") is None:
-            pytest.skip("artifact predates R3 exact evaluation oracle")
-        assert frozen.get("authoritative") is False
-        exact = replay.get("exact_replay") or {}
-        if exact:
-            assert exact.get("authoritative") is True
-        ann = replay.get("ann_robustness") or {}
-        if ann:
-            assert ann.get("authoritative") is False
-        live = replay.get("live_provider_robustness")
-        if live is not None:
-            assert live.get("authoritative") is False
+    replay = payload["replay_integrity"]
+    frozen = replay.get("frozen_snapshot_replay") or {}
+    assert frozen.get("authoritative") is False
+    exact = replay.get("exact_replay") or {}
+    assert exact, "artifact predates R3 exact evaluation oracle"
+    assert exact.get("authoritative") is True
+    ann = replay.get("ann_robustness") or {}
+    if ann:
+        assert ann.get("authoritative") is False
+    live = replay.get("live_provider_robustness")
+    if live is not None:
+        assert live.get("authoritative") is False
 
 
 def test_config_declares_embedding_snapshot_paths() -> None:

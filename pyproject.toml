@@ -10,7 +10,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "chromadb>=1.5,<2",
+    "langchain-core>=0.3,<1",
     "langchain-openai>=0.2,<1",
+    "numpy>=1.26,<3",
     "pydantic>=2.5,<3",
     "python-dotenv>=1.0,<2",
     "PyYAML>=6.0,<7",
@@ -25,6 +27,12 @@ dev = [
 ]
 ui = [
     "streamlit>=1.40,<2",
+]
+# One-off tooling for scripts/capture_ui_screenshots.py (acceptance evidence).
+# Not needed by the app or the test suite; Chromium is installed separately:
+#   python -m playwright install chromium
+screenshots = [
+    "playwright>=1.40,<2",
 ]
 
 [project.scripts]
@@ -53,6 +61,10 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = "-ra --strict-markers"
+markers = [
+    "real_tiktoken: production tokenization invariants that hold only under the real cl100k_base vocabulary; skipped in the default lane (offline stand-in tokenizer), run in the real-tokenizer lane: python -m pytest --real-tiktoken -m real_tiktoken (needs the vocabulary provisioned in the local tiktoken cache; never downloads, never skips)",
+    "local_artifact: verifies a gitignored local artifact (production index, maintainer evaluation run); skipped with the missing path as reason when the artifact is absent, and a failure when it is present but stale or malformed",
+]
 
 [tool.coverage.run]
 source = ["customer_claims_rag"]

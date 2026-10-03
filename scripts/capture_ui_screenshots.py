@@ -42,7 +42,8 @@ def main() -> int:
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
         raise SystemExit(
-            "playwright is required for UI screenshots: pip install playwright && playwright install chromium"
+            "playwright is required for UI screenshots: "
+            'pip install -e ".[screenshots]" && python -m playwright install chromium'
         ) from exc
 
     UI_DIR.mkdir(parents=True, exist_ok=True)
