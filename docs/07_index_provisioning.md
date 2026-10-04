@@ -81,21 +81,21 @@ data/04_index_production/
 ## Validate in Docker
 
 ```powershell
-docker compose run --rm streamlit validate-release-posture
+python scripts/release_compose.py run --rm streamlit validate-release-posture
 ```
 
-The index is built on the host (above) and bind-mounted at `/app/data/04_index_production`; set `RAG_ACTIVE_INDEX_HOST_PATH` to use another host directory. See `docs/08_docker_runbook.md`.
+The index is built on the host (above) and bind-mounted read-write at `/app/data/04_index_production` (Chroma writes to its own files even to read); set `RAG_ACTIVE_INDEX_HOST_PATH` to use another host directory. Compose is run through `scripts/release_compose.py`, which takes `OPENAI_API_KEY` from the shell environment and never from a repository `.env`. See `docs/08_docker_runbook.md`.
 
 ## Failure behavior
 
 | Condition | Result |
 |-----------|--------|
-| Index directory missing or empty | `validate-release-posture` exits `1` with `index_present=no` and the build command; the container preflight fails; Streamlit does not start |
-| Missing `chroma.sqlite3` | container preflight fails with a clear error |
+| Index directory missing or empty | `validate-release-posture` exits `1` with `index_present=no` and the build command; the container's release gate fails; Streamlit does not start |
+| Missing `chroma.sqlite3` | `validate-release-posture` reports `index_present=no` with the build command; the container's release gate fails and the server does not start |
 | Index built from another corpus, stale, or hand-edited | exit `1`, `index_matches_canonical_corpus=no`, the mismatching value and the build command |
 | Manifest without content digests | refused: the index was not written by this build path |
 | Source files differ from the corpus manifest | `build-chunks` / `build-index` refuse to proceed; `validate-release-posture` reports `canonical_corpus_sources=mismatch (...)` |
-| `OPENAI_API_KEY` missing from the process environment | the canonical build stops before creating an embedding provider (`credential_source=missing`; a key that exists only in a repository `.env` does not count), and production retrieval at runtime fails; validation itself does not need the key |
+| `OPENAI_API_KEY` missing from the process environment | the canonical build stops before creating an embedding provider (`credential_source=missing`; a key that exists only in a repository `.env` does not count), and production retrieval at runtime fails; the host `validate-release-posture` does not need the key, but the release container refuses to start without it (exit `2`) |
 
 ## Replacing an index
 

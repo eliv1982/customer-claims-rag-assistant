@@ -98,9 +98,19 @@ def test_skipping_the_store_establishes_nothing_about_the_content(tmp_path: Path
     )
 
 
-def test_deployment_without_the_corpus_sources_reports_them_as_not_present(tmp_path: Path) -> None:
+def test_deployment_without_the_corpus_sources_is_not_release_ready(tmp_path: Path) -> None:
     staged = stage_consistent_release(tmp_path)
-    assert assess_release_readiness(_context(staged)).corpus_sources.startswith("not_present")
+    sources = tmp_path / "data" / "02_clean_markdown"
+    for source in sources.iterdir():
+        source.unlink()
+    sources.rmdir()
+
+    readiness = assess_release_readiness(_context(staged))
+    assert readiness.corpus_sources.startswith("not_present")
+    assert readiness.index_present is True
+    assert readiness.index_matches_canonical_corpus == "not_checked"
+    assert readiness.release_can_proceed is False
+    assert "canonical corpus sources are not release-ready" in (readiness.problem or "")
 
 
 def test_the_committed_corpus_sources_are_reported_verified() -> None:
@@ -114,10 +124,48 @@ def test_the_committed_corpus_sources_are_reported_verified() -> None:
 def test_a_source_that_drifted_from_the_manifest_is_reported(tmp_path: Path) -> None:
     staged = stage_consistent_release(tmp_path)
     sources = tmp_path / "data" / "02_clean_markdown"
-    sources.mkdir(parents=True)
     (sources / "01_service_overview.md").write_text("not what the manifest approved", encoding="utf-8")
-    sources_state = assess_release_readiness(_context(staged)).corpus_sources
-    assert sources_state.startswith("mismatch") and "01_service_overview.md" in sources_state
+    readiness = assess_release_readiness(_context(staged))
+    assert readiness.corpus_sources.startswith("mismatch")
+    assert "01_service_overview.md" in readiness.corpus_sources
+    assert readiness.release_can_proceed is False
+    assert readiness.diagnostics is None
+
+
+def test_an_unreadable_source_blocks_readiness_without_escaping_as_a_raw_exception(
+    tmp_path: Path,
+) -> None:
+    staged = stage_consistent_release(tmp_path)
+    source = tmp_path / "data" / "02_clean_markdown" / "01_service_overview.md"
+    source.write_bytes(b"\xff\xfe\x00")
+
+    readiness = assess_release_readiness(_context(staged))
+    assert readiness.corpus_sources.startswith("unreadable")
+    assert readiness.release_can_proceed is False
+    assert readiness.diagnostics is None
+
+
+def test_a_missing_included_source_blocks_an_otherwise_valid_index(tmp_path: Path) -> None:
+    staged = stage_consistent_release(tmp_path)
+    (tmp_path / "data" / "02_clean_markdown" / "01_service_overview.md").unlink()
+
+    readiness = assess_release_readiness(_context(staged))
+    assert readiness.index_present is True
+    assert readiness.corpus_sources.startswith("mismatch")
+    assert "missing source files" in readiness.corpus_sources
+    assert readiness.release_can_proceed is False
+    assert "release_can_proceed=no" in readiness.format_status_lines()
+
+
+def test_an_undeclared_markdown_source_blocks_the_canonical_selection(tmp_path: Path) -> None:
+    staged = stage_consistent_release(tmp_path)
+    unexpected = tmp_path / "data" / "02_clean_markdown" / "99_unexpected.md"
+    unexpected.write_text("not selected by the manifest", encoding="utf-8")
+
+    readiness = assess_release_readiness(_context(staged))
+    assert readiness.corpus_sources.startswith("mismatch")
+    assert "neither included nor excluded" in readiness.corpus_sources
+    assert readiness.release_can_proceed is False
 
 
 # --- the instruction is executable ---------------------------------------------------------------

@@ -103,11 +103,23 @@ def test_guard_allows_loopback() -> None:
 
 
 def test_guard_uninstall_restores_socket_functions() -> None:
-    before = (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo)
+    before = (
+        socket.socket.connect,
+        socket.socket.connect_ex,
+        socket.getaddrinfo,
+        socket.gethostbyname,
+        socket.gethostbyname_ex,
+    )
     guard = NetworkGuard()
     guard.install()
     guard.uninstall()
-    assert (socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo) == before
+    assert (
+        socket.socket.connect,
+        socket.socket.connect_ex,
+        socket.getaddrinfo,
+        socket.gethostbyname,
+        socket.gethostbyname_ex,
+    ) == before
 
 
 def test_swallowed_network_attempt_still_fails_the_session(tmp_path: Path) -> None:
@@ -142,6 +154,78 @@ def test_swallowed_network_attempt_still_fails_the_session(tmp_path: Path) -> No
     assert "1 passed" in completed.stdout
     assert "blocked network access" in completed.stdout
     assert "getaddrinfo 'example.invalid'" in completed.stdout
+    assert completed.returncode == 1
+
+
+def test_ordinary_child_python_inherits_dns_and_socket_guard_but_allows_loopback(
+    tmp_path: Path,
+) -> None:
+    """Negative control for the old in-process-only implementation.
+
+    A nested guarded pytest session launches an ordinary Python child with the environment it
+    inherited from pytest. The child catches both failures, so only the shared child-attempt log can
+    make the nested session fail. A real loopback connection in that same child remains permitted.
+    """
+    (tmp_path / "conftest.py").write_text(
+        'pytest_plugins = ["tests.conftest"]\n', encoding="utf-8"
+    )
+    (tmp_path / "test_child_guard.py").write_text(
+        textwrap.dedent(
+            '''
+            import socket
+            import subprocess
+            import sys
+
+            def test_inherited_child_guard_and_loopback_allowance():
+                probe = r"""
+            import socket
+
+            blocked = []
+            try:
+                socket.getaddrinfo("example.invalid", 443)
+            except OSError as exc:
+                blocked.append(type(exc).__name__)
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as external:
+                try:
+                    external.connect(("93.184.216.34", 80))
+                except OSError as exc:
+                    blocked.append(type(exc).__name__)
+            assert blocked == ["NetworkAccessBlocked", "NetworkAccessBlocked"]
+
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+                server.bind(("127.0.0.1", 0))
+                server.listen(1)
+                with socket.create_connection(server.getsockname(), timeout=5):
+                    pass
+            print("child guard blocked DNS and raw socket; loopback allowed")
+            """
+                child = subprocess.run(
+                    [sys.executable, "-c", probe],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                assert child.returncode == 0, child.stdout + child.stderr
+                assert "child guard blocked DNS and raw socket; loopback allowed" in child.stdout
+            '''
+        ),
+        encoding="utf-8",
+    )
+    env = _clean_subprocess_env()
+    env["PYTHONPATH"] = os.pathsep.join([str(PROJECT_ROOT), str(PROJECT_ROOT / "src")])
+    completed = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", str(tmp_path)],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    output = completed.stdout + completed.stderr
+    assert "1 passed" in output
+    assert "blocked network access" in output
+    assert "child getaddrinfo 'example.invalid'" in output
+    assert "child connect ('93.184.216.34', 80)" in output
     assert completed.returncode == 1
 
 

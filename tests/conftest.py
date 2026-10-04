@@ -12,7 +12,8 @@ network access, and must not write into the repository:
   need real cl100k values carry ``@pytest.mark.real_tiktoken`` and run in the separate real
   lane (``tests/tokenizer_lanes.py``), which needs a provisioned tiktoken cache and refuses
   to run, rather than skip or download, without it;
-* non-loopback network access raises and fails the session (``tests/network_guard.py``);
+* non-loopback network access in pytest and ordinary child Python interpreters raises and fails the
+  session (``tests/network_guard.py`` plus the inherited test-only ``sitecustomize`` hook);
 * tests that verify gitignored local artifacts carry ``local_artifact`` and skip
   with a reason when the artifact is absent (``tests/local_artifacts.py``).
 """
@@ -25,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.network_guard import NetworkGuard
+from tests.network_guard import NetworkGuard, PythonSubprocessNetworkGuard
 from tests.offline_tiktoken import offline_tiktoken
 from tests.tokenizer_lanes import (
     DEFAULT_LANE_NOTE,
@@ -48,6 +49,11 @@ _APP_ENV_PREFIXES = ("OPENAI_", "RAG_", "GENERATION_")
 _APP_ENV_NAMES = ("CUSTOMER_CLAIMS_PROJECT_ROOT",)
 
 _NETWORK_GUARD = NetworkGuard()
+_PYTHON_SUBPROCESS_NETWORK_GUARD = PythonSubprocessNetworkGuard()
+
+
+def _network_attempts() -> list[str]:
+    return [*_NETWORK_GUARD.attempts, *_PYTHON_SUBPROCESS_NETWORK_GUARD.attempts]
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -70,6 +76,7 @@ def _real_lane(config: pytest.Config) -> bool:
 
 def pytest_configure(config: pytest.Config) -> None:
     _NETWORK_GUARD.install()
+    _PYTHON_SUBPROCESS_NETWORK_GUARD.install()
     if _real_lane(config):
         try:
             require_provisioned_cl100k()
@@ -78,6 +85,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 def pytest_unconfigure(config: pytest.Config) -> None:
+    _PYTHON_SUBPROCESS_NETWORK_GUARD.uninstall()
     _NETWORK_GUARD.uninstall()
 
 
@@ -119,15 +127,16 @@ def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:
     if config.get_verbosity() < 0:
         # ``-q`` suppresses the header, so the lane note is repeated where it stays visible.
         terminalreporter.write_line(REAL_LANE_NOTE if _real_lane(config) else DEFAULT_LANE_NOTE)
-    if _NETWORK_GUARD.attempts:
+    attempts = _network_attempts()
+    if attempts:
         terminalreporter.section("blocked network access", red=True)
-        for attempt in _NETWORK_GUARD.attempts:
+        for attempt in attempts:
             terminalreporter.write_line(attempt)
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     # An attempt that code under test swallowed must still fail the run.
-    if _NETWORK_GUARD.attempts and exitstatus == pytest.ExitCode.OK:
+    if _network_attempts() and exitstatus == pytest.ExitCode.OK:
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
 

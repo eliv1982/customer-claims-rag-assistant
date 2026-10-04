@@ -35,7 +35,12 @@ from customer_claims_rag.ingestion.canonical_corpus import (
 )
 from customer_claims_rag.ingestion.corpus_builder import CorpusBuilder
 from customer_claims_rag.ingestion.corpus_overlay import compute_doc08_fingerprint
+from customer_claims_rag.config import DEFAULT_EMBEDDING_BATCH_SIZE
 from customer_claims_rag.models import ChunkRecord
+from customer_claims_rag.retrieval.embedding_validation import (
+    MAX_EMBEDDING_DOCUMENT_CHARS,
+    validate_document_texts,
+)
 from customer_claims_rag.retrieval.fingerprint import compute_corpus_fingerprint
 from customer_claims_rag.token_counter import TiktokenCounter
 from tests.frozen_fixtures import CANONICAL_TOPOLOGY, HISTORICAL_TOPOLOGY
@@ -122,6 +127,17 @@ def test_canonical_chunk_boundaries_match_the_golden_topology(canonical_build) -
     differences = _differences(actual, golden["token_counts"])
     assert not differences, "chunk topology drifted from the golden table:\n" + "\n".join(differences)
     assert list(actual) == list(golden["token_counts"]), "chunk order drifted from the golden table"
+
+
+@pytest.mark.real_tiktoken
+def test_canonical_chunks_fit_the_document_embedding_bounds_with_headroom(canonical_build) -> None:
+    """Every supported canonical build request passes the project-owned embedding input bounds."""
+    texts = [chunk.content for chunk in canonical_build.chunks]
+    assert max(len(text) for text in texts) <= MAX_EMBEDDING_DOCUMENT_CHARS * 3 // 4
+    assert validate_document_texts(texts) == texts, "the whole corpus in one embedding call"
+    for start in range(0, len(texts), DEFAULT_EMBEDDING_BATCH_SIZE):
+        batch = texts[start : start + DEFAULT_EMBEDDING_BATCH_SIZE]
+        assert validate_document_texts(batch) == batch
 
 
 @pytest.mark.real_tiktoken

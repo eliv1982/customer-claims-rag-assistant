@@ -110,6 +110,27 @@ def _stale_index_with_forged_manifest(staged: StagedRelease) -> None:
     _point_descriptor_at(staged, "stale-index")
 
 
+def _source_directory_missing(staged: StagedRelease) -> None:
+    source_dir = staged.root / "data" / "02_clean_markdown"
+    for source in source_dir.iterdir():
+        source.unlink()
+    source_dir.rmdir()
+
+
+def _included_source_missing(staged: StagedRelease) -> None:
+    (staged.root / "data" / "02_clean_markdown" / f"{DOCS[0]}.md").unlink()
+
+
+def _included_source_changed(staged: StagedRelease) -> None:
+    source = staged.root / "data" / "02_clean_markdown" / f"{DOCS[0]}.md"
+    source.write_text("mutated after manifest approval", encoding="utf-8")
+
+
+def _canonical_selection_changed(staged: StagedRelease) -> None:
+    source = staged.root / "data" / "02_clean_markdown" / "99_unexpected.md"
+    source.write_text("undeclared source", encoding="utf-8")
+
+
 def _run(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -125,6 +146,10 @@ def _run(
 # state name -> (how to damage the release, exit of the full run, exit of --skip-vector-store)
 # The static check reads manifests only, so damage that lives in the store is invisible to it.
 DAMAGED_STATES: dict[str, tuple[Callable[[StagedRelease], None], int, int]] = {
+    "source-directory-missing": (_source_directory_missing, BLOCKED, BLOCKED),
+    "included-source-missing": (_included_source_missing, BLOCKED, BLOCKED),
+    "included-source-changed": (_included_source_changed, BLOCKED, BLOCKED),
+    "canonical-selection-changed": (_canonical_selection_changed, BLOCKED, BLOCKED),
     "index-missing": (_missing_index, BLOCKED, BLOCKED),
     "manifest-payload-digest-wrong": (_manifest_digest_wrong, BLOCKED, BLOCKED),
     "manifest-fingerprint-wrong": (_manifest_fingerprint_wrong, BLOCKED, BLOCKED),

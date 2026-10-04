@@ -1,12 +1,22 @@
+# Release Compose stack for the Streamlit UI. Run it through scripts/release_compose.py, never with
+# a bare `docker compose`: the launcher requires OPENAI_API_KEY in the real shell environment and
+# tells Compose to ignore the project .env, so an old repository .env cannot supply the credential.
+# Raw `docker compose` stops at the guard below. Details: docs/08_docker_runbook.md.
+
+# Set only by scripts/release_compose.py. A repository .env that defines it is deliberate misuse.
+x-release-guard: ${RELEASE_COMPOSE_LAUNCHER:?run this stack through scripts/release_compose.py (python scripts/release_compose.py up); a bare docker compose would read the project .env}
+
 services:
   streamlit:
     build: .
     ports:
-      - "8501:8501"
+      # Loopback by default: the UI has no authentication. Anything wider is an explicit opt-in
+      # (RAG_BIND_ADDRESS=0.0.0.0) and belongs behind an authenticating reverse proxy or firewall.
+      - "${RAG_BIND_ADDRESS:-127.0.0.1}:${RAG_HOST_PORT:-8501}:8501"
     environment:
       CUSTOMER_CLAIMS_PROJECT_ROOT: /app
       RAG_RELEASE_TARGET: ${RAG_RELEASE_TARGET:-active}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in the environment before starting}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY must be set in the shell environment}
       OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
       OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
       GENERATION_TEMPERATURE: ${GENERATION_TEMPERATURE:-0.0}
@@ -15,19 +25,22 @@ services:
       GENERATION_MAX_OUTPUT_TOKENS: ${GENERATION_MAX_OUTPUT_TOKENS:-1024}
       GENERATION_PROMPT_PATH: ${GENERATION_PROMPT_PATH:-prompts/system_prompt.md}
     volumes:
+      # The one writable path. Chroma opens its SQLite database read-write even to query it (a
+      # read-only mount fails with "attempt to write a readonly database"), so this mount is
+      # read-write; the application tree and the root filesystem are not. A missing host directory
+      # is an error, never something Compose creates (it would be an empty "index").
       - type: bind
         source: ${RAG_ACTIVE_INDEX_HOST_PATH:-./data/04_index_production}
         target: /app/data/04_index_production
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5)",
-        ]
-      interval: 30s
-      timeout: 10s
-      start_period: 60s
-      retries: 3
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # A failed release validation is deterministic: bounded retries, not a restart loop.
+    restart: on-failure:3
+    # The health check is defined once, in the image.

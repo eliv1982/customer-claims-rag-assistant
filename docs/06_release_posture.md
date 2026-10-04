@@ -76,11 +76,11 @@ The previous release `foodflow-10doc-release-v1` (index `data/04_index_backup_10
 
 | Line | Meaning |
 |------|---------|
-| `canonical_corpus_sources` | whether the source files in this checkout match the manifest (`verified`, `mismatch (...)`, or `not_present` in a deployment without the corpus) |
+| `canonical_corpus_sources` | whether the source files in this checkout/image match the manifest (`verified`, `mismatch (...)`, or `not_present`); anything except `verified` blocks production readiness before the index can be accepted |
 | `index_present` | whether a Chroma index exists at the target path |
 | `index_matches_canonical_corpus` | `yes` / `no` / `not_checked`: whether the index matches the corpus, **recomputed from the stored records** |
 | `static_validation` | `passed` when the descriptor, the manifests and the frozen config validated. It says nothing about the index content and is **not** a release verdict |
-| `release_can_proceed` | `yes` only when the index content was verified against the canonical corpus; `no` otherwise, with the command that builds it; `not_established` when the static checks passed but the content was not verified |
+| `release_can_proceed` | `yes` only when the canonical source files were recomputed successfully and the index content was verified against that corpus; `no` for missing/mutated sources or a missing/invalid index; `not_established` when the sources/static checks passed but index content was not verified |
 
 The command is a release gate, and its exit status says which of the three verdicts it reached:
 

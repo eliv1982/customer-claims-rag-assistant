@@ -260,16 +260,16 @@ python -m streamlit run src/customer_claims_rag/ui/streamlit_app.py
 1. Собрать index на хосте: `docs/07_index_provisioning.md`
 2. Runbook: `docs/08_docker_runbook.md`
 
-Кратко (PowerShell):
+Кратко (PowerShell). Compose запускается только через `scripts/release_compose.py`: ключ берётся из environment процесса, а не из репозиторного `.env`:
 
 ```powershell
 $env:OPENAI_API_KEY = "your-key-here"
-docker compose build
-docker compose run --rm streamlit validate-release-posture
-docker compose up
+python scripts/release_compose.py build
+python scripts/release_compose.py run --rm streamlit validate-release-posture
+python scripts/release_compose.py up -d --wait
 ```
 
-Откройте http://localhost:8501. Индекс монтируется read-write в `/app/data/04_index_production`; в image он **не** копируется. `RAG_INDEX_DIR` на production UI flow **не влияет**; selector — `RAG_RELEASE_TARGET` + descriptor.
+Откройте http://127.0.0.1:8501 (порт публикуется только на loopback; `RAG_BIND_ADDRESS` — явный opt-in). Индекс монтируется read-write в `/app/data/04_index_production` (Chroma пишет в свою SQLite даже при чтении); остальная файловая система контейнера read-only, процесс работает от uid 10001. В image индекс **не** копируется. `RAG_INDEX_DIR` на production UI flow **не влияет**; selector — `RAG_RELEASE_TARGET` + descriptor.
 
 Дополнительные параметры search-index (локальный Python, dev/evaluation):
 

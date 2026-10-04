@@ -37,7 +37,15 @@ class ChromaVectorStore:
             )
         else:
             self._index_dir.mkdir(parents=True, exist_ok=True)
-        self._client = chromadb.PersistentClient(path=str(self._index_dir))
+        try:
+            self._client = chromadb.PersistentClient(path=str(self._index_dir))
+        except Exception as exc:
+            # Chroma opens its SQLite database read-write even to query it, so a read-only or
+            # foreign-owned index directory fails here with an engine error. Surface it as the
+            # typed store error the release gate and the UI already handle, not as a traceback.
+            raise VectorStoreError(
+                f"cannot open the Chroma index at {self._index_dir}: {exc}"
+            ) from exc
         if open_existing:
             try:
                 self._collection = self._client.get_collection(name=self._collection_name)

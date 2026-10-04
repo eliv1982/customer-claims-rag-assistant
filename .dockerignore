@@ -1,51 +1,28 @@
-# Version control and CI metadata
-.git
-.github
+# The build context is an allowlist: everything is excluded unless it is re-included below, so a
+# new local file (a credential, an index, a cache, an evaluation output) can never reach the image
+# by default. Docker matches these patterns from the context root; the last matching line wins.
+*
 
-# Local environment and secrets
-.venv
-.env
-.env.*
-!.env.example
-
-# Python caches and build artifacts
-__pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-.coverage
-htmlcov/
-build/
-dist/
-.tmp/
-
-# IDE and editor metadata
-.claude/
-.cursor/
-.idea/
-.vscode/
-.DS_Store
-Thumbs.db
-
-# Tests, deliverables, and experiments (not required at runtime)
-tests/
-deliverables/
-experiments/
-
-# Documentation (README.md is required for package install)
-docs/
-*.md
+# Everything the image is built from (see the Dockerfile COPY lines).
+!pyproject.toml
 !README.md
+!src/
+!configs/
+!prompts/
+!scripts/docker-entrypoint.sh
+!scripts/healthcheck.py
 
-# Corpus and generated data (production index is bind-mounted at runtime)
-data/01_raw/
-data/02_clean_markdown/
-data/03_chunks/
-data/04_index/
-data/04_index_backup_10docs_215chunks/
-data/04_index_production/
-data/04_index_experiments/
-data/05_evaluation/
+# Full release validation recomputes the committed source hashes at container startup. Re-include
+# the parent directories explicitly (Docker cannot re-include a file below an ignored parent), then
+# only the canonical Markdown source directory. Generated chunks, indexes, evaluations and every
+# other workstation data path remain excluded by the leading allowlist rule.
+!data/
+!data/02_clean_markdown/
+!data/02_clean_markdown/*.md
 
-# Local Chroma index patterns
-data/04_index*/
+# Local state that can sit inside an allowed directory. `**/` is required: a bare
+# `__pycache__/` only matches at the context root, which is how compiled files from a developer
+# workstation reached an earlier image.
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info

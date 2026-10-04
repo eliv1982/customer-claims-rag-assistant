@@ -42,7 +42,6 @@ TEST_CORPUS_MANIFEST_RELATIVE = "configs/corpus/test_corpus.json"
 TEST_CORPUS_ID = "test-corpus"
 FAKE_MODEL = "fake-embedding-model"
 FAKE_DIMENSION = 8
-TEST_SOURCE_SHA256 = "0" * 64
 
 
 def hex64(label: str) -> str:
@@ -69,6 +68,13 @@ def write_test_corpus_manifest(
     embedding_model: str = FAKE_MODEL,
 ) -> Path:
     ids = sorted(document_ids)
+    source_dir = project_root / "data" / "02_clean_markdown"
+    source_dir.mkdir(parents=True, exist_ok=True)
+    source_hashes: dict[str, str] = {}
+    for doc in ids:
+        content = f"# {doc}\n\nCanonical source used by the release-readiness test.\n"
+        (source_dir / f"{doc}.md").write_text(content, encoding="utf-8")
+        source_hashes[doc] = hashlib.sha256(content.encode("utf-8")).hexdigest()
     payload = {
         "schema_version": "1.0.0",
         "corpus_id": TEST_CORPUS_ID,
@@ -76,7 +82,11 @@ def write_test_corpus_manifest(
         "source_dir": "data/02_clean_markdown",
         "tokenizer_encoding": "cl100k_base",
         "documents": [
-            {"document_id": doc, "file": f"{doc}.md", "source_sha256": TEST_SOURCE_SHA256}
+            {
+                "document_id": doc,
+                "file": f"{doc}.md",
+                "source_sha256": source_hashes[doc],
+            }
             for doc in ids
         ],
         "excluded_documents": [],

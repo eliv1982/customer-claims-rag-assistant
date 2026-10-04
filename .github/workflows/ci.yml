@@ -7,9 +7,10 @@
 #   real-tokenizer  real cl100k_base: the committed chunk topology of the production corpus, Ubuntu
 #
 # Network: allowed only to install packages and, in its own step, to provision the cl100k_base
-# vocabulary. During pytest, application network access is refused inside the process by the test
-# suite's network guard (tests/network_guard.py); proxy variables pointing at a dead address add a
-# second barrier for subprocesses. The runner itself is NOT sandboxed at OS level.
+# vocabulary. During pytest, application/test Python and ordinary inherited Python subprocesses are
+# DNS/socket guarded (tests/network_guard.py plus a test-only sitecustomize hook); dead proxy
+# variables add a second barrier for proxy-aware tools. The runner and arbitrary native executables
+# are NOT sandboxed at OS level.
 #
 # No secrets, no deployment, no uploads: contents are read-only, and nothing here needs
 # OPENAI_API_KEY (the production embedding index is built deliberately, outside CI).

@@ -95,3 +95,29 @@ def test_no_project_tree_pollution(tmp_path: Path, project_root: Path) -> None:
 
     after = _snapshot_index_dir(project_index_dir)
     assert after == before, "Chroma integration test modified project index directory"
+
+
+def test_engine_failure_on_open_is_a_typed_store_error_not_a_raw_engine_exception(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A read-only or foreign-owned index fails inside Chroma at open time (it needs write access to
+    its SQLite database even to query). The release gate and the UI handle VectorStoreError; a bare
+    engine exception would reach the operator as a traceback."""
+    import chromadb
+    import pytest
+
+    from customer_claims_rag.exceptions import RetrievalError, VectorStoreError
+
+    index_dir = tmp_path / "production_index"
+    index_dir.mkdir()
+    (index_dir / "chroma.sqlite3").write_bytes(b"")
+
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("(code: 8) attempt to write a readonly database")
+
+    monkeypatch.setattr(chromadb, "PersistentClient", refuse)
+    with pytest.raises(VectorStoreError, match="cannot open the Chroma index") as caught:
+        ChromaVectorStore(index_dir=index_dir, collection_name="customer_claims", open_existing=True)
+    assert isinstance(caught.value, RetrievalError)
+    assert "attempt to write a readonly database" in str(caught.value)
+    assert isinstance(caught.value.__cause__, RuntimeError)

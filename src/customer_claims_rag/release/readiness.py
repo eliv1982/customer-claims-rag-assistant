@@ -112,19 +112,31 @@ class ReleaseReadiness:
         return lines
 
 
-def _describe_sources(context: ProductionReleaseContext) -> str:
+def _assess_sources(context: ProductionReleaseContext) -> tuple[str, str | None]:
+    """Describe and independently verify the source files required by this release.
+
+    The manifest's claimed hashes are not enough for readiness: this reads the image/checkout files
+    and recomputes their hashes before any index can be accepted.
+    """
     target = context.resolved_target
     try:
         manifest = load_canonical_corpus_manifest(target.corpus_manifest_path)
         source_dir = manifest.source_directory(context.project_root)
     except Exception as exc:  # the manifest was valid when the target resolved; report, not raise
-        return f"unreadable ({exc})"
+        description = f"unreadable ({exc})"
+        return description, f"canonical corpus sources are not release-ready: {description}"
     if not source_dir.is_dir():
-        return "not_present (source directory absent; this is a deployment without the corpus)"
-    report = verify_corpus_sources(manifest, project_root=context.project_root)
+        description = "not_present (canonical source directory absent)"
+        return description, f"canonical corpus sources are not release-ready: {description}"
+    try:
+        report = verify_corpus_sources(manifest, project_root=context.project_root)
+    except Exception as exc:
+        description = f"unreadable ({exc})"
+        return description, f"canonical corpus sources are not release-ready: {description}"
     if report.ok:
-        return f"verified ({len(manifest.documents)} source files match source_sha256)"
-    return f"mismatch ({report.describe()})"
+        return f"verified ({len(manifest.documents)} source files match source_sha256)", None
+    description = f"mismatch ({report.describe()})"
+    return description, f"canonical corpus sources are not release-ready: {description}"
 
 
 def assess_release_readiness(
@@ -135,7 +147,7 @@ def assess_release_readiness(
 ) -> ReleaseReadiness:
     """Assess the release state of the resolved target. Never raises for release problems."""
     target = context.resolved_target
-    corpus_sources = _describe_sources(context)
+    corpus_sources, source_problem = _assess_sources(context)
     instruction = build_instruction(target)
     common = {
         "release_posture_id": context.descriptor.release_posture_id,
@@ -149,6 +161,16 @@ def assess_release_readiness(
     }
 
     index_present = target.index_dir.is_dir() and chroma_sqlite_path(target.index_dir).is_file()
+    if source_problem is not None:
+        return ReleaseReadiness(
+            **common,
+            index_present=index_present,
+            index_matches_canonical_corpus=INDEX_MATCHES_NOT_CHECKED,
+            release_can_proceed=False,
+            problem=source_problem,
+            next_step=None,
+            diagnostics=None,
+        )
     if not index_present:
         return ReleaseReadiness(
             **common,

@@ -23,7 +23,9 @@ The default suite runs on both Ubuntu and Windows because the repository's path,
 | tokenizer provisioning (`scripts/provision_tiktoken_cache.py`, its own step) | allowed, to the tiktoken vocabulary host only |
 | test execution | no application or tokenizer access |
 
-During pytest the suite's own network guard (`tests/network_guard.py`) raises on any non-loopback DNS lookup or connect and fails the session even if the code under test swallowed the error. The test steps additionally set `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` to a dead loopback address, a second barrier that also covers subprocesses the tests start. This is not an operating-system sandbox: the runner itself still has internet access.
+During pytest the suite's own network guard (`tests/network_guard.py`) raises on any non-loopback DNS lookup or socket connect in the test process. A test-only `sitecustomize` hook is inherited through `PYTHONPATH`, so ordinary child Python interpreters that inherit the supported pytest environment install the same DNS/socket guard before their code runs. Parent and child attempts are recorded, and the session fails even if code catches the raised error. The test steps also set `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` to a dead loopback address as a second barrier for proxy-aware tools.
+
+This is deliberately not described as an operating-system network sandbox. The GitHub runner still has internet access, an explicitly isolated Python (`-I`) or a child that replaces the supported environment can bypass Python startup inheritance, and arbitrary native executables are not socket-patched. The guarantee covers application/test Python and its ordinary inherited Python subprocesses; no external attempt is permitted or observed in that supported suite.
 
 ## Real `cl100k_base` provisioning
 
@@ -41,7 +43,7 @@ The Actions cache is only an optimisation: a miss provisions, and a stale or cor
 - It never calls OpenAI and never needs `OPENAI_API_KEY`; the workflow references no secret.
 - It does not build the production Chroma index or run retrieval evaluation. The index is built on purpose, with a key in the process environment, as described in `docs/07_index_provisioning.md`; the canonical corpus identity (documents, chunk topology, fingerprint) and the release validator's store-recomputation logic are what CI verifies.
 - It does not run the `local_artifact` tests, which verify gitignored local artifacts (historical archives, a built production index). They skip with the missing path as reason; the repository-controlled parts of those contracts are covered by ordinary tests.
-- It does not build or scan the Docker image.
+- It does not build or scan the Docker image, and no job needs Docker. The container contract (non-root user, runtime-only dependencies, loopback publication, credential source, gate-before-server ordering, build-context allowlist) is pinned statically by `tests/unit/test_container_runtime_contract.py`, `test_release_compose_launcher.py` and `test_container_healthcheck.py`, which run in the default suite; building and starting the image is verified by hand against a Docker daemon (`docs/08_docker_runbook.md`, "Verification record").
 
 ## Reproducing the lanes locally
 

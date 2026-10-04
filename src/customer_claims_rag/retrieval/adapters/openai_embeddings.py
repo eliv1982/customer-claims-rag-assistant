@@ -8,6 +8,7 @@ from langchain_openai import OpenAIEmbeddings
 
 from customer_claims_rag.exceptions import EmbeddingError
 from customer_claims_rag.retrieval.embedding_validation import (
+    validate_document_texts,
     validate_embedding_batch,
     validate_embedding_vector,
     validate_query_text,
@@ -15,7 +16,14 @@ from customer_claims_rag.retrieval.embedding_validation import (
 
 
 class OpenAIEmbeddingProvider:
-    """LangChain-backed OpenAI embedding provider."""
+    """LangChain-backed OpenAI embedding provider.
+
+    Text is bounded here, by the project, and not by LangChain: queries and documents are checked
+    by ``validate_query_text`` and ``validate_document_texts`` before any request is made, so
+    LangChain must not tokenize these already-bounded requests a second time.  Besides being
+    redundant, its optional length check requires a tiktoken vocabulary/cache (and can download
+    one) in an otherwise serving-only image.
+    """
 
     def __init__(
         self,
@@ -35,6 +43,10 @@ class OpenAIEmbeddingProvider:
         self._client = OpenAIEmbeddings(
             model=model_name,
             api_key=api_key,
+            # Query and document sizes are project-owned invariants.  Keep ordinary embedding
+            # calls independent of cl100k_base; the real tokenizer remains mandatory when the
+            # canonical chunks themselves are constructed and their topology is verified.
+            check_embedding_ctx_length=False,
         )
 
     @property
@@ -46,19 +58,20 @@ class OpenAIEmbeddingProvider:
         return self._vector_dimension
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
-        if not texts:
+        documents = validate_document_texts(texts)
+        if not documents:
             return []
         try:
-            vectors = self._client.embed_documents(list(texts))
+            vectors = self._client.embed_documents(documents)
         except Exception:
             raise EmbeddingError("OpenAI embedding request failed") from None
-        validated = validate_embedding_batch(vectors, expected_count=len(texts))
+        validated = validate_embedding_batch(vectors, expected_count=len(documents))
         if self._vector_dimension is None and validated:
             self._vector_dimension = len(validated[0])
         if self._vector_dimension is not None:
             return validate_embedding_batch(
                 validated,
-                expected_count=len(texts),
+                expected_count=len(documents),
                 expected_dimension=self._vector_dimension,
             )
         return validated
