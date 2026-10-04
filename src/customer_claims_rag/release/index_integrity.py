@@ -19,9 +19,11 @@ vector dimension           length of every stored vector        release descript
 
 What stays trusted, and why it cannot be otherwise offline: that the stored vectors were produced
 by the named embedding model (only the name, via the fingerprint, and the dimension are checkable),
-and ``embedding_digest`` (it hashes the provider's float64 vectors, which Chroma stores as float32,
-so it cannot be re-derived from the store; ``collection_content_digest`` plays that role for the
-store itself). Reading the records is a few hundred rows; no embedding request is ever made.
+and ``embedding_digest`` (it hashes the vectors the provider returned, each component serialized
+as an IEEE-754 half-precision value, 2 bytes big-endian; Chroma stores float32 copies, and rounding
+float64 -> float32 -> half is not always the same as float64 -> half, so it cannot be re-derived
+exactly from the store; ``collection_content_digest`` plays that role for the store itself).
+Reading the records is a few hundred rows; no embedding request is ever made.
 """
 
 from __future__ import annotations

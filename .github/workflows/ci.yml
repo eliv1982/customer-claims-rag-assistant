@@ -1,0 +1,173 @@
+# CI for the repository contract: a clean checkout installs from the declared dependencies and passes
+# the test suite without any credential, .env, built index, tokenizer download or application network
+# access. Docs: docs/09_ci_contract.md.
+#
+# Two lanes, because the offline test suite cannot prove production tokenization:
+#   default-suite   offline tokenizer substitute (NOT cl100k_base), Ubuntu + Windows
+#   real-tokenizer  real cl100k_base: the committed chunk topology of the production corpus, Ubuntu
+#
+# Network: allowed only to install packages and, in its own step, to provision the cl100k_base
+# vocabulary. During pytest, application network access is refused inside the process by the test
+# suite's network guard (tests/network_guard.py); proxy variables pointing at a dead address add a
+# second barrier for subprocesses. The runner itself is NOT sandboxed at OS level.
+#
+# No secrets, no deployment, no uploads: contents are read-only, and nothing here needs
+# OPENAI_API_KEY (the production embedding index is built deliberately, outside CI).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # A superseded pull request run is waste; a run on main is a record and is never cancelled.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  default-suite:
+    name: default hermetic suite (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: "[install] declared dependencies (.[dev])"
+        run: python -m pip install -e ".[dev]"
+
+      - name: "[install] pip check"
+        run: python -m pip check
+
+      - name: "[hermetic] precondition - no credential, .env, built index or tokenizer cache"
+        shell: python
+        env:
+          TIKTOKEN_CACHE_DIR: ${{ runner.temp }}/empty-tiktoken-cache
+        run: |
+          import os
+          from pathlib import Path
+
+          problems = [f"environment variable {name} is set" for name in os.environ
+                      if name.startswith(("OPENAI_", "RAG_", "GENERATION_"))]
+          for path in (".env", "data/04_index_production", "data/04_index/manifest.json",
+                       "data/03_chunks/chunks.jsonl"):
+              if Path(path).exists():
+                  problems.append(f"{path} exists in a clean checkout")
+          cache = Path(os.environ["TIKTOKEN_CACHE_DIR"])
+          if cache.exists() and any(cache.iterdir()):
+              problems.append(f"tokenizer cache {cache} is not empty")
+          if problems:
+              raise SystemExit("hermetic precondition violated:\n  " + "\n  ".join(problems))
+          print("hermetic precondition holds: no credential, .env, built index or tokenizer cache")
+
+      - name: "[default suite] hermetic tests (offline tokenizer substitute, not cl100k_base)"
+        env:
+          TIKTOKEN_CACHE_DIR: ${{ runner.temp }}/empty-tiktoken-cache
+          HTTP_PROXY: http://127.0.0.1:9
+          HTTPS_PROXY: http://127.0.0.1:9
+          ALL_PROXY: http://127.0.0.1:9
+          NO_PROXY: 127.0.0.1,localhost,::1
+        run: python -m pytest -p no:cacheprovider
+
+      - name: "[hermetic] the tests left the checkout unchanged"
+        shell: bash
+        run: |
+          changes="$(git status --porcelain)"
+          if [ -n "$changes" ]; then
+            echo "the test run modified or added files in the checkout:"
+            echo "$changes"
+            exit 1
+          fi
+
+  real-tokenizer:
+    name: real cl100k_base topology (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Where the vocabulary is provisioned and where the lane reads it from.
+      TIKTOKEN_CACHE_DIR: /tmp/ci-tiktoken-cache
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: "[install] declared dependencies (.[dev])"
+        run: python -m pip install -e ".[dev]"
+
+      - name: "[install] pip check"
+        run: python -m pip check
+
+      # An optimisation only. The provisioning step below always runs and tiktoken checks the
+      # vocabulary's SHA-256 itself, so a stale or corrupted cache cannot satisfy the lane.
+      - name: "[tokenizer cache] restore"
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.TIKTOKEN_CACHE_DIR }}
+          key: tiktoken-cl100k_base-v1
+
+      - name: "[tokenizer provisioning] fetch and verify the real cl100k_base vocabulary (network allowed here only)"
+        run: python scripts/provision_tiktoken_cache.py
+
+      - name: "[real-tokenizer lane] negative control - refuses to run without the vocabulary"
+        env:
+          TIKTOKEN_CACHE_DIR: ${{ runner.temp }}/empty-tiktoken-cache
+        run: |
+          set +e
+          python -m pytest --real-tiktoken -m real_tiktoken -p no:cacheprovider
+          status=$?
+          set -e
+          if [ "$status" -ne 4 ]; then
+            echo "expected pytest usage error 4 (vocabulary not provisioned), got $status"
+            exit 1
+          fi
+
+      - name: "[real-tokenizer lane] production chunk topology under real cl100k_base"
+        env:
+          HTTP_PROXY: http://127.0.0.1:9
+          HTTPS_PROXY: http://127.0.0.1:9
+          ALL_PROXY: http://127.0.0.1:9
+          NO_PROXY: 127.0.0.1,localhost,::1
+        run: |
+          # Read-only cache: the lane can read the vocabulary but nothing can write a download into it.
+          chmod -R a-w "$TIKTOKEN_CACHE_DIR"
+          python -m pytest --real-tiktoken -m real_tiktoken -p no:cacheprovider
+
+      - name: "[hermetic] the tests left the checkout unchanged"
+        run: |
+          changes="$(git status --porcelain)"
+          if [ -n "$changes" ]; then
+            echo "the test run modified or added files in the checkout:"
+            echo "$changes"
+            exit 1
+          fi

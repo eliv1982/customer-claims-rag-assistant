@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import math
+import os
 import sys
 import traceback
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from customer_claims_rag.config import (
@@ -15,7 +18,7 @@ from customer_claims_rag.config import (
     DEFAULT_INPUT_DIR,
 )
 from customer_claims_rag.env_bootstrap import load_project_env
-from customer_claims_rag.exceptions import IngestionError, RetrievalError
+from customer_claims_rag.exceptions import EmbeddingError, IngestionError, RetrievalError
 from customer_claims_rag.ingestion.canonical_corpus import (
     CanonicalCorpusBuild,
     build_canonical_corpus,
@@ -28,6 +31,38 @@ from customer_claims_rag.retrieval.path_helpers import validate_index_dir
 from customer_claims_rag.retrieval.ports import VectorStore
 from customer_claims_rag.retrieval_config import RetrievalSettings
 from customer_claims_rag.token_counter import TiktokenCounter
+
+
+OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
+CREDENTIAL_SOURCE_PROCESS_ENVIRONMENT = "process_environment"
+CREDENTIAL_SOURCE_MISSING = "missing"
+
+
+@dataclass(frozen=True)
+class ReleaseBuildCredential:
+    """Where the embedding credential of a release build came from; never what it is."""
+
+    source: str
+    api_key: str | None = field(default=None, repr=False)
+
+    @property
+    def available(self) -> bool:
+        return self.api_key is not None
+
+
+def resolve_release_build_credential(process_api_key: str | None) -> ReleaseBuildCredential:
+    """The credential of a canonical (``--corpus-manifest``) build: the process environment only.
+
+    ``process_api_key`` must be ``OPENAI_API_KEY`` as the process started with, read before
+    ``load_project_env()`` merged a repository ``.env`` into ``os.environ``. A paid embedding run
+    over the release corpus has to be started with a key somebody put in the environment on
+    purpose, not with whatever file happens to sit in the working tree. Ordinary development
+    commands keep reading ``.env``.
+    """
+    key = (process_api_key or "").strip()
+    if not key:
+        return ReleaseBuildCredential(source=CREDENTIAL_SOURCE_MISSING)
+    return ReleaseBuildCredential(source=CREDENTIAL_SOURCE_PROCESS_ENVIRONMENT, api_key=key)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -52,7 +87,9 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Canonical corpus manifest (e.g. configs/corpus/foodflow_production_v1.json): index "
             "exactly the documents it selects, after verifying sources, chunk topology and "
-            "fingerprint against it. This is how the production index is built"
+            "fingerprint against it. This is how the production index is built. Unless --dry-run, "
+            "it needs OPENAI_API_KEY in the process environment; a repository .env is not used "
+            "for this build"
         ),
     )
     parser.add_argument(
@@ -213,12 +250,26 @@ def run_build(
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Read before load_project_env(): it merges a repository .env into os.environ, after which
+    # a key from the file and a key from the shell can no longer be told apart.
+    process_api_key = os.environ.get(OPENAI_API_KEY_ENV)
     load_project_env()
     parser = build_parser()
     args = parser.parse_args(argv)
     settings = RetrievalSettings.from_env()
 
     try:
+        if args.corpus_manifest is not None and not args.dry_run:
+            credential = resolve_release_build_credential(process_api_key)
+            if not credential.available:
+                raise EmbeddingError(
+                    f"{OPENAI_API_KEY_ENV} is required in the process environment for a canonical "
+                    f"release build (credential_source={credential.source}); a repository .env is "
+                    "not used as the credential source of this build. Export it in the shell that "
+                    "runs the command"
+                )
+            print(f"credential_source={credential.source}")
+            settings = dataclasses.replace(settings, openai_api_key=credential.api_key)
         return run_build(
             input_dir=args.input_dir,
             index_dir=args.index_dir,

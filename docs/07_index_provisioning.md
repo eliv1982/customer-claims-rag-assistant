@@ -35,7 +35,7 @@ Production target selection uses `RAG_RELEASE_TARGET` against the committed desc
 
 ## Build the index
 
-1. Install the project (see `README.md`) and set `OPENAI_API_KEY` in the environment (or in your own `.env`; the build tool loads it if present).
+1. Install the project (see `README.md`) and export `OPENAI_API_KEY` in the shell that runs the build. The canonical build (`--corpus-manifest`, not `--dry-run`) reads the key from the process environment only and ignores a repository `.env` as a credential source, so a paid embedding run starts only with a key you provided on purpose. Without it the build stops before any provider is created and prints `credential_source=missing`; with it, it prints `credential_source=process_environment` (never the key). Other development commands keep loading `.env`.
 2. Check the corpus and see the plan, without any embedding request:
 
    ```powershell
@@ -95,7 +95,7 @@ The index is built on the host (above) and bind-mounted at `/app/data/04_index_p
 | Index built from another corpus, stale, or hand-edited | exit `1`, `index_matches_canonical_corpus=no`, the mismatching value and the build command |
 | Manifest without content digests | refused: the index was not written by this build path |
 | Source files differ from the corpus manifest | `build-chunks` / `build-index` refuse to proceed; `validate-release-posture` reports `canonical_corpus_sources=mismatch (...)` |
-| Missing `OPENAI_API_KEY` | the embedding step of the build, and production retrieval at runtime, fail; validation itself does not need the key |
+| `OPENAI_API_KEY` missing from the process environment | the canonical build stops before creating an embedding provider (`credential_source=missing`; a key that exists only in a repository `.env` does not count), and production retrieval at runtime fails; validation itself does not need the key |
 
 ## Replacing an index
 
