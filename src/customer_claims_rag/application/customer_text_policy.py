@@ -273,9 +273,15 @@ _rule(
 
 # ── Sensitive payment / authentication data ─────────────────────────────────────────────────────
 # 'Не отправляйте CVV' is the safe wording and must keep passing; only the request is rejected.
+# Between the request verb and the secret there may be light punctuation and a short polite
+# insertion ('Пришлите, пожалуйста, пин-код'): a run of up to three words, each followed by
+# whitespace or a comma / colon / dash, and never by a sentence end. 'пин' / 'pin' must be the
+# whole word (optionally 'пин-код', 'пин код', 'pin-code'), never the start of another word.
+_SOFT_SEP = r"[\s,;:—–\-]+"
+_SOFT_GAP = rf"(?:\w+{_SOFT_SEP}){{0,3}}"
 _rule(
     "sensitive-data-request",
-    rf"(?<!\bне\s)\b(?:пришлите|присылайте|отправьте|отправляйте|укажите|сообщите|назовите|введите|продиктуйте|предоставьте|передайте|напишите|скиньте)\s+{_GAP}(?:cvv2?|cvc2?|пин(?:-?код\w*)?|pin|полн\w+\s+номер\w*\s+(?:банковск\w+\s+)?карт\w+|номер\w*\s+банковск\w+\s+карт\w+|одноразов\w+\s+(?:код\w*|парол\w+)|смс[-\s]?код\w*|код\w*\s+(?:из\s+(?:смс|sms)|подтвержден\w+|безопасност\w+)|парол\w+|срок\w*\s+действия\s+карт\w+)",
+    rf"(?<!\bне\s)\b(?:пришлите|присылайте|отправьте|отправляйте|укажите|сообщите|назовите|введите|продиктуйте|предоставьте|передайте|напишите|скиньте){_SOFT_SEP}{_SOFT_GAP}(?:cvv2?|cvc2?|(?:пин|pin)(?:[\s\-]?(?:код|code)\w*)?(?!\w)|полн\w+\s+номер\w*\s+(?:банковск\w+\s+)?карт\w+|номер\w*\s+банковск\w+\s+карт\w+|одноразов\w+\s+(?:код\w*|парол\w+)|смс[-\s]?код\w*|код\w*\s+(?:из\s+(?:смс|sms)|подтвержден\w+|безопасност\w+)|парол\w+|срок\w*\s+действия\s+карт\w+)",
 )
 
 # ── Markup that has no place in a plain-text customer reply ─────────────────────────────────────

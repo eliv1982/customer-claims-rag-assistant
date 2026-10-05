@@ -46,6 +46,11 @@ from customer_claims_rag.risk.validator import (
 # this module uses an unbounded wildcard, so no regex can backtrack across the whole message.
 _GAP = r"[^\n]{0,%d}" % ANCHOR_WINDOW
 
+# Lexicon terms are word stems ('отек\w*'). Without a left boundary a stem also matches inside an
+# unrelated word: 'отек' in 'протекает', 'сыпь' in 'насыпь', 'опасн' in 'безопасный'. A term that
+# decides a safety outcome therefore starts at a word start.
+_WORD_START = r"(?<!\w)"
+
 _DELAY_CONTEXT = re.compile(
   r"(?:"
   r"опозда\w*"
@@ -494,9 +499,20 @@ _PERSONAL_DATA_CRITICAL = re.compile(
 # The message must connect the complaint to eating / receiving the order. Every relation here is
 # either a plain local pattern or an independent co-occurrence check: no wildcard spans the message.
 
+# Food, meal and 'after' words are explicit word-start forms, not bare stems. A bare stem also
+# matches inside other words ('ед' in 'неделя' and 'среда', 'блюд' in 'соблюдена', 'доставк' in
+# 'недоставка') and, from the word start, unrelated ones ('едва', 'единый', 'супермаркет',
+# 'супруг', 'последний'). The eating verbs that used to match only because 'ед' sits inside them
+# ('обедал', 'отведал', 'съедено') are listed on purpose.
+_MEAL = r"ед(?:а|ы|е|у|ой)(?!\w)"
+_EATING = r"(?:(?:по|ото)?обед(?!н)\w*|отведа\w*|(?:до|по|съ)ед(?:а\w*|ен\w*))"
+_SOUP = r"суп(?:а|е|у|ом|ы|чик\w*|ов\w*)?(?!\w)"
+_AFTER = r"после(?!\w)"
+
 _CONSUMPTION_DIRECT = re.compile(
-  r"(?:"
-  r"после\s+(?:еды|ужин\w*|обед\w*|завтрак\w*|блюд\w*|суп\w*|заказ\w*|доставк\w*|употреблен\w*|ваш\w+\s+(?:ед\w*|блюд\w*|суп\w*|заказ\w*))"
+  rf"{_WORD_START}(?:"
+  rf"после\s+(?:еды(?!\w)|ужин\w*|обед\w*|завтрак\w*|блюд\w*|{_SOUP}|заказ\w*|доставк\w*|употреблен\w*"
+  rf"|ваш\w+\s+(?:{_MEAL}|блюд\w*|{_SOUP}|заказ\w*|доставк\w*))"
   r"|поел\w*"
   r"|съел\w*"
   r"|употребил\w*"
@@ -504,25 +520,30 @@ _CONSUMPTION_DIRECT = re.compile(
 )
 
 # food anchor ... later 'после' / 'отравлен'
-_FOOD_BEFORE_AFTER_FIRST = re.compile(r"(?:ед\w*|блюд\w*|суп\w*|заказ\w*)")
-_FOOD_BEFORE_AFTER_SECOND = re.compile(r"(?:после|отравлен\w*)")
+_FOOD_BEFORE_AFTER_FIRST = re.compile(rf"{_WORD_START}(?:{_MEAL}|{_EATING}|блюд\w*|{_SOUP}|заказ\w*)")
+_FOOD_BEFORE_AFTER_SECOND = re.compile(rf"{_WORD_START}(?:{_AFTER}|отравлен\w*)")
 
 # delivery verb ... later 'после' / food word
-_DELIVERY_BEFORE_FOOD_FIRST = re.compile(r"(?:доставк\w*|привез\w*|доставил\w*)")
-_DELIVERY_BEFORE_FOOD_SECOND = re.compile(r"(?:после|ед\w*|блюд\w*)")
+_DELIVERY_BEFORE_FOOD_FIRST = re.compile(rf"{_WORD_START}(?:доставк\w*|привез\w*|доставил\w*)")
+_DELIVERY_BEFORE_FOOD_SECOND = re.compile(rf"{_WORD_START}(?:{_AFTER}|{_MEAL}|{_EATING}|блюд\w*)")
 
 # core symptom word and food / order word anywhere in the message, in either order
 _CORE_SYMPTOM = re.compile(
-  r"(?:тошнит|рвот\w*|заболел\w*|аллерг\w*|задыха\w*|одышк\w*|трудно\s+дыш|тяжело\s+дыш|хрип\w*"
+  _WORD_START
+  + r"(?:тошнит|рвот\w*|заболел\w*|аллерг\w*|задыха\w*|одышк\w*|трудно\s+дыш|тяжело\s+дыш|(?:за)?хрип\w*"
   r"|отравил\w*|сыпь\w*|зуд\w*|крапивниц\w*|отёк\w*|отек\w*)",
 )
 _GENERAL_MALAISE = re.compile(
   r"(?:мне\s+плохо|стало\s+плохо|плохо\s+стало|ухудшилось\s+самочувств\w*|стало?\s+нехорошо)",
 )
-_ORDER_OR_FOOD_WORD = re.compile(r"(?:заказ\w*|ед\w*|блюд\w*|доставк\w*)")
+_ORDER_OR_FOOD_WORD = re.compile(rf"{_WORD_START}(?:заказ\w*|{_MEAL}|{_EATING}|блюд\w*|доставк\w*)")
 
+# 'температур\w*' is deliberately not in this lexicon: it also describes a product, so it is
+# classified separately (see ``_temperature_symptom_spans``). A leading ``за`` is kept for 'хрип'
+# because 'захрипел' is the natural verb form of the symptom.
 _HEALTH_SYMPTOM = re.compile(
-  r"(?:"
+  _WORD_START
+  + r"(?:"
   r"тошнот\w*"
   r"|тошнит"
   r"|рвот\w*"
@@ -537,7 +558,6 @@ _HEALTH_SYMPTOM = re.compile(
   r"|отравлен\w*"
   r"|отравил\w*"
   r"|заболел\w*"
-  r"|температур\w*"
   r"|вызвал\w*\s+скор\w*"
   r"|слабост\w*"
   r"|трудно\s+дышать"
@@ -548,7 +568,7 @@ _HEALTH_SYMPTOM = re.compile(
   r"|одышк\w*"
   r"|трудно\s+вдохнуть"
   r"|перехватило\s+дыхание"
-  r"|хрип\w*"
+  r"|(?:за)?хрип\w*"
   r"|сыпь\w*"
   r"|зуд\w*"
   r"|крапивниц\w*"
@@ -605,6 +625,71 @@ _HEALTH_LOCAL_EXCLUSION = re.compile(
   r")",
 )
 
+# --- temperature: a body or a product? ---------------------------------------------------------
+# 'температура' is the one health term that also describes a product, its storage or the weather
+# ('при низкой температуре', 'температура блюда'). Each mention is classified on its own:
+#
+# * wording that ties it to a person's body ('у ребенка температура', 'температура поднялась',
+#   'температура 39') makes it a symptom, whatever else surrounds it;
+# * wording that ties it to a product or its environment is a local mask like the look-alike
+#   phrases above: it cancels only the mention it covers, never a symptom stated elsewhere;
+# * a bare mention ('после еды температура') is neither and stays a symptom: where the floor
+#   cannot tell, it errs towards escalation.
+_TEMPERATURE = re.compile(_WORD_START + r"температур\w*")
+
+_BODY_OWNER = (
+  r"(?:меня|него|нее|ребенка|детей|сына|дочери|дочки|мужа|жены|мамы|папы|бабушки|дедушки"
+  r"|брата|сестры|подруги|друга|всех)"
+)
+_BODY_TEMPERATURE_VERB = r"(?:поднял\w*|подскочил\w*|повысил\w*|выросл\w*|появил\w*)"
+_BODY_TEMPERATURE = re.compile(
+  r"(?:"
+  r"(?<!\w)у\s+" + _BODY_OWNER + r"\s+(?:\w+\s+)?температур\w*"
+  r"|" + _BODY_TEMPERATURE_VERB + r"\s+(?:\w+\s+)?температур\w*"
+  r"|температур\w*\s+" + _BODY_TEMPERATURE_VERB
+  + r"|(?:сбить|сбива\w+|измерил\w*|измеря\w+|мерил\w*)\s+(?:\w+\s+)?температур\w*"
+  # a reading in the clinical range: 'температура 39', 'температура была 38,5', 'температура под 40'
+  r"|температур\w*\s+(?:(?:была|стала|около|под|почти|более|до)\s+)?(?:3[5-9]|4[0-2])(?:[.,]\d)?(?!\d)"
+  r")",
+)
+
+_PRODUCT_OR_PLACE = (
+  rf"(?:блюд\w*|{_MEAL}|пищ\w*|заказ\w*|{_SOUP}|напитк\w*|продукт\w*|содержимо\w*|контейнер\w*"
+  r"|упаковк\w*|термосумк\w*|сумк\w*|короб\w*|доставк\w*|хранени\w*|подач\w*|воздух\w*"
+  r"|помещени\w*|улиц\w*|холодильник\w*)"
+)
+# 'высокой' / 'повышенной' / 'нормальной' are deliberately absent: they describe a body as well.
+_STORAGE_CONDITION = (
+  r"(?:низк|комнатн|плюсов|минусов|подходящ|нужн|правильн|неправильн|неподходящ|оптимальн"
+  r"|рекомендован|заданн|определенн)"
+)
+_OBJECT_ONLY_ADJECTIVE = (
+  r"(?:комнатн|сомнительн|спорн|неподходящ|неправильн|несоответствующ|нужн|оптимальн|требуем"
+  r"|рекомендован)"
+)
+_PRODUCT_TEMPERATURE = re.compile(
+  r"(?:"
+  # storage / serving conditions: 'при низкой температуре', 'при температуре воздуха'
+  r"при\s+(?:\w+\s+){0,2}" + _STORAGE_CONDITION + r"\w*\s+температур\w*"
+  r"|при\s+температур\w*\s+(?:воздуха|хранени\w+|доставк\w+|окружающ\w+|[+\-−]\s*\d"
+  r"|ниже\s+нул\w+|выше\s+нул\w+)"
+  r"|(?:хран\w+|подава\w+|привез\w+|довез\w+|достав\w+|готов\w+)\s+(?:\w+\s+){0,3}при\s+(?:\w+\s+){0,2}температур\w*"
+  # wording that only fits an object: 'комнатная', 'сомнительная', 'спорная температура'
+  r"|" + _OBJECT_ONLY_ADJECTIVE + r"\w*\s+температур\w*"
+  r"|температурн\w+\s+(?:режим|услови|цепочк|норм|стандарт|ожидани)\w*"
+  # the temperature of a thing: 'температура блюда', 'температура в контейнере'
+  r"|температур\w*\s+(?:(?:в|на|при)\s+)?" + _PRODUCT_OR_PLACE
+  # a complaint about it, or a failure to keep it
+  + r"|(?:жалоб\w*|претензи\w*|недовол\w*|замечани\w*)\s+(?:\w+\s+){0,2}(?:на|по|из-за)\s+температур\w*"
+  # active forms only: 'сохраняется температура' (a fever that persists) is not a failure to keep one
+  r"|(?:держит|держат|держали|сохраняет|сохраняют|сохранил\w*|поддерживает|поддерживают|соблюд\w+|нарушен\w*)\s+(?:\w+\s+){0,2}температур\w*"
+  r"|температур\w*\s+(?:не\s+)?(?:соблюден\w*|нарушен\w*|соответству\w+|устраива\w+|устроил\w*)"
+  # a place that cannot have a fever: 'на улице низкая температура', 'в сумке температура'
+  r"|(?:на\s+улице|на\s+морозе|на\s+жаре|в\s+мороз|в\s+жару|в\s+сумке|в\s+термосумке|в\s+контейнере"
+  r"|в\s+машине|в\s+помещении)\s+(?:\w+\s+){0,2}температур\w*"
+  r")",
+)
+
 _STAFF = r"(?:курьер|сотрудник|менеджер)\w*"
 _STAFF_SEVERE_SYMPTOM = (
   r"(?:тяжело\s+дыш|трудно\s+дыш|задыха|одышк|хрип|не\s+хватает\s+воздух"
@@ -632,25 +717,53 @@ _HEALTH_STAFF_LOOKAHEAD = 20
 _STAFF_CHAIN_WINDOW = _HEALTH_LOCAL_WINDOW + _HEALTH_STAFF_LOOKAHEAD
 
 _FOOD_CONTEXT = re.compile(
-  r"(?:"
-  r"(?:в\s+)?(?:еде|блюд\w*|салат\w*|суп\w*|продукт\w*|заказ\w*|тарелк\w*|контейнер\w*)"
-  r")",
+  rf"{_WORD_START}(?:в\s+)?(?:еде(?!\w)|блюд\w*|салат\w*|{_SOUP}|продукт\w*|заказ\w*|тарелк\w*|контейнер\w*)",
 )
 
+# 'осколок' loses its vowel in the oblique forms ('осколка'); both stems are the same object.
+_SHARD = r"оскол(?:ок|к\w*)"
 _DANGEROUS_OBJECT = re.compile(
-  r"(?:"
+  _WORD_START
+  + r"(?:"
   r"стекл\w*"
   r"|игл\w*"
-  r"|остр\w+\s+(?:металлическ\w+\s+)?(?:осколк\w*|предмет\w*|металл\w*)"
-  r"|металлическ\w+\s+осколк\w*"
+  r"|остр\w+\s+(?:металлическ\w+\s+)?(?:" + _SHARD + r"|предмет\w*|металл\w*)"
+  r"|металлическ\w+\s+" + _SHARD
+  # a piece of metal in the food: 'кусок металла', 'металлическая стружка', 'металлический предмет'
+  + r"|(?:кус\w+|частиц\w*|стружк\w*|опилк\w*|обломк\w*)\s+металл\w*"
+  r"|металлическ\w+\s+(?:предмет\w*|кус\w+|стружк\w*|частиц\w*|обломк\w*|опилк\w*)"
   r"|(?:обнаружен\w*|найден\w*)\s+остр\w+\s+предмет\w*"
   r"|острый\s+предмет\w*"
-  r"|(?:остр\w+|тверд\w+|опасн\w+)\s+(?:пластик\w*|осколк\w*|фрагмент\w*)"
+  r"|(?:остр\w+|тверд\w+|опасн\w+)\s+(?:пластик\w*|" + _SHARD + r"|фрагмент\w*)"
   r")",
 )
 # 'пластик / осколок / фрагмент ... острый / опасный / травма / риск' (anchor chain)
-_DANGEROUS_FRAGMENT = re.compile(r"(?:пластик\w*|осколк\w*|фрагмент\w*)")
-_DANGEROUS_HAZARD_WORD = re.compile(r"(?:остр\w+|опасн\w+|травм\w*|риск\w*)")
+_DANGEROUS_FRAGMENT = re.compile(r"(?:пластик\w*|" + _SHARD + r"|фрагмент\w*)")
+_DANGEROUS_HAZARD_WORD = re.compile(_WORD_START + r"(?:остр\w+|опасн\w+|травм\w*|риск\w*)")
+
+# Hair, or a 'foreign object' nobody has described as dangerous, found in the food: a HIGH quality
+# complaint that needs a person (06 food quality, FAQ-36, H-03), not a dangerous object. 'Hair' is a
+# look-alike mask of the critical rule above on purpose; this rule is where it is counted. The
+# object must be located in the food ('в салате волос', 'волос в еде'), so a courier's hair next
+# to a mention of the order never matches.
+_UNCONFIRMED_OBJECT = re.compile(
+  _WORD_START + r"(?:волос\w*|(?:постор\w+|инород\w+)\s+(?:предмет\w*|тел\w*|объект\w*))",
+)
+_FOOD_LOCATION = re.compile(
+  rf"{_WORD_START}(?:в|во|из)\s+(?:\w+\s+)?(?:"
+  r"блюд\w*|салат\w*|котлет\w*|куриц\w*|курин\w*|рыб\w*|мяс\w*|гарнир\w*|борщ\w*|десерт\w*|пицц\w*"
+  r"|порци\w*|тарелк\w*|контейнер\w*|упаковк\w*|заказ\w*|продукт\w*|ужин\w*|обед\w*|завтрак\w*"
+  # short names are exact words: 'суп' must not match 'супермаркет', 'каше' must not match 'кашель'
+  rf"|{_SOUP}|{_MEAL}"
+  r"|(?:рис(?:а|е|у|ом)?|паст(?:а|ы|е|у|ой)|каш(?:а|и|е|у|ей))(?!\w)"
+  r")",
+)
+_UNCONFIRMED_OBJECT_WINDOW = 60
+# A hypothetical ('что будет, если я найду волос') is a question, not a complaint.
+_UNCONFIRMED_OBJECT_HYPOTHETICAL = re.compile(
+  r"(?:если|вдруг)\s+(?:\w+\s+){0,3}(?:найд(?:у|ем|ешь|ет)|обнаруж(?:у|им|ишь|ит)|попадется|окажется)"
+  r"[^.?!;\n]{0,60}",
+)
 
 # Look-alike objects. Each masks only the object phrase it covers.
 _FOREIGN_OBJECT_EXCLUSION = re.compile(
@@ -669,7 +782,7 @@ _SYMPTOM_CLUSTER = re.compile(r"(?:плохо\s+стало|стало\s+плох
 _MASS_COUNT_PEOPLE = re.compile(r"(?:двум|троим|трем|трое|четырем|пятерым|\d+\s+люд\w*)")
 _MASS_GROUP_A = re.compile(r"(?:нескольк\w+\s+(?:люд\w*|человек|клиент\w*)|у\s+всей\s+семь\w*)")
 _MASS_GROUP_B = re.compile(r"(?:нескольк\w+\s+клиент\w*|несколько\s+человек)")
-_MASS_GROUP_B_CONTEXT = re.compile(r"(?:после|партии|еды|заказ\w*)")
+_MASS_GROUP_B_CONTEXT = re.compile(rf"{_WORD_START}(?:{_AFTER}|партии|еды(?!\w)|заказ\w*)")
 _MASS_BATCH = re.compile(r"(?:партии|партия)")
 _MASS_SIMILAR_SYMPTOMS = re.compile(r"у\s+всех\s+похож\w+\s+симптом\w*")
 _MASS_COUNTED_PEOPLE = re.compile(
@@ -942,6 +1055,16 @@ def _is_staff_attributed_symptom(staff_spans: list[Span], symptom_start: int) ->
   return False
 
 
+def _temperature_symptom_spans(normalized: str) -> list[Span]:
+  """Temperature mentions that read as a symptom (see the temperature block above)."""
+  mentions = spans(_TEMPERATURE, normalized)
+  if not mentions:
+    return []
+  product = Masks(spans(_PRODUCT_TEMPERATURE, normalized))
+  body = Masks(spans(_BODY_TEMPERATURE, normalized))
+  return [mention for mention in mentions if body.overlaps(mention) or not product.overlaps(mention)]
+
+
 def _match_health_symptoms(normalized: str) -> bool:
   if not _has_consumption_link(normalized):
     return False
@@ -951,12 +1074,12 @@ def _match_health_symptoms(normalized: str) -> bool:
     spans(_HEALTH_LOCAL_EXCLUSION, normalized) + spans(_HEALTH_INFORMATIONAL, normalized),
   )
   staff_spans: list[Span] | None = None
-  for match in _HEALTH_SYMPTOM.finditer(normalized):
-    if masks.overlaps(match.span()):
+  for start, end in spans(_HEALTH_SYMPTOM, normalized) + _temperature_symptom_spans(normalized):
+    if masks.overlaps((start, end)):
       continue
     if staff_spans is None:
       staff_spans = _staff_subject_spans(normalized)
-    if not _is_staff_attributed_symptom(staff_spans, match.start()):
+    if not _is_staff_attributed_symptom(staff_spans, start):
       return True
   return False
 
@@ -1151,6 +1274,24 @@ def _match_dangerous_foreign_object(normalized: str) -> bool:
   return has_unmasked(candidates, masks)
 
 
+def _match_unconfirmed_foreign_object(normalized: str) -> bool:
+  candidates = chain_spans(
+    normalized,
+    (_FOOD_LOCATION, _UNCONFIRMED_OBJECT),
+    window=_UNCONFIRMED_OBJECT_WINDOW,
+    stop=SENTENCE_BREAK,
+  ) + chain_spans(
+    normalized,
+    (_UNCONFIRMED_OBJECT, _FOOD_LOCATION),
+    window=_UNCONFIRMED_OBJECT_WINDOW,
+    stop=SENTENCE_BREAK,
+  )
+  if not candidates:
+    return False
+  masks = Masks(spans(_UNCONFIRMED_OBJECT_HYPOTHETICAL, normalized))
+  return has_unmasked(candidates, masks)
+
+
 def _match_direct_threat(normalized: str) -> bool:
   candidates = chain_spans(normalized, (_THREAT_ACTION, _STAFF_TARGET_PATTERN))
   candidates += chain_spans(normalized, (_STAFF_TARGET_PATTERN, _THREAT_HARM))
@@ -1291,6 +1432,12 @@ _RULES: tuple[_RiskRule, ...] = (
     RiskLevel.HIGH,
     "food_spoilage",
     lambda text: _FOOD_SPOILAGE.search(text) is not None,
+  ),
+  _RiskRule(
+    RiskReasonCode.UNCONFIRMED_FOREIGN_OBJECT,
+    RiskLevel.HIGH,
+    "unconfirmed_foreign_object",
+    _match_unconfirmed_foreign_object,
   ),
   _RiskRule(
     RiskReasonCode.LEGAL_OR_REGULATORY_ESCALATION,

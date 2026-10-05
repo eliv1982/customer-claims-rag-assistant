@@ -21,6 +21,7 @@ class RiskReasonCode(StrEnum):
   FALSE_DELIVERY_STATUS = "false_delivery_status"
   PACKAGE_TAMPERING = "package_tampering"
   FOOD_SPOILAGE = "food_spoilage"
+  UNCONFIRMED_FOREIGN_OBJECT = "unconfirmed_foreign_object"
   LEGAL_OR_REGULATORY_ESCALATION = "legal_or_regulatory_escalation"
   OFFICIAL_WRITTEN_RESPONSE = "official_written_response"
   PERSONAL_DATA_EXPOSURE = "personal_data_exposure"

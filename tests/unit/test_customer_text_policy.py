@@ -234,6 +234,70 @@ def test_sensitive_data_request_is_rejected(text: str) -> None:
     assert "sensitive-data-request" in _codes(text)
 
 
+# Stage 2I: natural punctuation and a short polite insertion between the verb and the secret must
+# not let the request through ("Пришлите, пожалуйста, пин-код" used to pass: the comma after the
+# verb broke the whitespace-only gap).
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Пришлите пин-код",
+        "Пришлите пин-код.",
+        "Пришлите, пожалуйста, пин-код.",
+        "Пришлите пожалуйста пин-код",
+        "Пожалуйста, пришлите пин-код",
+        "Пришлите пин-код, пожалуйста",
+        "ПРИШЛИТЕ, ПОЖАЛУЙСТА, ПИН-КОД!",
+        "Пришлите, пожалуйста, ПИН код вашей карты",
+        "Пришлите, пожалуйста, пинкод",
+        "Пришлите: пин-код",
+        "Пришлите — пин-код",
+        "Пришлите, будьте добры, пин-код",
+        "Напишите, пожалуйста, pin",
+        "Сообщите, пожалуйста, PIN-code карты",
+        "Пришлите, пожалуйста, CVV.",
+        "Отправьте, пожалуйста, cvc2",
+        "Укажите, пожалуйста, ваш полный номер карты",
+        "Назовите, пожалуйста, одноразовый код",
+        "Назовите, пожалуйста, код из смс",
+        "Введите, пожалуйста, пароль",
+        "Пришлите нам, пожалуйста, срок действия карты",
+    ],
+)
+def test_sensitive_data_request_survives_punctuation_and_polite_insertions(text: str) -> None:
+    assert "sensitive-data-request" in _codes(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # the safe wording the templates use
+        "Не отправляйте CVV.",
+        "Пожалуйста, не отправляйте пин-код.",
+        "Не присылайте, пожалуйста, пин-код и пароль.",
+        "Не отправляйте в чате CVV/CVC, PIN, полный номер карты, коды из SMS и пароли.",
+        # ordinary requests, and words that merely start like 'пин'
+        "Пришлите, пожалуйста, фото упаковки.",
+        "Укажите, пожалуйста, номер заказа.",
+        "Укажите, пожалуйста, пинту молока.",
+        "Сообщите, пожалуйста, пингвин это или нет.",
+        "Пришлите фото. Пин-код не нужен.",  # the secret is named in a different sentence
+    ],
+)
+def test_sensitive_data_policy_does_not_flag_safe_or_unrelated_wording(text: str) -> None:
+    assert "sensitive-data-request" not in _codes(text)
+
+
+def test_sensitive_data_request_gap_stays_bounded_on_adversarial_separators() -> None:
+    started = time.perf_counter()
+    for text in (
+        "Пришлите" + ", " * 20_000,
+        ("Пришлите, " * 5_000) + "фото",
+        "Пришлите " + "а, " * 20_000,
+    ):
+        assert "sensitive-data-request" not in _codes(text)
+    assert time.perf_counter() - started < 2.0
+
+
 @pytest.mark.parametrize(
     "text",
     [

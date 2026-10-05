@@ -37,6 +37,9 @@ REASON_CODE_CATEGORIES: dict[RiskReasonCode, str] = {
     RiskReasonCode.FALSE_DELIVERY_STATUS: "Неверный статус доставки",
     RiskReasonCode.PACKAGE_TAMPERING: "Нарушение целостности упаковки",
     RiskReasonCode.FOOD_SPOILAGE: "Испорченный или некачественный продукт",
+    # Not confirmed dangerous (hair, 'foreign object'): the same HIGH quality category and text as
+    # spoilage, not the critical hazard category.
+    RiskReasonCode.UNCONFIRMED_FOREIGN_OBJECT: "Испорченный или некачественный продукт",
     RiskReasonCode.LEGAL_OR_REGULATORY_ESCALATION: "Юридическая или регуляторная эскалация",
     RiskReasonCode.OFFICIAL_WRITTEN_RESPONSE: "Требование официального письменного ответа",
     RiskReasonCode.PERSONAL_DATA_EXPOSURE: CATEGORY_PERSONAL_DATA,
