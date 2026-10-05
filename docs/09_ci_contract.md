@@ -6,14 +6,27 @@
 
 | Job | Runner | Tokenizer | Command |
 |---|---|---|---|
-| `default-suite` | Ubuntu and Windows, Python 3.12 | offline stand-in (**not** `cl100k_base`) | `python -m pytest -p no:cacheprovider` |
+| `default-suite` | Ubuntu and Windows, Python 3.12, fresh venv under `runner.temp` | offline stand-in (**not** `cl100k_base`) | `python -m pytest -p no:cacheprovider` |
 | `real-tokenizer` | Ubuntu, Python 3.12 | real `cl100k_base` | `python -m pytest --real-tiktoken -m real_tiktoken -p no:cacheprovider` |
 
 Both jobs install with `python -m pip install -e ".[dev]"` and run `python -m pip check`. Nothing else is installed (no Playwright/`screenshots` extra); a dependency the suite needs but `pyproject.toml` does not declare fails the job, and is fixed in `pyproject.toml`.
 
+`default-suite` does this in a fresh virtual environment of its own (next section); `real-tokenizer` installs into the runner's Python as provided.
+
 Why two lanes: the default suite replaces the tokenizer with a deterministic word-level stand-in so it needs no vocabulary and no network. That stand-in packs chunks differently from production, so the default lane cannot say anything about production chunk counts, corpus fingerprints or document topology. The `real_tiktoken` tests (about the canonical corpus topology and golden fingerprints) skip there, and the real-tokenizer job is what runs them. A run of the real lane never skips: a `real_tiktoken` test that skips there is reported as a failure.
 
 The default suite runs on both Ubuntu and Windows because the repository's path, line-ending and symlink handling is platform-sensitive; the real lane is a function of the corpus and the vocabulary only, so one platform is enough.
+
+## Project environment (`default-suite`)
+
+A hosted runner's Python ships with global packages of its own. Installing the project into it lets the install rewrite the runner's tools and lets `python -m pip check` judge them together with the project: on the Windows runner, the image's `pipx` requires `packaging>=26` while the project's `langchain-core` requires `packaging<26`, so `pip check` failed on a conflict that is not in the project. The project's dependency pins are not changed to suit whatever a runner image preinstalls; the environment is what is isolated.
+
+Each `default-suite` job (Ubuntu and Windows) therefore builds the project environment itself, after `setup-python` and before anything is installed:
+
+1. `[venv] create`: `venv.EnvBuilder(system_site_packages=False, clear=True, with_pip=True)` at `runner.temp/project-venv`, outside the checkout. The step adds the environment's `Scripts`/`bin` directory to `GITHUB_PATH` (which puts it first on `PATH` for later steps) and exports `VIRTUAL_ENV` through `GITHUB_ENV`, so every later `python` in the job is the venv's interpreter. The install, `pip check`, the hermetic precondition script and pytest are the same commands as everywhere else, run from the venv.
+2. `[venv] verify`: before the install, the job fails unless the interpreter is a virtual environment under `RUNNER_TEMP`, `VIRTUAL_ENV` names it, `pyvenv.cfg` has `include-system-site-packages = false`, and the only packages visible are the ones `venv` bootstraps (`pip`, `setuptools`, `wheel`). Nothing from the runner's global site-packages can reach the project install, `pip check` or the tests.
+
+`pip check` itself is unchanged and not weakened; it now judges exactly the project's resolved environment. `tests/unit/test_ci_workflow.py` pins the step order, the absence of any route back to global packages (`--system-site-packages`, `--user`, `PYTHONPATH`, ...), and executes both steps' scripts, including negative controls for each way the check can fail.
 
 ## Network boundary
 
