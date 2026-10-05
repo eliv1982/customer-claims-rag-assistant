@@ -113,9 +113,15 @@ def test_readme_metrics_are_the_ones_in_the_committed_retrieval_summary(readme, 
 
 def test_readme_names_the_limitations_the_evidence_shows(readme, retrieval) -> None:
     limitations = _section(readme, "Known limitations")
-    for case_id in ("T004", "T040", "T044", "T047", "T039", "T053"):
+    for case_id in ("T004", "T040", "T044", "T047", "T053"):
         assert case_id in limitations, case_id
     assert retrieval["limitations"]["primary_outside_pool_at_24"] == ["T004"]
+    # the one rule gap the evidence still shows is named; the two closed in Stage 2I are described as closed
+    assert retrieval["limitations"]["dataset_high_or_critical_without_matching_floor"] == ["T053"]
+    assert retrieval["limitations"]["deterministic_floor_two_or_more_levels_above_dataset_label"] == []
+    rows = {row["case_id"]: row["deterministic"] for row in retrieval["cases"]}
+    assert rows["T039"]["risk_floor"] == "high" and "T039" in limitations
+    assert rows["T026"]["risk_floor"] == "medium" and "T026" in limitations
     for needle in ("OpenAI credential", "cannot be proven offline", "single-shot", "Retrieval only"):
         assert needle.lower() in limitations.lower(), needle
 

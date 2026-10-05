@@ -375,9 +375,18 @@ def test_deterministic_behaviour_of_the_frozen_high_and_critical_cases(retrieval
     for case_id in ("T040", "T047"):
         assert not rows[case_id]["primary_hit_at_4"]
         assert rows[case_id]["deterministic"]["answer_provenance"] == "category_template"
-    # the cases the rules do not cover are reported, not hidden
-    assert retrieval["limitations"]["dataset_high_or_critical_without_matching_floor"] == ["T039", "T053"]
-    assert retrieval["limitations"]["deterministic_floor_two_or_more_levels_above_dataset_label"] == ["T026"]
+    # the case the rules do not cover is reported, not hidden: T053 is a documented gap (README)
+    assert retrieval["limitations"]["dataset_high_or_critical_without_matching_floor"] == ["T053"]
+    assert retrieval["limitations"]["deterministic_floor_two_or_more_levels_above_dataset_label"] == []
+    assert rows["T053"]["deterministic"]["assessment_status"] == "no_signal"
+    # Stage 2I: a hair in a salad is a high quality complaint, a closed leak-free container is a refund
+    hair = rows["T039"]["deterministic"]
+    assert (hair["assessment_status"], hair["risk_floor"]) == ("rule_match", "high")
+    assert hair["handoff_required"] and not hair["priority_handoff"]
+    assert hair["claim_category"] == "Испорченный или некачественный продукт"
+    container = rows["T026"]["deterministic"]
+    assert (container["risk_floor"], container["claim_category"]) == ("medium", "Требование возврата средств")
+    assert not container["handoff_required"] and not container["priority_handoff"]
 
 
 # --- hygiene --------------------------------------------------------------------------------------------------

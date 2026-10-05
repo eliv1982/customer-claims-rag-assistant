@@ -16,12 +16,12 @@
       "sha256": "a38537bcf856eeaa02ed9204acf2854cd46cd69c12e6a5e761a6b0edff708070"
     },
     "retrieval_summary.json": {
-      "bytes": 47397,
-      "sha256": "379a7bd982fb481d5dcd696ebf6ef8bb58eff578c7b23b5a94d003bb0aab4001"
+      "bytes": 47344,
+      "sha256": "28ad8f3a0a769c23faa66d352edf0eb1a167793328c0cda4ec3b1fc1dd8d2e23"
     },
     "retrieval_summary.md": {
-      "bytes": 6329,
-      "sha256": "cc217057b0d9381b4187a103da7af5c4d5ad0c86bbf84ed29fe2ade97c2ef3c7"
+      "bytes": 6325,
+      "sha256": "4a4cad882b746e2c63162da2e2a166a32de5a8ec5522cecc1dcc5f19f9f9dfc1"
     },
     "scenarios.md": {
       "bytes": 6024,
@@ -108,7 +108,7 @@
       "sha256": "c456c390093aba06ff2e55e1a306aa5747a33162d3a95362bc45e2364ba9ff8d"
     }
   },
-  "generated_at_utc": "2026-10-05T05:58:19Z",
+  "generated_at_utc": "2026-10-05T07:30:34Z",
   "generator": "scripts/capture_final_acceptance.py",
   "kind": "final_acceptance_evidence",
   "release": {
@@ -142,7 +142,7 @@
   "run_mode": "deterministic_stub_run",
   "schema_version": "2.0.0",
   "source": {
-    "git_commit": "0d5b94dbc57425b97309e66877f7b19cab4e46e9",
+    "git_commit": "31b50346ed6fd97107afd7fa18fa715b8fd44c61",
     "note": "code commit that produced this evidence; later commits add only the evidence and documentation",
     "source_tree_clean": true
   },

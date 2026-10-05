@@ -10,7 +10,7 @@ Derived from the final retrieval evaluation of the production index (`vector-poo
 | Raw artifact SHA-256 | `ff291709dbcd9f32d5c786ac53216aea3ad5157afb8d440643228bcc13123cc7` |
 | Evaluation run (UTC) | 2026-10-05T04:48:59.846216Z |
 | Evaluation code commit | `54b0336b275aae29e833fe5602284f90ca9aa30e` (working tree clean: true) |
-| Summary derived by | `scripts/summarize_retrieval_evidence.py` at `0d5b94dbc57425b97309e66877f7b19cab4e46e9` |
+| Summary derived by | `scripts/summarize_retrieval_evidence.py` at `31b50346ed6fd97107afd7fa18fa715b8fd44c61` |
 
 ## Identity
 
@@ -82,7 +82,7 @@ Per-case improvements: **1**.
 | T035 | high | no | 5 | `rule_match` | `high` | no | `llm_draft` |
 | T036 | high | yes | 1 | `rule_match` | `high` | no | `llm_draft` |
 | T037 | high | yes | 1 | `rule_match` | `high` | no | `llm_draft` |
-| T039 | high | yes | 4 | `no_signal` | `low` | no | `llm_draft` |
+| T039 | high | yes | 4 | `rule_match` | `high` | no | `llm_draft` |
 | T040 | critical | no | 8 | `rule_match` | `critical` | yes | `category_template` |
 | T041 | critical | yes | 1 | `rule_match` | `critical` | yes | `category_template` |
 | T042 | critical | yes | 2 | `rule_match` | `critical` | yes | `category_template` |
@@ -103,7 +103,7 @@ Per-case improvements: **1**.
 - Expected primary document outside pool@24 for every candidate: T004.
 - Primary reachable in the pool but not in the first four (ranking-limited after pool expansion): T016, T040, T044, T047, T053.
 - Primary document not in the first four, critical cases: T040, T047; high cases: T035, T044, T053, T055.
-- Frozen cases labelled high or critical whose deterministic floor is lower or undetermined: T039, T053 (reported as `no_signal`, never as an affirmative low risk).
-- Deterministic floor two or more levels above the dataset label (over-escalation): T026.
+- Frozen cases labelled high or critical whose deterministic floor is lower or undetermined: T053 (reported as `no_signal`, never as an affirmative low risk).
+- Deterministic floor two or more levels above the dataset label (over-escalation): none.
 
 Pool expansion improves candidate reachability, not top-4 ordering: the source-authority reranker's bonus is small by design, so a large similarity gap is not overcome. The experiment was frozen after it; see `docs/06_release_posture.md`.
