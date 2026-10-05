@@ -2,7 +2,7 @@
 
 They read ``.github/workflows/ci.yml`` as data and pin the properties other documents and the
 audit depend on (which suite runs where, that the real-tokenizer lane cannot fall back to the
-stand-in, that the default lane runs in a fresh virtual environment isolated from the runner's own
+stand-in, that every job runs in a fresh virtual environment isolated from the runner's own
 packages, that no credential, deployment or upload exists). They do not restate every step.
 """
 
@@ -136,8 +136,9 @@ def _named_step(job: dict, prefix: str) -> dict:
     return matches[0]
 
 
-def test_default_suite_builds_its_own_environment_under_runner_temp_before_installing(workflow: dict) -> None:
-    job = _jobs(workflow)[DEFAULT_JOB]
+@pytest.mark.parametrize("job_name", [DEFAULT_JOB, REAL_JOB])
+def test_each_job_builds_its_own_environment_under_runner_temp_before_installing(workflow: dict, job_name: str) -> None:
+    job = _jobs(workflow)[job_name]
     create = _named_step(job, VENV_CREATE_STEP)
     verify = _named_step(job, VENV_VERIFY_STEP)
 
@@ -147,12 +148,13 @@ def test_default_suite_builds_its_own_environment_under_runner_temp_before_insta
         _step_index(job, lambda step: step is verify),
         _step_index(job, lambda step: step.get("run", "").strip() == INSTALL_COMMAND),
         _step_index(job, lambda step: step.get("run", "").strip() == PIP_CHECK_COMMAND),
-        _step_index(job, lambda step: "[hermetic] precondition" in step.get("name", "")),
-        _step_index(job, lambda step: "python -m pytest" in step.get("run", "")),
     ]
-    assert order == sorted(set(order)), "venv before install, install before pip check, all before the suite runs"
+    assert order == sorted(set(order)), "venv before install, install before pip check"
     before_verify = [step for step in _steps(job)[: order[2]] if "run" in step]
     assert before_verify == [create], "nothing but the venv step may run code before the isolation check"
+    # Provisioning, the precondition, the negative control and pytest all run in the checked environment.
+    before_pip_check = [step["run"].strip() for step in _steps(job)[: order[4] + 1] if "run" in step]
+    assert before_pip_check == [create["run"].strip(), verify["run"].strip(), INSTALL_COMMAND, PIP_CHECK_COMMAND]
 
     for step in (create, verify):
         assert step["shell"] == "python"
@@ -162,8 +164,16 @@ def test_default_suite_builds_its_own_environment_under_runner_temp_before_insta
     assert "GITHUB_ENV" in create["run"] and "VIRTUAL_ENV" in create["run"]
 
 
-def test_default_suite_has_no_route_back_to_runner_global_packages(workflow: dict) -> None:
-    job = _jobs(workflow)[DEFAULT_JOB]
+def test_real_tokenizer_job_uses_the_same_isolated_environment_steps_as_the_default_suite(workflow: dict) -> None:
+    # One definition of isolation: the steps the executed-script tests below run are the steps of both jobs.
+    default_job, real_job = _jobs(workflow)[DEFAULT_JOB], _jobs(workflow)[REAL_JOB]
+    for prefix in (VENV_CREATE_STEP, VENV_VERIFY_STEP):
+        assert _named_step(real_job, prefix) == _named_step(default_job, prefix)
+
+
+@pytest.mark.parametrize("job_name", [DEFAULT_JOB, REAL_JOB])
+def test_each_job_has_no_route_back_to_runner_global_packages(workflow: dict, job_name: str) -> None:
+    job = _jobs(workflow)[job_name]
     for command in _commands(job):
         for escape in ("--system-site-packages", "system_site_packages=True", "--user", "--break-system-packages",
                        "--target", "--prefix", "pythonLocation"):
@@ -190,7 +200,10 @@ class IsolatedEnvironment(NamedTuple):
 
 @pytest.fixture(scope="module")
 def isolated_environment(workflow: dict, tmp_path_factory: pytest.TempPathFactory) -> IsolatedEnvironment:
-    """Run the workflow's own venv-creation step the way a runner would, in a scratch runner.temp."""
+    """Run the workflow's own venv-creation step the way a runner would, in a scratch runner.temp.
+
+    Both jobs carry these exact steps (test_real_tokenizer_job_uses_the_same_isolated_environment_steps...).
+    """
     job = _jobs(workflow)[DEFAULT_JOB]
     create = _named_step(job, VENV_CREATE_STEP)
     verify = _named_step(job, VENV_VERIFY_STEP)
