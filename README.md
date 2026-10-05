@@ -1,488 +1,200 @@
 # customer-claims-rag-assistant
 
-Учебный RAG-ассистент для первичной обработки клиентских обращений, жалоб и претензий вымышленного сервиса доставки еды **FoodFlow**.
+A staff-assist RAG triage tool for customer claims. A support agent pastes one customer message and gets a draft reply, a deterministic risk assessment with handoff guidance, and the knowledge-base passages the draft rests on. The agent reviews and sends; the tool decides nothing about refunds or compensation.
 
-Ассистент помогает классифицировать обращение, находить релевантные правила в базе знаний и формировать проект ответа. Окончательные решения принимает сотрудник поддержки.
+The company is **FoodFlow, a fictional food-delivery service**. The knowledge base, prompts, UI and customer drafts are in Russian; the code, configuration and documentation are in English.
 
-> **Важно:** FoodFlow — вымышленная компания. Все документы и правила созданы исключительно в учебных целях и не отражают политику реальной организации.
+> Кратко: учебный RAG-ассистент для первичной обработки обращений вымышленного сервиса FoodFlow. Для сотрудника поддержки: черновик ответа, детерминированная оценка риска, источники из базы знаний. Решение всегда принимает сотрудник.
 
-## Структура каталогов
+| | |
+|---|---|
+| Production corpus | 10 documents, 216 chunks, release `foodflow-10doc-release-v2` |
+| Retrieval | `text-embedding-3-small` -> Chroma (cosine) -> pool of 24 -> `source-authority-v1` rerank -> final 12 |
+| Safety | rule-based risk floor computed before retrieval; fixed texts for critical categories; model drafts checked by a text policy |
+| Retrieval quality (60 frozen cases) | Hit@4 0.897, primary hit@4 0.759, MRR 0.715; expected primary source reachable in the pool for 56 of 57 cases |
+| Reproducibility | canonical corpus manifest with hashes, release gate that recomputes the index identity from the stored records, secret-free CI on Ubuntu and Windows |
+| License | [MIT](LICENSE) |
 
-| Каталог | Назначение |
-|---------|------------|
-| `data/01_raw/` | Исходные тексты документов базы знаний (`.txt`) |
-| `data/02_clean_markdown/` | Очищенные версии документов в Markdown (`.md`) |
-| `data/03_chunks/` | Сгенерированные чанки (JSONL) и статистика; не источник истины |
-| `data/04_index/` | Default output of `build-index` / `search-index` / evaluation CLIs; на maintainer-машине может содержать historical 15-document index; **не** production index |
-| `data/04_index_production/` | **Production index** для release posture `foodflow-10doc-release-v2` (10 documents, 215 chunks); строится из репозитория командой из `docs/07_index_provisioning.md`; не коммитится |
-| `data/05_evaluation/` | Сгенерированные JSON-результаты retrieval evaluation; не источник истины |
-| `docs/` | Проектная документация: область проекта, инвентаризация, отчеты, стратегии |
-| `prompts/` | Системный промпт и шаблон RAG-запроса |
-| `tests/` | Тестовые вопросы, ожидаемые ответы, результаты прогонов |
-| `deliverables/` | Итоговые артефакты проекта: manual acceptance report, evidence index, screenshots |
+## What problem it solves
 
-## Текущий статус
+A first-line agent reading a complaint has to do several things at once: classify it, find the applicable rules, avoid promises the company has not made (a refund, a deadline, an admission of fault), and notice the few messages that are not routine (a health symptom, a foreign object in food, fraud, a threat, a data leak). A language model is good at drafting and at finding passages, and unreliable at the second and third. This project keeps those apart: retrieval and drafting are probabilistic and reviewed by a person; the safety-relevant decisions are deterministic code that a model cannot override.
 
-**Ingestion layer (hybrid chunking)** — реализованы загрузка clean Markdown, валидация метаданных, гибридный чанкинг и экспорт в JSONL.
+**Scope.** It is a single-shot assist tool, not a ticketing or helpdesk platform. There is no database, no authentication, no conversation or case history, no document upload, no feedback loop and no deployment; the Streamlit UI and the `answer-claim` CLI each process one message. It has no access to orders, payments or couriers.
 
-**Retrieval layer (baseline dense search)** — реализованы framework-isolated embeddings, persistent Chroma index, deterministic fingerprint/manifest, baseline semantic retrieval и CLI для сборки/поиска.
+## Architecture and request flow
 
-**Retrieval evaluation (60-case baseline)** — реализованы parser evaluation corpus, baseline retrieval evaluator, retrieval-only metrics, threshold sweep analysis, CLI и committed Markdown reports.
+```mermaid
+flowchart TD
+    A["Staff pastes one customer message"] --> B["Request validation<br/>stripped, 1 to 4000 characters"]
+    B --> C["Deterministic risk assessment<br/>rules only, before any model or index work"]
+    B --> D["Query embedding<br/>text-embedding-3-small"]
+    D --> E["Chroma cosine search<br/>top 24"]
+    E --> F["source-authority-v1 rerank<br/>final top 12"]
+    F --> G["Context package S1..S12"]
+    G --> H["Grounded generation<br/>JSON draft with source markers"]
+    C --> I["Customer-output policy<br/>chooses the text and says why"]
+    H --> I
+    I --> J["Staff card or CLI JSON<br/>draft, risk, handoff, sources"]
+```
 
-**Reranking A/B (stage 2C.1, source-authority-v1)** — baseline retrieval evaluation завершён; A/B candidate принят по quality criteria; stage 2C.1 закрыт repair/audit cycle.
+1. **Validation.** The message is stripped and bounded (4000 characters) by the request model, below any UI.
+2. **Risk assessment.** Deterministic rules produce exactly one assessment per request, before retrieval, so no later failure can lose it.
+3. **Retrieval.** One query embedding, a cosine search for 24 candidates, a small deterministic rerank, 12 passages kept.
+4. **Generation.** The model is asked for a JSON reply (`grounded_answer`, `insufficient_context` or `out_of_scope`) citing passages as `[S1]`..`[S12]`.
+5. **Customer-output policy.** One function decides which text becomes the customer draft and records its provenance. Both the UI and the CLI are thin adapters over it and never see raw model text.
+6. **Degradation.** If retrieval, context building or generation fails, the draft falls back to a deterministic text and the risk assessment is kept; the failure is reported as `failure_source`.
 
-**Vector pool expansion (stage 2C.2)** — candidate `vector top-24 → source-authority-v1 → final top-12` принят; это **selected retrieval configuration** для MVP.
+## Deterministic safety boundary
 
-**Hybrid lexical + vector (stage 2C.3)** — experiment `hybrid-lexical-vector-v1` выполнен; formal guardrails не пройдены (**rejected** для MVP selection). Retrieval experimentation **frozen** после 2C.3. Hybrid v1 **не** production-ready.
+- **Risk floor.** `assess_deterministic_risk` returns a floor (`low` to `critical`) and a status: `rule_match`, `no_signal` or `unsupported_language`. A model can only ever raise a level. `no_signal` is reported as "risk not determined by rules", never as low risk, and a message that is not in Russian is not classified at all but routed to manual review.
+- **Critical categories.** Health symptoms after eating, a dangerous foreign object, a mass incident, fraud indicators and a direct threat to staff are critical: they get a fixed customer text and a priority handoff. Personal-data exposure (high or critical) gets a fixed text as well. The model's draft is not consulted for any of them.
+- **Text policy for model drafts.** A draft for any other case is shown only if it passes checks that reject admissions of fault, promises of a refund, compensation or a deadline, statements that the application has registered, transferred or will review something (it does none of that), medical diagnoses and advice, requests for card numbers, CVV, PIN or SMS codes, and markup. A draft that fails is replaced by a verified template (`safety_replacement`).
+- **Honest provenance.** Every answer carries `answer_provenance`, and `citations` lists sources only when the accepted text really is the model's grounded draft; retrieved passages that do not support the text are listed separately as `retrieved_materials`.
+- **What this is not.** Retrieval supports the staff member's context; it is never the basis of a safety decision. The rules are a conservative lexicon, not a classifier (see the limitations).
 
-**Application layer (functional MVP)** — реализованы grounded generation, deterministic risk/handoff, citations и fallback handling; production composition root (`build_customer_claims_pipeline`), frozen retrieval `vector top-24 → source-authority-v1 → final top-12`, single-shot CLI (`answer-claim`) и локальный Streamlit UI.
+[`deliverables/evidence/`](deliverables/evidence/README.md) shows the behaviour in 14 recorded situations, including a model draft that promises a refund and diagnoses a symptom being replaced, and an injection attempt around a health complaint that changes nothing.
 
-**10-document production release posture (stage 4C.4-B, пересобран в 2D2)** — release descriptor `foodflow-10doc-release-v2` (canonical corpus `configs/corpus/foodflow_production_v1.json`: documents 01–10, index `data/04_index_production`, frozen pool@24 contract). Index воспроизводится из репозитория (`build-index --corpus-manifest ...`); production startup fail-closed и пересчитывает identity из хранимых записей. Rollback — операция над репозиторием (checkout предыдущего релиза и rebuild), не архив. Подробности: `docs/06_release_posture.md`.
+## Retrieval design
 
-**Expanded corpus index (stage 4C.1)** — historical 15-document index (333 chunks) — исторический evidence (локальный архив, больше не часть release posture); **не** production.
+- **Corpus.** Ten cleaned Markdown documents (service overview, delivery, orders, refunds, compensation, food quality, complaint procedure, escalation and risk rules, response style, FAQ). A structure-aware chunker with a `cl100k_base` token budget produces 216 chunks with typed metadata (document, section, chunk type, priority).
+- **Search.** Dense retrieval only: `text-embedding-3-small` vectors in a persistent Chroma collection (cosine). The contract is frozen in `configs/retrieval/vector_pool_expansion_v1.json`: fetch 24, pool 24, final 12, similarity threshold 0.0 (no filtering, on purpose).
+- **Rerank.** `source-authority-v1` adds a bonus of at most 0.03 by document type (policy and escalation highest, FAQ and templates none), with deterministic tie-breaking. It cannot overtake a large similarity gap.
+- **How the configuration was chosen.** The candidates below were each judged on the frozen 60-case set against written guardrails (no regression on high and critical cases). The reports are kept as history under `tests/`; see [`deliverables/README.md`](deliverables/README.md).
 
-**Expanded corpus frozen regression (stage 4C.2)** — frozen 60-question regression выполнен для historical 10-document и 15-document index arms; артефакт `expanded_corpus_frozen_regression_v1`.
+| Experiment | Outcome |
+|------------|---------|
+| Source-authority rerank | accepted |
+| Candidate pool 12 -> 24 | accepted: primary reachability 51/57 -> 56/57, critical 6/8 -> 8/8, high 13/15 -> 15/15 |
+| Hybrid BM25 + vector (RRF) | rejected: failed its guardrails |
+| 15-document expansion (adds documents 11 to 15) | rejected: harmful regressions on high and critical cases |
+| Deeper pool with a per-document cap (36, cap 4) on the expanded corpus | accepted only as a partial candidate-generation repair |
+| Two further repairs of the expansion (atomic risk units, atomic threat units) | rejected |
 
-**Functional MVP complete:** production retrieval, grounded generation, deterministic risk/handoff, single-shot CLI и локальный Streamlit interface реализованы и покрыты тестами.
+Documents 11 to 15 therefore stay out of the production corpus; the deterministic layer covers payment data, personal data, threats, hazards and health with fixed texts that do not depend on them.
 
-**Docker-based local delivery (stage 5B)** — reproducible Streamlit deployment через Docker Compose с bind-mount активного production index; fail-closed startup preflight. См. `docs/07_index_provisioning.md` и `docs/08_docker_runbook.md`.
+## Reproducible canonical corpus and index
 
-**Russian production flow (финальный repair-пакет)** — весь пользовательский production flow русифицирован: generation, deterministic risk/handoff, category-specific fallback, risk rules на русском языке; client draft отделен от staff information; технические статусы вынесены в свернутый блок.
+- `configs/corpus/foodflow_production_v1.json` is the only place the corpus is selected. It records the SHA-256 of every source document, the expected chunk count (216), a **chunk payload digest** (`f46fa977...`, chunk ids, texts, metadata, independent of the embedding model) and a **corpus fingerprint** (`aa1005e1...`, the same plus the embedding model name). Every Markdown file in the source directory must be declared as included or excluded.
+- `configs/release/production_posture.json` (schema 2.0.0) names release `foodflow-10doc-release-v2` and the index path `data/04_index_production`.
+- The index is a **build artifact**: it is not committed and is built from the repository by one documented command ([`docs/07_index_provisioning.md`](docs/07_index_provisioning.md)). Only the last step, embedding, needs `OPENAI_API_KEY` and network, and the canonical build reads the key from the process environment only.
+- `validate-release-posture` is the release gate. It recomputes the chunk count, payload digest, corpus fingerprint, collection content digest and vector dimensions **from the stored records**, so a manifest edited to claim the approved identity, a stale index, an edited chunk or vector, or a wrong dimension are all refused. Exit status `0` is only ever returned when the index content was verified; `answer-claim`, the UI and the container run the same validation before serving.
+- What it cannot prove: that the stored vectors came from the model the manifest names. Only the configured model name, the dimension and the build-time digests can be checked offline ([`docs/06_release_posture.md`](docs/06_release_posture.md)).
 
-**Manual acceptance (stage 5C + targeted recheck R1–R4)** — основной набор 5 типовых + 2 out-of-scope сценариев, targeted recheck R1–R4 (оплаченная недоставка, задержка, жалоба на здоровье, возврат). Verdict: **PASS**. Все targeted ответы менее 30 секунд (9.90 / 3.66 / 3.65 / 2.58 с). Отчет: `deliverables/manual_acceptance_report.md`; evidence index: `deliverables/evidence/README.md`; скриншоты: `deliverables/evidence/manual_acceptance/`.
+## Evaluation results
 
-**Еще не реализованы:** authentication, chat history, document upload из UI, feedback collection, query rewriting, remote/public deployment. Клиентские черновики являются предварительными и проверяются сотрудником перед отправкой. Более естественные category-specific шаблоны и SLA-aware ответы — post-MVP improvements (`итеративная калибровка шаблонов по результатам пилотной эксплуатации`). Система не обучается самостоятельно на обращениях.
+Retrieval-only evaluation of the production index on the 60 frozen cases (`tests/01_test_questions.md`, `tests/02_expected_answers.md`), real embeddings, production configuration. Full derivation, per-case rows and provenance: [`deliverables/evidence/retrieval_summary.md`](deliverables/evidence/retrieval_summary.md).
 
-Источником истины для базы знаний остаются файлы в `data/02_clean_markdown/`. Каталоги `data/03_chunks/` и `data/04_index*/` — только локальные generated артефакты. **Свежий clone не содержит production index** — его нужно собрать из репозитория (`docs/07_index_provisioning.md`; нужен `OPENAI_API_KEY`).
+| Metric | Value | Cases |
+|--------|------:|------:|
+| Hit@4 (any expected source in the first 4) | 0.897 | 52/58 |
+| Primary hit@4 (an expected primary source in the first 4) | 0.759 | 44/58 |
+| Primary hit@1 | 0.397 | 23/58 |
+| MRR | 0.715 | 60 |
+| Expected primary source in the 24-candidate pool | 0.982 | 56/57 |
 
-## Запуск с нуля (Windows / PowerShell)
+- Against the baseline accepted before the corpus corrections, there is **no per-case regression**; one case improved (T011, high risk: primary source now in the first 4), so primary hit@4 moved from 0.741 to 0.759.
+- Pool reachability for the safety-relevant slices: critical 8/8, high 15/15.
+- The only case whose expected primary source is outside the candidate pool is **T004**. Some high and critical cases (for example T040, T044, T047) are reachable but ranked below position 4; for the critical ones the fixed customer text and priority handoff do not depend on retrieval.
 
-Самостоятельная инструкция для чистого компьютера. Все зависимости проекта описаны **только** в `pyproject.toml`; отдельные `requirements.txt` / `requirements-dev.txt` намеренно не используются, чтобы не поддерживать второй дублирующий список пакетов.
+How to read these numbers: they measure retrieval, not answer quality. The 60 cases also guided the choice of the retrieval configuration, so they are a regression baseline, not an estimate of performance on unseen messages. Model answers are not scored anywhere in this repository.
 
-### Требования
+## Running locally
 
-- **Git** — клонирование репозитория;
-- **Python 3.12 или новее** — минимальная поддерживаемая версия определяется `requires-python = ">=3.12"` в `pyproject.toml`;
-- **OpenAI API key** — требуется для реальных embeddings/search и grounded generation в `answer-claim` и Streamlit UI; **не требуется** для ingestion (`build-chunks`) и offline automated tests;
-- **Автоматические тесты** работают полностью offline и **не требуют** OpenAI API key.
-
-### Клонирование
+Python 3.12 or newer. The dependencies are declared once, in `pyproject.toml`.
 
 ```powershell
 git clone https://github.com/eliv1982/customer-claims-rag-assistant.git
 cd customer-claims-rag-assistant
-```
-
-### Создание виртуального окружения
-
-```powershell
 py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-Если активация блокируется политикой выполнения PowerShell:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
-
-### Установка проекта
-
-```powershell
-python -m pip install --upgrade pip
+.\.venv\Scripts\Activate.ps1          # Linux/macOS: python3.12 -m venv .venv && source .venv/bin/activate
 python -m pip install -e ".[dev]"
 python -m pip check
+python -m pytest -p no:cacheprovider  # needs no key, no network, no index
 ```
 
-Кратко:
+A fresh clone has the corpus, the manifests, the evidence and the tools, but not the index. To run the application:
 
-- `pyproject.toml` — единственный источник runtime- и dev-зависимостей;
-- `-e` устанавливает пакет в **editable mode** (изменения в `src/` сразу доступны);
-- `[dev]` добавляет pytest и pytest-cov для тестов и coverage.
+1. Export a key **on purpose** in the shell that builds: `$env:OPENAI_API_KEY = "<key>"`.
+2. Build the index (dry run first, then the build; embedding 216 chunks is a small request). The exact commands are in [`docs/07_index_provisioning.md`](docs/07_index_provisioning.md):
 
-### Настройка environment
+   ```powershell
+   python -m customer_claims_rag.cli.build_index --corpus-manifest configs/corpus/foodflow_production_v1.json --index-dir data/04_index_production --collection customer_claims --embedding-model text-embedding-3-small --rebuild
+   ```
 
-Скопируйте шаблон и заполните ключ локально:
+3. Check the release: `validate-release-posture` (exit status `0`, `release_can_proceed=yes`).
+4. Ask:
+
+   ```powershell
+   answer-claim --message "Заказ FF-52525 опоздал на 40 минут. Положена ли компенсация?"
+   python -m streamlit run src/customer_claims_rag/ui/streamlit_app.py
+   ```
+
+Credentials: `answer-claim` and the UI read `OPENAI_API_KEY` from the process environment or a local `.env` (the process environment wins; `.env` is gitignored, `.env.example` has no secrets). The canonical index build and the Docker launcher use the process environment only, so a stale `.env` cannot start a paid run. Production retrieval settings come from the release descriptor; `RAG_INDEX_DIR` affects only the development and evaluation CLIs.
+
+## Tests and CI
+
+- **Default suite** (about 2,800 tests): hermetic. No credential, no `.env`, no tokenizer download, no built index, no network; a socket guard in the test process and in ordinary child interpreters fails the session on any outbound attempt. Tests of gitignored local artifacts (`local_artifact`) skip with the missing path as the reason, and fail if the artifact exists but is stale.
+- **Two tokenizer lanes.** The default lane uses an offline stand-in for `cl100k_base`; a separate lane (`python -m pytest --real-tiktoken -m real_tiktoken`) runs against the real vocabulary and checks the canonical chunk topology and fingerprints. Serving a request never loads a tokenizer: a test drives the real LangChain and OpenAI clients over a stubbed transport with an empty cache and every tokenizer entry point trapped.
+- **CI** (GitHub Actions, no secrets, read-only permissions): the default suite on Ubuntu and Windows and the real-tokenizer lane on Ubuntu, each in a fresh virtual environment with `pip check`. Details: [`docs/09_ci_contract.md`](docs/09_ci_contract.md).
+- **Evidence tests.** The committed evidence is checked against the committed release configuration, and on a machine with the production index it is re-derived and compared byte for byte.
+
+## Docker and release workflow
+
+The Streamlit UI runs in a hardened container: non-root user, read-only root filesystem, dropped capabilities, port published on loopback only, the index mounted from the host (never copied into the image), and a start-up order that runs the full release validation before the server starts. Compose is started only through the launcher, which takes the key from the process environment and ignores `.env`:
 
 ```powershell
-Copy-Item .env.example .env
-```
-
-Откройте `.env` и задайте:
-
-```env
-OPENAI_API_KEY=
-```
-
-Файл `.env` **не коммитится** (см. `.gitignore`). Шаблон `.env.example` содержит безопасные placeholder-значения без секретов.
-
-Проект автоматически загружает `.env` из корня репозитория при запуске CLI, `answer-claim`, Streamlit UI и чтении `ApplicationSettings` / `RetrievalSettings`. Уже установленные переменные процесса имеют **приоритет** над значениями из `.env`. Отсутствие `.env` не является ошибкой.
-
-Production retrieval использует `configs/release/production_posture.json` (default target `active`). Индекс `data/04_index_production` — локальный build artifact; после сборки проверьте:
-
-```powershell
-validate-release-posture
-```
-
-См. `docs/06_release_posture.md` для release identity, limitations и rollback.
-
-### Тесты
-
-```powershell
-$env:PYTHONDONTWRITEBYTECODE="1"
-python -m pytest -q -p no:cacheprovider
-```
-
-С coverage:
-
-```powershell
-python -m pytest --cov=customer_claims_rag --cov-report=term-missing
-```
-
-### Сборка ingestion chunks
-
-```powershell
-python -m customer_claims_rag.cli.build_chunks --verbose
-```
-
-По умолчанию:
-
-- вход: `data/02_clean_markdown/`;
-- выход: `data/03_chunks/chunks.jsonl`;
-- статистика: `data/03_chunks/chunk_stats.json`.
-
-OpenAI API key для этой команды **не требуется**.
-
-### Сборка vector index (dev/evaluation)
-
-> **Важно:** production index создаётся только командой с `--corpus-manifest` (см. `docs/07_index_provisioning.md`). Generic `build-index --rebuild` без manifest индексирует **все** документы директории и release-валидацию не пройдёт.
-
-Требуется заполненный `OPENAI_API_KEY` в `.env` или в environment процесса.
-
-Используйте явный disposable path для dev/evaluation, чтобы не затрагивать локальные индексы:
-
-```powershell
-python -m customer_claims_rag.cli.build_index `
-  --rebuild `
-  --index-dir data/04_index_dev_tmp
-```
-
-Для диагностики ошибок:
-
-```powershell
-python -m customer_claims_rag.cli.build_index `
-  --rebuild `
-  --index-dir data/04_index_dev_tmp `
-  --verbose
-```
-
-Флаг `--verbose` выводит полный traceback; без него CLI показывает только краткое сообщение об ошибке.
-
-По умолчанию:
-
-- вход: `data/02_clean_markdown/` (через `CorpusBuilder`);
-- index (build CLI default при отсутствии `--index-dir`): `data/04_index/` — dev/evaluation default, **не** production index;
-- collection: `customer_claims`;
-- embedding model: `text-embedding-3-small`.
-
-`--rebuild` обязателен: выполняется destructive full rebuild. `--index-dir` явно задаёт целевой путь.
-
-### Поиск
-
-```powershell
-python -m customer_claims_rag.cli.search_index "Где мой заказ?"
-```
-
-```powershell
-python -m customer_claims_rag.cli.search_index "Сколько времени занимает возврат денег?"
-```
-
-```powershell
-python -m customer_claims_rag.cli.search_index "После еды мне стало плохо"
-```
-
-```powershell
-python -m customer_claims_rag.cli.search_index "Заказ отмечен доставленным, но я его не получил" --json
-```
-
-### Production claim answer (single-shot)
-
-Требуется собранный production index (`data/04_index_production` per release descriptor), заполненный `OPENAI_API_KEY` и generation env vars (см. `.env.example`). Production index path задаётся **только** через `configs/release/production_posture.json`; `RAG_INDEX_DIR` на answer/UI flow **не влияет**.
-
-Команда принимает одно обращение, выполняет production pipeline один раз и печатает стабильный JSON в stdout:
-
-```powershell
-answer-claim --message "Курьер привез вскрытый контейнер"
-```
-
-Эквивалент через модуль:
-
-```powershell
-python -m customer_claims_rag.cli.answer_claim --message "Курьер привез вскрытый контейнер"
-```
-
-JSON содержит customer-safe поля: `answer`, `response_mode`, `generation_outcome`, `risk_level`, handoff flags/notice и citations (`key`, `heading`, `document_id`).
-
-### Streamlit MVP (локальный UI)
-
-Установка UI-зависимостей:
-
-```powershell
-python -m pip install -e ".[ui]"
-```
-
-Требования те же, что и для `answer-claim`: заполненный `.env`, собранный production index, generation env vars из `.env.example`. UI **не пересобирает** индекс и не загружает документы.
-
-Запуск:
-
-```powershell
-python -m streamlit run src/customer_claims_rag/ui/streamlit_app.py
-```
-
-Интерфейс принимает одно обращение, вызывает production pipeline один раз и показывает:
-
-- черновик ответа клиенту (предварительный; проверяется сотрудником перед отправкой);
-- отдельную служебную информацию для сотрудника;
-- категорию обращения;
-- уровень риска;
-- необходимость эскалации;
-- рекомендуемый маршрут обработки;
-- действия сотрудника;
-- основания и источники;
-- найденные материалы для ручной проверки;
-- техническую информацию в свернутом блоке.
-
-### Docker (рекомендуемый способ демонстрации)
-
-Требования: Docker Desktop / Docker Engine + Compose, собранный production index на хосте, `OPENAI_API_KEY` в environment процесса.
-
-1. Собрать index на хосте: `docs/07_index_provisioning.md`
-2. Runbook: `docs/08_docker_runbook.md`
-
-Кратко (PowerShell). Compose запускается только через `scripts/release_compose.py`: ключ берётся из environment процесса, а не из репозиторного `.env`:
-
-```powershell
-$env:OPENAI_API_KEY = "your-key-here"
+$env:OPENAI_API_KEY = "<key>"
 python scripts/release_compose.py build
 python scripts/release_compose.py run --rm streamlit validate-release-posture
 python scripts/release_compose.py up -d --wait
 ```
 
-Откройте http://127.0.0.1:8501 (порт публикуется только на loopback; `RAG_BIND_ADDRESS` — явный opt-in). Индекс монтируется read-write в `/app/data/04_index_production` (Chroma пишет в свою SQLite даже при чтении); остальная файловая система контейнера read-only, процесс работает от uid 10001. В image индекс **не** копируется. `RAG_INDEX_DIR` на production UI flow **не влияет**; selector — `RAG_RELEASE_TARGET` + descriptor.
+Open http://127.0.0.1:8501. The mount is writable because Chroma writes to its own SQLite file even to read. See [`docs/08_docker_runbook.md`](docs/08_docker_runbook.md), including how the image was verified by hand (CI does not build it).
 
-Дополнительные параметры search-index (локальный Python, dev/evaluation):
+## Known limitations
 
-```powershell
-python -m customer_claims_rag.cli.search_index "возврат" --top-k 4 --fetch-k 12 --threshold 0.35
-```
+- **Scope.** Single-shot staff assist: no persistence, authentication, case history, ticketing or deployment. The knowledge base is fictional and the rules are tuned to Russian text; other languages are routed to manual review.
+- **Retrieval.** T004 stays outside the 24-candidate pool. T040, T044 and T047 (and T016, T053) are reachable but ranked below position 4: pool expansion fixed candidate generation, not ordering. Retrieval is dense-only; there is no query rewriting.
+- **Rule coverage and precision.** The risk rules are a conservative, pattern-based lexicon. Two frozen cases labelled high (T039, a hair in a salad; T053, the third wrong dish in a row) match no rule and come out as "risk not determined"; staff must judge them, and the UI says so. The lexicon can also over-escalate: a complaint about a leaking container can match a health term and receive the health template. These are accepted limitations to be handled by rule changes, not by the model.
+- **Evaluation.** Retrieval only, on 60 cases that also guided configuration; no answer-quality benchmark.
+- **Embeddings.** Rebuilding the index needs an external OpenAI credential and spends embedding credit. That the stored vectors came from the named model cannot be proven offline beyond the configured name, dimension and digests.
+- **Tokenizer.** Building and verifying the canonical chunks needs the `cl100k_base` vocabulary (downloaded once); serving does not.
+- **Runtime.** The container is verified by hand, not in CI; the UI is local (loopback) and unauthenticated by design.
 
-Явный `--threshold` по-прежнему включает filtering; без него используется default из env (см. ниже).
-
-### Generated artifacts
-
-- **Production release index** (`data/04_index_production`) — build artifact, строится из репозитория; see `docs/07_index_provisioning.md` and `docs/06_release_posture.md`;
-- **Build/evaluation index** (`data/04_index/`) — default output path для `build-index` / `search-index` / evaluation CLIs (на maintainer-машине может содержать historical 15-document index для воспроизведения экспериментов);
-
-  > **Предупреждение:** generic build command (`build-index --rebuild`) выполняет destructive full rebuild в `data/04_index/` (все документы директории). Для одноразовой dev/evaluation сборки укажите явный путь: `build-index --rebuild --index-dir data/04_index_dev_tmp`.
-
-- Chroma index и `manifest.json` создаются **внутри project root**;
-- нельзя направлять `--index-dir` в `data/01_raw/`, `data/02_clean_markdown/` или внутрь `--input-dir`;
-- generated contents **не коммитятся** (см. `.gitignore`);
-- `data/04_index/.gitkeep` сохраняет структуру каталога в git.
-
-### Остановка окружения
-
-```powershell
-deactivate
-```
-
-### Переменные окружения (справочник)
-
-| Переменная | Назначение | Default |
-|------------|------------|---------|
-| `OPENAI_API_KEY` | Ключ OpenAI для embeddings и generation | — |
-| `OPENAI_EMBEDDING_MODEL` | Модель embeddings | `text-embedding-3-small` |
-| `OPENAI_CHAT_MODEL` | Модель chat completion для generation | `gpt-4o-mini` |
-| `CUSTOMER_CLAIMS_PROJECT_ROOT` | Explicit project root for container/non-editable installs | unset (auto-detect from package layout) |
-| `RAG_RELEASE_TARGET` | Production release target (в descriptor только `active`) | `active` (descriptor default) |
-| `RAG_ACTIVE_INDEX_HOST_PATH` | Docker Compose **host** bind-mount path for active index only | `./data/04_index_production` |
-| `RAG_INDEX_DIR` | Index path for **build/search/evaluation CLIs only** | `data/04_index` |
-| `RAG_COLLECTION_NAME` | Имя Chroma collection — **build/search/evaluation CLI only**; production pipeline использует frozen contract | `customer_claims` |
-| `RAG_TOP_K` | Максимум результатов поиска — **retrieval/evaluation CLI only**; production pipeline: final top-12 (frozen) | `4` |
-| `RAG_FETCH_K` | Размер candidate pool — **retrieval/evaluation CLI only**; production pipeline: fetch24 (frozen) | `12` |
-| `RAG_SIMILARITY_THRESHOLD` | Минимальная cosine similarity — **retrieval/evaluation CLI only**; production pipeline: threshold=0.0 (frozen) | `0.0` |
-| `RAG_EMBEDDING_BATCH_SIZE` | Batch size при индексации | `64` |
-| `GENERATION_TEMPERATURE` | Temperature для grounded generation | `0.0` |
-| `GENERATION_TIMEOUT_SECONDS` | Timeout chat completion (сек.) | `60` |
-| `GENERATION_MAX_RETRIES` | Retries chat completion | `2` |
-| `GENERATION_MAX_OUTPUT_TOKENS` | Max output tokens | `1024` |
-| `GENERATION_PROMPT_PATH` | Путь к prompt-файлу | `prompts/system_prompt.md` |
-
-CLI-параметры переопределяют env-значения.
-
-### Архитектура retrieval layer
+## Repository structure
 
 ```text
-clean Markdown
-  -> CorpusBuilder (ingestion, framework-independent)
-  -> validated ChunkRecord list
-  -> deterministic ordering + corpus fingerprint
-  -> EmbeddingProvider (OpenAI adapter via langchain-openai)
-  -> VectorStore (Chroma adapter, cosine space)
-  -> manifest.json
-  -> BaselineRetriever (fetch_k -> threshold -> top_k)
+configs/            corpus manifest, release descriptor, retrieval and reranker contracts
+data/02_clean_markdown/   cleaned knowledge-base documents (01-10 production, 11-15 experimental)
+data/05_evaluation/       tracked results of historical experiments (generated outputs are gitignored)
+deliverables/       final acceptance evidence (current) and the superseded Stage 5C package (historical)
+docs/               scope and data-preparation records, release posture, provisioning, Docker, CI
+experiments/        frozen historical corpus snapshot and the rejected repair experiments
+prompts/            system prompt and RAG prompt template
+scripts/            release launcher, container entrypoint, evidence capture, tokenizer provisioning
+src/customer_claims_rag/
+  ingestion/        loading, chunking, canonical corpus
+  retrieval/        embeddings, Chroma store, retriever, reranker, fingerprints, manifest
+  risk/             deterministic risk rules and invariants
+  generation/       context, prompt, parser, validator, fallbacks
+  application/      pipeline, customer-output policy, templates, factory
+  release/          release posture and readiness (the gate)
+  evaluation/       retrieval evaluation and experiment harnesses
+  cli/, ui/         answer-claim, build/validate/evaluate commands, Streamlit app
+tests/              unit and integration tests, the 60 frozen cases, historical experiment reports
 ```
 
-Код:
+## Development approach
 
-```text
-src/customer_claims_rag/retrieval/
-  models.py            # IndexManifest, SearchResult, SearchResponse
-  ports.py             # EmbeddingProvider, VectorStore protocols
-  fingerprint.py       # deterministic SHA-256 corpus fingerprint
-  metadata_mapper.py   # ChunkRecord -> scalar Chroma metadata
-  manifest.py          # atomic manifest read/write/validation
-  index_builder.py     # full rebuild pipeline
-  retriever.py         # baseline dense retrieval
-  adapters/
-    openai_embeddings.py
-    chroma_store.py
-    fake_embeddings.py # offline tests only
-```
+The project was built in stages, each closed against written acceptance criteria and re-checked before the next began.
 
-LangChain используется только в `adapters/openai_embeddings.py`. Ingestion core не зависит от LangChain и не меняет свои chunk models.
+- **Retrieval by experiment.** Each change to retrieval (reranking, pool depth, hybrid search, corpus expansion, atomic-unit repairs) was a separate experiment on a frozen regression set with guardrails fixed in advance; rejected experiments are kept and documented rather than deleted.
+- **Safety as code.** The safety rules are deterministic, tested against adversarial and regression inputs, and structurally separate from the model: the assessment is computed once, before retrieval, and generation cannot lower it.
+- **Identity you can verify.** Corpus manifest, chunk payload digest, corpus fingerprint and a release gate that recomputes them from the stored index. The release path never depends on an archive or on a maintainer's machine.
+- **Clean-clone reproducibility.** One dependency declaration, a hermetic test suite, an offline tokenizer stand-in plus a real-tokenizer lane, and CI that proves both from an empty environment.
+- **Independent validation of boundaries.** Mutation-style tests for the release gate (edited manifests, stale or altered stores), contract tests for the container and the credential rules, and evidence whose numbers are checked against the configuration they describe.
+- **Hardening.** A hardened container, bounded embedding input, and evidence that labels history as history instead of rewriting it.
 
-### Cosine similarity threshold
+## License
 
-Chroma collection настроена на cosine space. Adapter преобразует raw distance в similarity централизованно:
-
-```text
-similarity = 1.0 - distance
-```
-
-Baseline retriever:
-
-1. получает до `fetch_k` кандидатов;
-2. при `threshold > 0` отфильтровывает по `similarity >= threshold`;
-3. возвращает не более `top_k` результатов;
-4. сортирует по similarity desc, tie-break по `chunk_id`.
-
-**Production retrieval contract (frozen):** `fetch24 / pool24 / final12 / threshold0.0 / source-authority-v1`.
-
-**`threshold=0.0` — frozen release configuration.** Означает отсутствие similarity filtering после candidate retrieval: все fetch_k кандидаты передаются reranker'у, затем возвращается final top-k. Значение зафиксировано в `configs/retrieval/vector_pool_expansion_v1.json` и не подлежит изменению без нового release. Это не «ожидающий выбора production threshold», а осознанное решение, принятое по итогам baseline evaluation и A/B анализа.
-
-Исторически: smoke-run показал, что threshold `0.70` был слишком высок для текущего embedding/index (тематически очевидные запросы отсекались). После 60-case baseline evaluation был выбран и заморожен контракт `threshold=0.0` с reranker `source-authority-v1`.
-
-### Manifest и fingerprint
-
-`data/04_index/manifest.json` генерируется только после успешной индексации (temp + replace). Содержит:
-
-- `index_format_version`, `metadata_schema_version`;
-- `collection_name`, `embedding_model`;
-- `corpus_fingerprint`, `chunk_count`, `document_count`;
-- `vector_dimension`, informational `created_at`.
-
-Fingerprint зависит от `chunk_id`, `content`, canonical metadata, embedding model и index format version. Timestamp и абсолютные пути в fingerprint не входят.
-
-При mismatch manifest vs runtime retriever возвращает понятную ошибку с инструкцией выполнить rebuild. Автоматический rebuild не выполняется.
-
-Human-readable search output показывает rank, similarity, chunk/document IDs, heading, source path и короткий excerpt. JSON mode возвращает structured `SearchResponse` с diagnostics.
-
-## Baseline retrieval evaluation (60 cases) — исторический этап
-
-> **Примечание:** этот раздел описывает завершённый исторический этап (stage 2C), результаты которого привели к выбору frozen production retrieval contract `fetch24 / pool24 / final12 / threshold0.0 / source-authority-v1`. Раздел сохранён для справки и воспроизводимости; он **не описывает** текущий production release.
-
-Formal retrieval-only evaluation на corpus `tests/01_test_questions.md` + `tests/02_expected_answers.md`.
-
-```powershell
-python -m customer_claims_rag.cli.evaluate_retrieval
-```
-
-Явные paths при необходимости:
-
-```powershell
-python -m customer_claims_rag.cli.evaluate_retrieval `
-  --questions tests/01_test_questions.md `
-  --expected tests/02_expected_answers.md `
-  --index-dir data/04_index `
-  --collection customer_claims `
-  --embedding-model text-embedding-3-small `
-  --top-k 12 `
-  --fetch-k 12 `
-  --threshold 0.0 `
-  --output-json data/05_evaluation/retrieval_results.json
-```
-
-Требования:
-
-- существующий index в `data/04_index/` (без rebuild);
-- `OPENAI_API_KEY` для query embeddings в **real run**;
-- automated tests работают **offline** через fake retriever/fixtures.
-
-Outputs:
-
-- `data/05_evaluation/retrieval_results.json` — generated machine-readable JSON (**ignored by Git**);
-- `tests/03_test_results.md` — committed human-readable run summary;
-- `tests/04_improvement_log.md` — committed baseline improvement log.
-
-**Output consistency:** каждый файл записывается атомарно (temp + replace), но набор из трёх файлов **не** является общей транзакцией. Поле `evaluation_result_id` (SHA-256 canonical result) должно совпадать во всех трёх артефактах; расхождение означает partial или mixed run.
-
-**Preflight:** CLI выполняет parser validation до первого embedding call; полный manifest/index preflight (`retriever.validate_index()`) — до цикла по кейсам. Fatal mismatch (`IndexManifestError`, missing manifest/index, embedding model/collection/schema mismatch, missing `OPENAI_API_KEY`) прерывает run с **nonzero exit** без success reports.
-
-**Методология @k:** все метрики `@k` ограничивают **первые k raw chunks**, затем при необходимости дедуплицируют document IDs внутри этого окна. `Supporting source hit@4` считается только по кейсам с непустым `expected_supporting_documents` (denominator явно показывается как `hits/denominator`).
-
-**Run metadata:** `git_commit` + `git_dirty` фиксируются до run; при dirty working tree commit hash не полностью идентифицирует evaluation implementation.
-
-Baseline evaluation использовал `threshold=0.0` для измерения raw recall. Метрики **не** оценивают качество LLM-ответов, risk/handoff classification, answer factuality или Markdown output contract. По итогам baseline analysis был выбран и заморожен production contract; retrieval experimentation закрыто.
-
-### Troubleshooting
-
-| Симптом | Действие |
-|---------|----------|
-| `OPENAI_API_KEY is required` | Заполнить `OPENAI_API_KEY` в `.env` или export в PowerShell |
-| `index manifest not found` (production `answer-claim` / UI) | Собрать index согласно `docs/07_index_provisioning.md`, затем `validate-release-posture` |
-| `index manifest not found` (dev/evaluation CLI) | Пересобрать отдельный индекс: `build-index --rebuild --index-dir data/04_index_dev_tmp` |
-| `embedding model mismatch` | Пересобрать index с тем же `--embedding-model`, что и search CLI |
-| `chunk count mismatch` | Выполнить rebuild после изменения corpus |
-| `No results above threshold` | Проверить явный `--threshold` или `RAG_SIMILARITY_THRESHOLD`; default `0.0` не фильтрует |
-
-## Известные ограничения
-
-### Ingestion MVP
-
-- Generic chunk IDs вида `chunk-NNN` могут сдвинуться при добавлении более раннего раздела в документ.
-- На текущем real corpus overlap не требуется, хотя synthetic tests покрывают механизм overlap.
-- Policy overlap унифицирован диапазоном strategy; per-document fine-tuning еще не применен.
-- Target token range носит рекомендательный характер; grouping ориентируется на soft/hard limits.
-- Chunk-level `risk_level` не вычисляется эвристически на этапе ingestion.
-- Поле `topic` заполняется только у chunks с явным semantic ID (FAQ, template, forbidden row).
-- Output и stats должны находиться внутри permitted project root; перезапись source Markdown запрещена.
-
-### Retrieval (production frozen)
-
-- Dense cosine retrieval, frozen production contract: `fetch24 / pool24 / final12 / threshold0.0 / source-authority-v1`.
-- Stage **2C.3** hybrid BM25+RRF experiment завершён и **отклонён** для MVP; retrieval stage frozen.
-- Нет query rewriting.
-- `threshold=0.0` — frozen release configuration; similarity filtering после candidate retrieval не применяется. Контракт зафиксирован; выбор production threshold завершён.
-- Incremental indexing не поддерживается; только full rebuild.
-
-### Retrieval evaluation (исторический этап, завершён)
-
-- Только retrieval metrics; answer/risk/handoff quality не измерялись.
-- Fallback cases (T006, T060) анализировались отдельно от source-recall aggregates.
-- Threshold sweep выполнялся post-hoc над сохраненными candidates без повторных embedding calls.
-- По итогам baseline analysis выбран и заморожен production contract; retrieval experimentation закрыто.
-
-### Application MVP (текущие ограничения)
-
-- Нет authentication.
-- Нет chat history.
-- Нет document upload из UI.
-- Нет feedback collection.
-- Нет query rewriting.
-- Нет remote/public deployment.
-- Клиентские черновики являются предварительными и проверяются сотрудником перед отправкой.
-- Более естественные category-specific шаблоны и SLA-aware ответы — post-MVP improvements (`итеративная калибровка шаблонов по результатам пилотной эксплуатации`).
-- Система не обучается самостоятельно на обращениях.
-- Documents 11–15 не входят в production support.
+MIT, see [LICENSE](LICENSE).

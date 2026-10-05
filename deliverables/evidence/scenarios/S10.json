@@ -1,0 +1,16 @@
+{
+  "answer": "Сожалеем за длительное ожидание. Статус и история доставки по вашему заказу требуют проверки. Просим указать номер заказа. Возможный вариант решения, включая возможную компенсацию, зависит от результатов проверки.",
+  "answer_provenance": "failure_fallback",
+  "assessment_status": "rule_match",
+  "citations": [],
+  "failure_source": "retrieval",
+  "generation_outcome": "generation_error_fallback",
+  "handoff_notice": "Для решения этого вопроса требуется проверка сотрудником поддержки.",
+  "handoff_required": true,
+  "priority_handoff": false,
+  "response_mode": "insufficient_context",
+  "retrieved_materials": [],
+  "risk_floor": "high",
+  "risk_label": "Высокий",
+  "risk_note": null
+}

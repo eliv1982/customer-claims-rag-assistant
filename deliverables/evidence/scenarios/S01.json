@@ -1,0 +1,22 @@
+{
+  "answer": "Сожалеем, что заказ задержался. Задержка отсчитывается от конца согласованного интервала доставки. Вопрос о компенсации требует проверки: просим указать номер заказа, дату и интервал доставки.",
+  "answer_provenance": "llm_draft",
+  "assessment_status": "rule_match",
+  "citations": [
+    {
+      "document_id": "02_delivery_rules",
+      "heading": "Каноническое правило интервала и задержки",
+      "key": "S1"
+    }
+  ],
+  "failure_source": null,
+  "generation_outcome": "grounded_answer",
+  "handoff_notice": null,
+  "handoff_required": false,
+  "priority_handoff": false,
+  "response_mode": "grounded_answer",
+  "retrieved_materials": [],
+  "risk_floor": "medium",
+  "risk_label": "Средний",
+  "risk_note": null
+}

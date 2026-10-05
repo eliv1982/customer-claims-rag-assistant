@@ -1,0 +1,77 @@
+{
+  "answer": "Сожалеем о произошедшем. Не употребляйте продукт, сохраните его и упаковку для возможной проверки. Просим указать номер заказа и, если возможно, приложить фотографии. Обращение требует приоритетной проверки.",
+  "answer_provenance": "category_template",
+  "assessment_status": "rule_match",
+  "citations": [],
+  "failure_source": null,
+  "generation_outcome": "grounded_answer",
+  "handoff_notice": "Обращение требует приоритетной проверки сотрудником поддержки.",
+  "handoff_required": true,
+  "priority_handoff": true,
+  "response_mode": "grounded_answer",
+  "retrieved_materials": [
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Проблемы качества самого продукта",
+      "key": "S1"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Примеры и пограничные сценарии",
+      "key": "S2"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Critical",
+      "key": "S3"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Как отличать дефект от субъективного недовольства",
+      "key": "S4"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Безопасные рекомендации клиенту",
+      "key": "S5"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Категории риска",
+      "key": "S6"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Сочетанные кейсы и несколько затронутых признаков",
+      "key": "S7"
+    },
+    {
+      "document_id": "07_complaint_handling_procedure",
+      "heading": "Качество, упаковка и безопасность",
+      "key": "S8"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Эскалация и приоритет обработки",
+      "key": "S9"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "High",
+      "key": "S10"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Памятка ассистенту",
+      "key": "S11"
+    },
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Качество, повреждение и открытая упаковка",
+      "key": "S12"
+    }
+  ],
+  "risk_floor": "critical",
+  "risk_label": "Критический",
+  "risk_note": null
+}

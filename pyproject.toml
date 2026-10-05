@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "customer-claims-rag"
 version = "0.1.0"
-description = "RAG ingestion layer for FoodFlow customer claims assistant"
+description = "Staff-assist RAG triage tool for customer claims: deterministic safety rules, reproducible retrieval evaluation and hardened release validation"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

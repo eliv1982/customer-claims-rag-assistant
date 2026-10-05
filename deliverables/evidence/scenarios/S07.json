@@ -1,0 +1,77 @@
+{
+  "answer": "Сожалеем о возникшей ситуации. Мы не можем подтвердить или опровергнуть факт утечки по одному сообщению: это требует проверки. Просим описать, что именно, где и когда вы увидели, не повторяя сами персональные данные, и не отправлять в чате пароли и коды подтверждения.",
+  "answer_provenance": "category_template",
+  "assessment_status": "rule_match",
+  "citations": [],
+  "failure_source": null,
+  "generation_outcome": "grounded_answer",
+  "handoff_notice": "Обращение требует приоритетной проверки сотрудником поддержки.",
+  "handoff_required": true,
+  "priority_handoff": true,
+  "response_mode": "grounded_answer",
+  "retrieved_materials": [
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Персональные данные и утечки",
+      "key": "S1"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Critical",
+      "key": "S2"
+    },
+    {
+      "document_id": "07_complaint_handling_procedure",
+      "heading": "Классификация риска и маршрутизация",
+      "key": "S3"
+    },
+    {
+      "document_id": "07_complaint_handling_procedure",
+      "heading": "Классификация риска и маршрутизация",
+      "key": "S4"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Факторы, которые не понижают первичный риск",
+      "key": "S5"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Корректные формулировки и ограничения ассистента",
+      "key": "S6"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Жалобы, претензии и внешние инстанции",
+      "key": "S7"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Классификация риска не равна признанию факта или вины",
+      "key": "S8"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "High",
+      "key": "S9"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Мошенничество, массовые инциденты и угрозы персоналу",
+      "key": "S10"
+    },
+    {
+      "document_id": "07_complaint_handling_procedure",
+      "heading": "Ограничения ассистента",
+      "key": "S11"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Правило максимального риска",
+      "key": "S12"
+    }
+  ],
+  "risk_floor": "critical",
+  "risk_label": "Критический",
+  "risk_note": null
+}

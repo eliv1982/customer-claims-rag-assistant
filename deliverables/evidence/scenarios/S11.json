@@ -1,0 +1,77 @@
+{
+  "answer": "Сожалеем, что упаковка оказалась вскрыта. Не употребляйте продукт, сохраните упаковку и сделайте фотографии в том виде, в котором получили заказ. Просим указать номер заказа. Обращение требует проверки.",
+  "answer_provenance": "failure_fallback",
+  "assessment_status": "rule_match",
+  "citations": [],
+  "failure_source": "generation",
+  "generation_outcome": "generation_error_fallback",
+  "handoff_notice": "Для решения этого вопроса требуется проверка сотрудником поддержки.",
+  "handoff_required": true,
+  "priority_handoff": false,
+  "response_mode": "insufficient_context",
+  "retrieved_materials": [
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Проблемы упаковки и маркировки",
+      "key": "S1"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Примеры по упаковке и маркировке",
+      "key": "S2"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Сочетанные кейсы и несколько затронутых признаков",
+      "key": "S3"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Область применения и базовые определения",
+      "key": "S4"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Категории риска",
+      "key": "S5"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "План питания и повторяющиеся случаи",
+      "key": "S6"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "High",
+      "key": "S7"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Как отличать дефект от субъективного недовольства",
+      "key": "S8"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Какие данные и материалы нужны для проверки",
+      "key": "S9"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Проблемы качества самого продукта",
+      "key": "S10"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Примеры и пограничные сценарии",
+      "key": "S11"
+    },
+    {
+      "document_id": "06_food_quality_and_packaging",
+      "heading": "Безопасные рекомендации клиенту",
+      "key": "S12"
+    }
+  ],
+  "risk_floor": "high",
+  "risk_label": "Высокий",
+  "risk_note": null
+}

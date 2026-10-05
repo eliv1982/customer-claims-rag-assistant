@@ -1,5 +1,7 @@
 # Manual acceptance report (Stage 5C + Russian production flow)
 
+> **Historical document, superseded.** This is the Stage 5C acceptance record for release `foodflow-10doc-release-v1` (215 chunks, June 2026), kept as it was written. It does not describe the current product, corpus, index or CLI schema, and the commit it names no longer exists on `main`. Current evidence: [`deliverables/evidence/`](../../evidence/README.md). See [`README.md`](README.md) in this directory for what is outdated.
+
 **Overall verdict: PASS**
 
 ## 1. Scope

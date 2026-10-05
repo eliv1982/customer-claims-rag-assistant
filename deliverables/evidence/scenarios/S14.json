@@ -1,0 +1,77 @@
+{
+  "answer": "Пожалуйста, уточните, что именно произошло с заказом: доставка задерживается, заказ не получен, не хватает позиций или возникла проблема с качеством. Также укажите номер заказа и дату доставки, если они доступны. Это поможет быстрее рассмотреть обращение.",
+  "answer_provenance": "insufficient_context",
+  "assessment_status": "no_signal",
+  "citations": [],
+  "failure_source": null,
+  "generation_outcome": "insufficient_context",
+  "handoff_notice": null,
+  "handoff_required": false,
+  "priority_handoff": false,
+  "response_mode": "insufficient_context",
+  "retrieved_materials": [
+    {
+      "document_id": "10_customer_faq",
+      "heading": "FAQ-03. Видит ли ассистент статус заказа, оплату или местоположение курьера?",
+      "key": "S1"
+    },
+    {
+      "document_id": "07_complaint_handling_procedure",
+      "heading": "Ограничения ассистента",
+      "key": "S2"
+    },
+    {
+      "document_id": "10_customer_faq",
+      "heading": "FAQ-05. Какие платежные и личные данные нельзя отправлять ассистенту?",
+      "key": "S3"
+    },
+    {
+      "document_id": "10_customer_faq",
+      "heading": "FAQ-02. Что может сделать ассистент и является ли его ответ окончательным решением?",
+      "key": "S4"
+    },
+    {
+      "document_id": "03_order_changes_and_cancellations",
+      "heading": "Ограничения ассистента и эскалация",
+      "key": "S5"
+    },
+    {
+      "document_id": "01_service_overview",
+      "heading": "Возможности и ограничения AI-ассистент",
+      "key": "S6"
+    },
+    {
+      "document_id": "02_delivery_rules",
+      "heading": "Пограничные сценарии",
+      "key": "S7"
+    },
+    {
+      "document_id": "01_service_overview",
+      "heading": "Роли и ответственность участников",
+      "key": "S8"
+    },
+    {
+      "document_id": "01_service_overview",
+      "heading": "Каналы обращения и безопасная передача информации",
+      "key": "S9"
+    },
+    {
+      "document_id": "10_customer_faq",
+      "heading": "FAQ-42. Можно ли обратиться без номера заказа?",
+      "key": "S10"
+    },
+    {
+      "document_id": "03_order_changes_and_cancellations",
+      "heading": "Общие принципы обработки запросов",
+      "key": "S11"
+    },
+    {
+      "document_id": "10_customer_faq",
+      "heading": "FAQ-11. Что происходит, если клиент недоступен во время доставки?",
+      "key": "S12"
+    }
+  ],
+  "risk_floor": "low",
+  "risk_label": "Риск не определён правилами",
+  "risk_note": "Автоматические правила не выявили признаков риска. Это не означает, что обращение безопасно: при необходимости оцените его вручную."
+}

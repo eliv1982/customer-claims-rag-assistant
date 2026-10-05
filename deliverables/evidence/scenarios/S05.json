@@ -1,0 +1,77 @@
+{
+  "answer": "Сожалеем о возникшей ситуации. Не отправляйте в чате CVV/CVC, PIN, полный номер карты, коды из SMS и пароли: для рассмотрения обращения они не нужны. Если вы не совершали эту операцию, при необходимости обратитесь в свой банк. Просим указать номер заказа, дату и сумму списания. Обращение требует приоритетной проверки.",
+  "answer_provenance": "category_template",
+  "assessment_status": "rule_match",
+  "citations": [],
+  "failure_source": null,
+  "generation_outcome": "grounded_answer",
+  "handoff_notice": "Обращение требует приоритетной проверки сотрудником поддержки.",
+  "handoff_required": true,
+  "priority_handoff": true,
+  "response_mode": "grounded_answer",
+  "retrieved_materials": [
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Мошенничество, массовые инциденты и угрозы персоналу",
+      "key": "S1"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Critical",
+      "key": "S2"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Примеры по качеству, данным, эскалации и комбинированным кейсам",
+      "key": "S3"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Корректные формулировки и ограничения ассистента",
+      "key": "S4"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "High",
+      "key": "S5"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Факторы, которые не понижают первичный риск",
+      "key": "S6"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Medium",
+      "key": "S7"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Классификация риска не равна признанию факта или вины",
+      "key": "S8"
+    },
+    {
+      "document_id": "07_complaint_handling_procedure",
+      "heading": "Классификация риска и маршрутизация",
+      "key": "S9"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Примеры и пограничные сценарии",
+      "key": "S10"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Памятка ассистенту и связанные документы",
+      "key": "S11"
+    },
+    {
+      "document_id": "08_escalation_and_risk_rules",
+      "heading": "Триггеры по доставке и комплектации",
+      "key": "S12"
+    }
+  ],
+  "risk_floor": "critical",
+  "risk_label": "Критический",
+  "risk_note": null
+}

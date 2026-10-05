@@ -1,0 +1,1667 @@
+{
+  "cases": [
+    {
+      "case_id": "T001",
+      "category": "general",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "01"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 3,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.3333,
+      "risk": "low"
+    },
+    {
+      "case_id": "T002",
+      "category": "general",
+      "classification": "none",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "01"
+      ],
+      "expected_supporting": [
+        "07",
+        "02"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 7,
+      "primary_best_pool24_rank": 5,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 1.0,
+      "risk": "low"
+    },
+    {
+      "case_id": "T003",
+      "category": "general",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "01",
+        "07"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 3,
+      "primary_best_pool24_rank": 4,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "low"
+    },
+    {
+      "case_id": "T004",
+      "category": "general",
+      "classification": "reachable_only_beyond_selected_pool",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Требование возврата средств",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "07"
+      ],
+      "expected_supporting": [
+        "01"
+      ],
+      "hit_at_4": false,
+      "primary_best_final_rank": null,
+      "primary_best_pool24_rank": null,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.0,
+      "risk": "low"
+    },
+    {
+      "case_id": "T005",
+      "category": "general",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Недоставка оплаченного заказа",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "04",
+        "07"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T006",
+      "category": "general",
+      "classification": "fallback_case",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [],
+      "expected_supporting": [
+        "01"
+      ],
+      "hit_at_4": false,
+      "primary_best_final_rank": null,
+      "primary_best_pool24_rank": null,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.0,
+      "risk": "low"
+    },
+    {
+      "case_id": "T007",
+      "category": "delivery",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "02"
+      ],
+      "expected_supporting": [
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "low"
+    },
+    {
+      "case_id": "T008",
+      "category": "delivery",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "02"
+      ],
+      "expected_supporting": [
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "low"
+    },
+    {
+      "case_id": "T009",
+      "category": "delivery",
+      "classification": "none",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Задержка доставки более 30 минут",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "medium"
+      },
+      "expected_primary": [
+        "02"
+      ],
+      "expected_supporting": [
+        "08",
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 6,
+      "primary_best_pool24_rank": 6,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 1.0,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T010",
+      "category": "delivery",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Задержка доставки более 30 минут",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "medium"
+      },
+      "expected_primary": [
+        "02"
+      ],
+      "expected_supporting": [
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 3,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T011",
+      "category": "delivery",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Задержка доставки более 120 минут",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "02",
+        "08"
+      ],
+      "expected_supporting": [
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 4,
+      "primary_best_pool24_rank": 7,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "high"
+    },
+    {
+      "case_id": "T012",
+      "category": "delivery",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Неверный статус доставки",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "02",
+        "08"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "high"
+    },
+    {
+      "case_id": "T013",
+      "category": "delivery",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Недоставка оплаченного заказа",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "02",
+        "08"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 3,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "high"
+    },
+    {
+      "case_id": "T014",
+      "category": "delivery",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "02"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T015",
+      "category": "delivery",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "02"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 6,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T016",
+      "category": "delivery",
+      "classification": "candidate_generation_fixed_ranking_limited",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "02"
+      ],
+      "expected_supporting": [
+        "04"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 9,
+      "primary_best_pool24_rank": 18,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.3333,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T017",
+      "category": "orders",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "03"
+      ],
+      "expected_supporting": [
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 3,
+      "primary_best_pool24_rank": 5,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "low"
+    },
+    {
+      "case_id": "T018",
+      "category": "orders",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "03"
+      ],
+      "expected_supporting": [
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 3,
+      "primary_best_pool24_rank": 3,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T019",
+      "category": "orders",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "03"
+      ],
+      "expected_supporting": [
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "low"
+    },
+    {
+      "case_id": "T020",
+      "category": "orders",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "03"
+      ],
+      "expected_supporting": [
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "low"
+    },
+    {
+      "case_id": "T021",
+      "category": "orders",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Задержка доставки более 120 минут",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "03"
+      ],
+      "expected_supporting": [
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T022",
+      "category": "orders",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "03"
+      ],
+      "expected_supporting": [
+        "01"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "low"
+    },
+    {
+      "case_id": "T023",
+      "category": "orders",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Требование возврата средств",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "medium"
+      },
+      "expected_primary": [
+        "03",
+        "05"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 5,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T024",
+      "category": "refunds",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Недоставка оплаченного заказа",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "02",
+        "04",
+        "08"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "high"
+    },
+    {
+      "case_id": "T025",
+      "category": "refunds",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Неполный заказ (недокомплект)",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "medium"
+      },
+      "expected_primary": [
+        "04"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 3,
+      "primary_best_pool24_rank": 4,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T026",
+      "category": "refunds",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "category_template",
+        "assessment_status": "rule_match",
+        "claim_category": "Жалоба на здоровье после употребления продукта",
+        "handoff_required": true,
+        "priority_handoff": true,
+        "risk_floor": "critical"
+      },
+      "expected_primary": [
+        "04"
+      ],
+      "expected_supporting": [
+        "06"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 3,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T027",
+      "category": "refunds",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Нарушение целостности упаковки",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "06",
+        "08"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 3,
+      "primary_best_pool24_rank": 7,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.3333,
+      "risk": "high"
+    },
+    {
+      "case_id": "T028",
+      "category": "refunds",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Требование возврата средств",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "04"
+      ],
+      "expected_supporting": [
+        "03"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T029",
+      "category": "refunds",
+      "classification": "none",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Требование возврата средств",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "07"
+      ],
+      "expected_supporting": [
+        "04",
+        "10"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 5,
+      "primary_best_pool24_rank": 5,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 1.0,
+      "risk": "low"
+    },
+    {
+      "case_id": "T030",
+      "category": "refunds",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Задержка доставки более 120 минут",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "04"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T031",
+      "category": "refunds",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Задержка доставки более 30 минут",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "medium"
+      },
+      "expected_primary": [
+        "05"
+      ],
+      "expected_supporting": [
+        "02"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T032",
+      "category": "refunds",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "05"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 3,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T033",
+      "category": "refunds",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Испорченный или некачественный продукт",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "05"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T034",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 3,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T035",
+      "category": "quality",
+      "classification": "none",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Нарушение целостности упаковки",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": false,
+      "primary_best_final_rank": 5,
+      "primary_best_pool24_rank": 6,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.3333,
+      "risk": "high"
+    },
+    {
+      "case_id": "T036",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Нарушение целостности упаковки",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "high"
+    },
+    {
+      "case_id": "T037",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Испорченный или некачественный продукт",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "high"
+    },
+    {
+      "case_id": "T038",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T039",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 4,
+      "primary_best_pool24_rank": 5,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "high"
+    },
+    {
+      "case_id": "T040",
+      "category": "quality",
+      "classification": "candidate_generation_fixed_ranking_limited",
+      "deterministic": {
+        "answer_provenance": "category_template",
+        "assessment_status": "rule_match",
+        "claim_category": "Обнаружение постороннего предмета в еде",
+        "handoff_required": true,
+        "priority_handoff": true,
+        "risk_floor": "critical"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": false,
+      "primary_best_final_rank": 8,
+      "primary_best_pool24_rank": 13,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.25,
+      "risk": "critical"
+    },
+    {
+      "case_id": "T041",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "category_template",
+        "assessment_status": "rule_match",
+        "claim_category": "Жалоба на здоровье после употребления продукта",
+        "handoff_required": true,
+        "priority_handoff": true,
+        "risk_floor": "critical"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "critical"
+    },
+    {
+      "case_id": "T042",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "category_template",
+        "assessment_status": "rule_match",
+        "claim_category": "Жалоба на здоровье после употребления продукта",
+        "handoff_required": true,
+        "priority_handoff": true,
+        "risk_floor": "critical"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "critical"
+    },
+    {
+      "case_id": "T043",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "medium"
+    },
+    {
+      "case_id": "T044",
+      "category": "quality",
+      "classification": "candidate_generation_fixed_ranking_limited",
+      "deterministic": {
+        "answer_provenance": "category_template",
+        "assessment_status": "rule_match",
+        "claim_category": "Утечка персональных данных",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "08"
+      ],
+      "expected_supporting": [
+        "06"
+      ],
+      "hit_at_4": false,
+      "primary_best_final_rank": 11,
+      "primary_best_pool24_rank": 20,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.2,
+      "risk": "high"
+    },
+    {
+      "case_id": "T045",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "category_template",
+        "assessment_status": "rule_match",
+        "claim_category": "Утечка персональных данных",
+        "handoff_required": true,
+        "priority_handoff": true,
+        "risk_floor": "critical"
+      },
+      "expected_primary": [
+        "08"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "critical"
+    },
+    {
+      "case_id": "T046",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "category_template",
+        "assessment_status": "rule_match",
+        "claim_category": "Признаки мошенничества",
+        "handoff_required": true,
+        "priority_handoff": true,
+        "risk_floor": "critical"
+      },
+      "expected_primary": [
+        "08"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": true,
+      "primary_best_final_rank": 4,
+      "primary_best_pool24_rank": 6,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.3333,
+      "risk": "critical"
+    },
+    {
+      "case_id": "T047",
+      "category": "quality",
+      "classification": "candidate_generation_fixed_ranking_limited",
+      "deterministic": {
+        "answer_provenance": "category_template",
+        "assessment_status": "rule_match",
+        "claim_category": "Прямая угроза",
+        "handoff_required": true,
+        "priority_handoff": true,
+        "risk_floor": "critical"
+      },
+      "expected_primary": [
+        "08"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": false,
+      "primary_best_final_rank": 7,
+      "primary_best_pool24_rank": 15,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.25,
+      "risk": "critical"
+    },
+    {
+      "case_id": "T048",
+      "category": "quality",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "category_template",
+        "assessment_status": "rule_match",
+        "claim_category": "Массовое обращение",
+        "handoff_required": true,
+        "priority_handoff": true,
+        "risk_floor": "critical"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "critical"
+    },
+    {
+      "case_id": "T049",
+      "category": "procedure",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "07"
+      ],
+      "expected_supporting": [
+        "01"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "low"
+    },
+    {
+      "case_id": "T050",
+      "category": "procedure",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Требование официального письменного ответа",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "07"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "high"
+    },
+    {
+      "case_id": "T051",
+      "category": "procedure",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Юридическая или регуляторная эскалация",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "07"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 2,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 0.5,
+      "risk": "high"
+    },
+    {
+      "case_id": "T052",
+      "category": "procedure",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Юридическая или регуляторная эскалация",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "08"
+      ],
+      "expected_supporting": [
+        "07"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 2,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "high"
+    },
+    {
+      "case_id": "T053",
+      "category": "procedure",
+      "classification": "candidate_generation_fixed_ranking_limited",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "08"
+      ],
+      "expected_supporting": [
+        "02"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": null,
+      "primary_best_pool24_rank": 19,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 1.0,
+      "risk": "high"
+    },
+    {
+      "case_id": "T054",
+      "category": "procedure",
+      "classification": "none",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "07"
+      ],
+      "expected_supporting": [],
+      "hit_at_4": false,
+      "primary_best_final_rank": 5,
+      "primary_best_pool24_rank": 5,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.25,
+      "risk": "low"
+    },
+    {
+      "case_id": "T055",
+      "category": "procedure",
+      "classification": "none",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "rule_match",
+        "claim_category": "Нарушение целостности упаковки",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "high"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "08",
+        "07"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 7,
+      "primary_best_pool24_rank": 12,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.3333,
+      "risk": "high"
+    },
+    {
+      "case_id": "T056",
+      "category": "injection",
+      "classification": "none",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [],
+      "expected_supporting": [
+        "07",
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": null,
+      "primary_best_pool24_rank": null,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.5,
+      "risk": "low"
+    },
+    {
+      "case_id": "T057",
+      "category": "injection",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "category_template",
+        "assessment_status": "rule_match",
+        "claim_category": "Жалоба на здоровье после употребления продукта",
+        "handoff_required": true,
+        "priority_handoff": true,
+        "risk_floor": "critical"
+      },
+      "expected_primary": [
+        "06"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 1,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "critical"
+    },
+    {
+      "case_id": "T058",
+      "category": "injection",
+      "classification": "already_reachable_at_baseline",
+      "deterministic": {
+        "answer_provenance": "unsupported_language",
+        "assessment_status": "unsupported_language",
+        "claim_category": "Обращение не на русском языке",
+        "handoff_required": true,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "02"
+      ],
+      "expected_supporting": [
+        "08"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 1,
+      "primary_best_pool24_rank": 3,
+      "primary_hit_at_4": true,
+      "reciprocal_rank": 1.0,
+      "risk": "low"
+    },
+    {
+      "case_id": "T059",
+      "category": "injection",
+      "classification": "none",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [
+        "01"
+      ],
+      "expected_supporting": [
+        "07",
+        "03"
+      ],
+      "hit_at_4": true,
+      "primary_best_final_rank": 9,
+      "primary_best_pool24_rank": 7,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.5,
+      "risk": "low"
+    },
+    {
+      "case_id": "T060",
+      "category": "injection",
+      "classification": "fallback_case",
+      "deterministic": {
+        "answer_provenance": "llm_draft",
+        "assessment_status": "no_signal",
+        "claim_category": "Общий запрос по сервису FoodFlow",
+        "handoff_required": false,
+        "priority_handoff": false,
+        "risk_floor": "low"
+      },
+      "expected_primary": [],
+      "expected_supporting": [],
+      "hit_at_4": false,
+      "primary_best_final_rank": null,
+      "primary_best_pool24_rank": null,
+      "primary_hit_at_4": false,
+      "reciprocal_rank": 0.0,
+      "risk": "low"
+    }
+  ],
+  "comparison_with_previous_baseline": {
+    "baseline": {
+      "artifact": "data/05_evaluation/vector_pool_expansion_v1.json",
+      "artifact_sha256": "d1686f3f4666631273a74810633c2fd9943c311306d53ede3d5c63440a4947eb",
+      "chunk_count": 215,
+      "index_fingerprint": "bf3df0d4631f29f322760b50735382039f67d3ee7c6860b25b1ce221312074f3",
+      "run_timestamp_utc": "2026-06-21T17:58:20.730986Z",
+      "tracked_in_git": true
+    },
+    "improvements": [
+      {
+        "case_id": "T011",
+        "metric": "primary_hit_at_4",
+        "now": true,
+        "risk": "high",
+        "was": false
+      }
+    ],
+    "metric_deltas": {
+      "hit_at_1": {
+        "baseline": 0.5172,
+        "current": 0.5172,
+        "delta": 0.0
+      },
+      "hit_at_12": {
+        "baseline": 0.9828,
+        "current": 0.9828,
+        "delta": 0.0
+      },
+      "hit_at_4": {
+        "baseline": 0.8966,
+        "current": 0.8966,
+        "delta": 0.0
+      },
+      "mrr": {
+        "baseline": 0.7147,
+        "current": 0.7147,
+        "delta": 0.0
+      },
+      "primary_hit_at_1": {
+        "baseline": 0.3793,
+        "current": 0.3966,
+        "delta": 0.0173
+      },
+      "primary_hit_at_4": {
+        "baseline": 0.7414,
+        "current": 0.7586,
+        "delta": 0.0172
+      },
+      "supporting_hit_at_4": {
+        "baseline": 0.6053,
+        "current": 0.6053,
+        "delta": 0.0
+      }
+    },
+    "regressions": [],
+    "same_evaluation_dataset": true,
+    "same_reranker_config": true,
+    "same_retrieval_config": true
+  },
+  "derived_from": {
+    "artifact": "data/05_evaluation/stage2g_pool_expansion.json",
+    "artifact_bytes": 3050204,
+    "artifact_sha256": "ff291709dbcd9f32d5c786ac53216aea3ad5157afb8d440643228bcc13123cc7",
+    "derived_at_commit": "0d5b94dbc57425b97309e66877f7b19cab4e46e9",
+    "derived_by": "scripts/summarize_retrieval_evidence.py",
+    "experiment_id": "vector-pool-expansion-v1",
+    "experiment_mode": "production-like",
+    "run_git_commit": "54b0336b275aae29e833fe5602284f90ca9aa30e",
+    "run_git_dirty": false,
+    "run_timestamp_utc": "2026-10-05T04:48:59.846216Z",
+    "tracked_in_git": false
+  },
+  "identity": {
+    "case_count": 60,
+    "chunk_count": 216,
+    "collection": "customer_claims",
+    "contract": {
+      "fetch_k": 24,
+      "final_top_k": 12,
+      "pool_k": 24,
+      "threshold": 0.0
+    },
+    "document_count": 10,
+    "embedding_model": "text-embedding-3-small",
+    "evaluation_dataset_fingerprint": "339ee42b744e3f17df5c963b01895147c29d64c55163582293332baf11a36861",
+    "index_fingerprint": "aa1005e12a33bf6fb0b3c0e5d38262a88ba7c5528d930fbc44202f3eb76502be",
+    "reranker_config_hash": "c39c4608b6ed4f25bae2cda076a305c665e65155680f6778d6152dde01290957",
+    "reranker_id": "source-authority-v1",
+    "retrieval_config_hash": "ff53ff9721ad86b1c542bf96dce616d9057ed3b347e341fed59750b07b69e048"
+  },
+  "kind": "retrieval_acceptance_summary",
+  "limitations": {
+    "dataset_high_or_critical_without_matching_floor": [
+      "T039",
+      "T053"
+    ],
+    "deterministic_floor_two_or_more_levels_above_dataset_label": [
+      "T026"
+    ],
+    "primary_not_in_top4_by_risk": {
+      "critical": [
+        "T040",
+        "T047"
+      ],
+      "high": [
+        "T035",
+        "T044",
+        "T053",
+        "T055"
+      ]
+    },
+    "primary_outside_pool_at_24": [
+      "T004"
+    ],
+    "ranking_limited_primary_in_pool_not_in_top4": [
+      "T016",
+      "T040",
+      "T044",
+      "T047",
+      "T053"
+    ]
+  },
+  "metrics": {
+    "cases_total": 60,
+    "cases_with_expected_sources": 58,
+    "hit_at_1": {
+      "cases": 58,
+      "hits": 30,
+      "value": 0.5172
+    },
+    "hit_at_12": {
+      "cases": 58,
+      "hits": 57,
+      "value": 0.9828
+    },
+    "hit_at_4": {
+      "cases": 58,
+      "hits": 52,
+      "value": 0.8966
+    },
+    "mrr": 0.7147,
+    "primary_hit_at_1": {
+      "cases": 58,
+      "hits": 23,
+      "value": 0.3966
+    },
+    "primary_hit_at_4": {
+      "cases": 58,
+      "hits": 44,
+      "value": 0.7586
+    },
+    "supporting_hit_at_4": {
+      "cases": 38,
+      "hits": 23,
+      "value": 0.6053
+    }
+  },
+  "pool_reachability": {
+    "pool_at_12": {
+      "fully_unreachable": [
+        "T004",
+        "T040",
+        "T047"
+      ],
+      "primary": "51/57",
+      "supporting": "29/38"
+    },
+    "pool_at_24": {
+      "fully_unreachable": [
+        "T004"
+      ],
+      "primary": "56/57",
+      "supporting": "35/38"
+    },
+    "primary_by_risk": {
+      "critical": {
+        "pool_at_12": "6/8",
+        "pool_at_24": "8/8"
+      },
+      "high": {
+        "pool_at_12": "13/15",
+        "pool_at_24": "15/15"
+      },
+      "low": {
+        "pool_at_12": "14/15",
+        "pool_at_24": "14/15"
+      },
+      "medium": {
+        "pool_at_12": "18/19",
+        "pool_at_24": "19/19"
+      }
+    }
+  },
+  "schema_version": "1.0.0",
+  "status": "current"
+}

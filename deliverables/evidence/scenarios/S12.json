@@ -1,0 +1,77 @@
+{
+  "answer": "История заказов, сроки доставки и применимые условия возврата по каждому из них требуют проверки. Просим указать номера заказов, если они ещё не указаны в обращении. Возможность возврата зависит от результатов проверки каждого заказа.",
+  "answer_provenance": "safety_replacement",
+  "assessment_status": "rule_match",
+  "citations": [],
+  "failure_source": null,
+  "generation_outcome": "grounded_answer",
+  "handoff_notice": null,
+  "handoff_required": false,
+  "priority_handoff": false,
+  "response_mode": "grounded_answer",
+  "retrieved_materials": [
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Недоставка и отмена сервиса",
+      "key": "S1"
+    },
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Когда может рассматриваться полный возврат",
+      "key": "S2"
+    },
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Смешанные и спорные сценарии",
+      "key": "S3"
+    },
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Когда может рассматриваться частичный возврат",
+      "key": "S4"
+    },
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Назначение документа",
+      "key": "S5"
+    },
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Какие данные желательно собрать",
+      "key": "S6"
+    },
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Базовые принципы рассмотрения",
+      "key": "S7"
+    },
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Особенности плана питания",
+      "key": "S8"
+    },
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Возврат и компенсация",
+      "key": "S9"
+    },
+    {
+      "document_id": "04_refund_policy",
+      "heading": "Качество и упаковка",
+      "key": "S10"
+    },
+    {
+      "document_id": "10_customer_faq",
+      "heading": "FAQ-23. Что происходит, если доставку отменил FoodFlow?",
+      "key": "S11"
+    },
+    {
+      "document_id": "03_order_changes_and_cancellations",
+      "heading": "Отмена по инициативе FoodFlow и техническая невозможность",
+      "key": "S12"
+    }
+  ],
+  "risk_floor": "medium",
+  "risk_label": "Средний",
+  "risk_note": null
+}

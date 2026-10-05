@@ -1,0 +1,16 @@
+{
+  "answer": "Я могу помочь только с обращениями по заказам и сервису FoodFlow. По этому вопросу рекомендуем воспользоваться подходящим профильным сервисом.",
+  "answer_provenance": "out_of_scope",
+  "assessment_status": "no_signal",
+  "citations": [],
+  "failure_source": null,
+  "generation_outcome": "out_of_scope",
+  "handoff_notice": null,
+  "handoff_required": false,
+  "priority_handoff": false,
+  "response_mode": "out_of_scope",
+  "retrieved_materials": [],
+  "risk_floor": "low",
+  "risk_label": "Риск не определён правилами",
+  "risk_note": "Автоматические правила не выявили признаков риска. Это не означает, что обращение безопасно: при необходимости оцените его вручную."
+}

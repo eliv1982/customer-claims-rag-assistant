@@ -109,7 +109,7 @@ Startup of `answer-claim` and the Streamlit UI runs the same validation; if the 
 
 The retrieval experiments (stages 2C–4C) ran on the 10- and 15-document corpus as it was **before** the stage 2D2 content corrections. That corpus is frozen in `experiments/corpus/historical_pre_2d2_15doc_v1/` (documents plus `snapshot_manifest.json` with their hashes and identities: 10-document release v1 `bf3df0d4…`/215 chunks, 15-document expansion `b9526128…`/333 chunks). The tracked experiment artifacts in `data/05_evaluation/` and the experiment tests are reproduced from that snapshot; the real-tokenizer lane rebuilds the chunks and compares the fingerprints. The snapshot is never the production corpus and must not be edited.
 
-Retrieval quality measured on the old text (frozen 60-question benchmark) has **not** been re-measured on the corrected corpus: that needs the new index, which needs the OpenAI embedding API.
+Retrieval quality on the corrected corpus was re-measured with the frozen 60-question benchmark against the production index (stage 2G). Against the baseline accepted on the old text there is no per-case regression and one improvement (T011); the derived figures, identity and per-case rows are in `deliverables/evidence/retrieval_summary.md`. The experiment reports and artifacts above remain what they are, measurements of the old text.
 
 ## Known limitations
 

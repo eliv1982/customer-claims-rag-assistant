@@ -1,0 +1,150 @@
+{
+  "environment": {
+    "openai_api_key_in_process_env": false,
+    "platform": "Windows",
+    "python": "3.12.10",
+    "repository_dotenv_read": false,
+    "tokenizer_vocabulary_needed": false
+  },
+  "external_requests": {
+    "network": 0,
+    "openai": 0
+  },
+  "files": {
+    "release_posture.txt": {
+      "bytes": 929,
+      "sha256": "a38537bcf856eeaa02ed9204acf2854cd46cd69c12e6a5e761a6b0edff708070"
+    },
+    "retrieval_summary.json": {
+      "bytes": 47397,
+      "sha256": "379a7bd982fb481d5dcd696ebf6ef8bb58eff578c7b23b5a94d003bb0aab4001"
+    },
+    "retrieval_summary.md": {
+      "bytes": 6329,
+      "sha256": "cc217057b0d9381b4187a103da7af5c4d5ad0c86bbf84ed29fe2ade97c2ef3c7"
+    },
+    "scenarios.md": {
+      "bytes": 6024,
+      "sha256": "6b9073db1be1e55f24b89b6fe462619295a1624a06f53631bb283057bbe5d6b8"
+    },
+    "scenarios/S01.json": {
+      "bytes": 941,
+      "sha256": "2780e38575cac21eab866b716c6fef2b041bfc1606f1f464cc47f93a9e810393"
+    },
+    "scenarios/S02.json": {
+      "bytes": 1123,
+      "sha256": "796264198d5958ef6cb5c2bd881e45d026b1ae0ca9e57f1bedf3452a59a6e620"
+    },
+    "scenarios/S03.json": {
+      "bytes": 3300,
+      "sha256": "56f6fc597244be1f40bae410331d50655c8965331f86b34efff91c1857258c7e"
+    },
+    "scenarios/S04.json": {
+      "bytes": 3018,
+      "sha256": "77af499f0017da741c9f299e9efb0d19dfeba27df4af34787423ed83a69ba196"
+    },
+    "scenarios/S05.json": {
+      "bytes": 3149,
+      "sha256": "21a4d7d11113b419c6d4f1344e4936e840ea023b53c12a6b15ff3f5e909d10e6"
+    },
+    "scenarios/S06.json": {
+      "bytes": 3004,
+      "sha256": "26af60bab10ed5261efc1c6fc58e13358806c5b180012c0fddea806a155534ef"
+    },
+    "scenarios/S07.json": {
+      "bytes": 3038,
+      "sha256": "a520617e2b816dd089d206763a292ec52e7d18d5028fb3644736a85cce9aeb1b"
+    },
+    "scenarios/S08.json": {
+      "bytes": 2832,
+      "sha256": "26794dc38a9ebc134ad82edbc6185ab217fe1ad58598bb15e8e01db088c724d3"
+    },
+    "scenarios/S09.json": {
+      "bytes": 3018,
+      "sha256": "77af499f0017da741c9f299e9efb0d19dfeba27df4af34787423ed83a69ba196"
+    },
+    "scenarios/S10.json": {
+      "bytes": 956,
+      "sha256": "2681f28f91696e3bec9d55e09269b6685347ae2a39ba1585c37b921673751996"
+    },
+    "scenarios/S11.json": {
+      "bytes": 2949,
+      "sha256": "0ba867742434b77e83b9a68bead5c3a87a887a56638959c4b6e8b1aa463a9055"
+    },
+    "scenarios/S12.json": {
+      "bytes": 2725,
+      "sha256": "27f4b5de776ed4684004ae0244e9f143cacba3513e32b08abeff21758cdfa2a4"
+    },
+    "scenarios/S13.json": {
+      "bytes": 938,
+      "sha256": "c4e60c0a26bb1f1f64ba2fff09aa028f28acbb3b0b4fb8fc9daa44ba7bfe2e1b"
+    },
+    "scenarios/S14.json": {
+      "bytes": 3380,
+      "sha256": "a3155d38374737009708f9469481d6d9e0e8c2554b5aa7f1b420cbd235928553"
+    },
+    "ui/01_release_identity.png": {
+      "bytes": 61225,
+      "sha256": "e96878a9004aac75e01643a61ba636744b07e396b85d4c982f0a13c8738c47f9"
+    },
+    "ui/02_claim_with_sources.png": {
+      "bytes": 130868,
+      "sha256": "589b63f91a1680812b9d429a9f3d496eb027c19020795ff7c06a94c59d9a14f4"
+    },
+    "ui/03_critical_health_template.png": {
+      "bytes": 167143,
+      "sha256": "17d775e360706fe199811d62db799099b5b07ddcf0d00b05f34a8cac935a829a"
+    },
+    "ui/04_unsafe_draft_replaced.png": {
+      "bytes": 155587,
+      "sha256": "7ffbf7413a244d5bea6834547a9fbfc1871ee9338a2a15e0fa40c36bc7f7c11f"
+    },
+    "ui/05_retrieval_unavailable.png": {
+      "bytes": 171181,
+      "sha256": "c04c4da3eb3541bf97d901ff63314a93a10d97cd9581f3d222750f02abdd94ab"
+    },
+    "ui/06_unsupported_language.png": {
+      "bytes": 241463,
+      "sha256": "c456c390093aba06ff2e55e1a306aa5747a33162d3a95362bc45e2364ba9ff8d"
+    }
+  },
+  "generated_at_utc": "2026-10-05T05:58:19Z",
+  "generator": "scripts/capture_final_acceptance.py",
+  "kind": "final_acceptance_evidence",
+  "release": {
+    "canonical_corpus_id": "foodflow-10doc-corpus-v2",
+    "chunk_count": 216,
+    "chunk_payload_digest": "f46fa97741c3047628cb2d06cc48d4a11444c889ed894189b5f488f1e4c1b393",
+    "collection": "customer_claims",
+    "corpus_fingerprint": "aa1005e12a33bf6fb0b3c0e5d38262a88ba7c5528d930fbc44202f3eb76502be",
+    "corpus_manifest": "configs/corpus/foodflow_production_v1.json",
+    "document_count": 10,
+    "embedding_model": "text-embedding-3-small",
+    "frozen_config_hash": "ff53ff9721ad86b1c542bf96dce616d9057ed3b347e341fed59750b07b69e048",
+    "index_integrity": "store_recomputed",
+    "index_matches_canonical_corpus": "yes",
+    "index_path": "data/04_index_production",
+    "release_can_proceed": true,
+    "release_posture_id": "foodflow-10doc-release-v2",
+    "target": "active",
+    "vector_dimension": 1536
+  },
+  "retrieval_evaluation": {
+    "evaluation_dataset_fingerprint": "339ee42b744e3f17df5c963b01895147c29d64c55163582293332baf11a36861",
+    "hit_at_4": 0.8966,
+    "index_fingerprint": "aa1005e12a33bf6fb0b3c0e5d38262a88ba7c5528d930fbc44202f3eb76502be",
+    "mrr": 0.7147,
+    "primary_hit_at_4": 0.7586,
+    "raw_artifact_sha256": "ff291709dbcd9f32d5c786ac53216aea3ad5157afb8d440643228bcc13123cc7",
+    "retrieval_config_hash": "ff53ff9721ad86b1c542bf96dce616d9057ed3b347e341fed59750b07b69e048",
+    "summary": "retrieval_summary.json"
+  },
+  "run_mode": "deterministic_stub_run",
+  "schema_version": "2.0.0",
+  "source": {
+    "git_commit": "0d5b94dbc57425b97309e66877f7b19cab4e46e9",
+    "note": "code commit that produced this evidence; later commits add only the evidence and documentation",
+    "source_tree_clean": true
+  },
+  "status": "current"
+}

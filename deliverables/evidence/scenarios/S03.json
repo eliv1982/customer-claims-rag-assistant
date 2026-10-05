@@ -1,0 +1,77 @@
+{
+  "answer": "Благодарим за обращение. Сейчас мы можем обработать обращение автоматически только на русском языке. Пожалуйста, опишите ситуацию на русском языке и, если вопрос связан с заказом, укажите номер заказа. Обращение потребует ручной проверки.",
+  "answer_provenance": "unsupported_language",
+  "assessment_status": "unsupported_language",
+  "citations": [],
+  "failure_source": null,
+  "generation_outcome": "grounded_answer",
+  "handoff_notice": "Текст обращения не на русском языке: автоматическая оценка риска не выполнена. Требуется проверка сотрудником поддержки.",
+  "handoff_required": true,
+  "priority_handoff": false,
+  "response_mode": "grounded_answer",
+  "retrieved_materials": [
+    {
+      "document_id": "02_delivery_rules",
+      "heading": "Каноническое правило интервала и задержки",
+      "key": "S1"
+    },
+    {
+      "document_id": "02_delivery_rules",
+      "heading": "Погода и дорожная обстановка",
+      "key": "S2"
+    },
+    {
+      "document_id": "02_delivery_rules",
+      "heading": "Пограничные сценарии",
+      "key": "S3"
+    },
+    {
+      "document_id": "10_customer_faq",
+      "heading": "FAQ-06. Что делать, если доставка задерживается не более чем на 30 минут?",
+      "key": "S4"
+    },
+    {
+      "document_id": "10_customer_faq",
+      "heading": "FAQ-07. Что делать, если задержка превысила 30 минут?",
+      "key": "S5"
+    },
+    {
+      "document_id": "02_delivery_rules",
+      "heading": "Пограничные сценарии",
+      "key": "S6"
+    },
+    {
+      "document_id": "10_customer_faq",
+      "heading": "FAQ-08. Что делать, если задержка превысила 120 минут?",
+      "key": "S7"
+    },
+    {
+      "document_id": "02_delivery_rules",
+      "heading": "Технические обстоятельства и массовые инциденты",
+      "key": "S8"
+    },
+    {
+      "document_id": "02_delivery_rules",
+      "heading": "Недоступность клиента во время интервала",
+      "key": "S9"
+    },
+    {
+      "document_id": "03_order_changes_and_cancellations",
+      "heading": "Отмена и перенос интервала",
+      "key": "S10"
+    },
+    {
+      "document_id": "01_service_overview",
+      "heading": "Как устроена доставка и ожидание интервала",
+      "key": "S11"
+    },
+    {
+      "document_id": "02_delivery_rules",
+      "heading": "Базовые принципы доставки",
+      "key": "S12"
+    }
+  ],
+  "risk_floor": "low",
+  "risk_label": "Оценка недоступна для языка обращения",
+  "risk_note": "Автоматическая оценка риска для этого языка не выполнялась. Требуется ручная проверка."
+}

@@ -1,0 +1,22 @@
+{
+  "answer": "Разовый заказ - это одна отдельная покупка с одной доставкой. План питания - это пакет с несколькими заранее запланированными доставками.",
+  "answer_provenance": "llm_draft",
+  "assessment_status": "no_signal",
+  "citations": [
+    {
+      "document_id": "10_customer_faq",
+      "heading": "FAQ-01. Чем разовый заказ отличается от плана питания?",
+      "key": "S1"
+    }
+  ],
+  "failure_source": null,
+  "generation_outcome": "grounded_answer",
+  "handoff_notice": null,
+  "handoff_required": false,
+  "priority_handoff": false,
+  "response_mode": "grounded_answer",
+  "retrieved_materials": [],
+  "risk_floor": "low",
+  "risk_label": "Риск не определён правилами",
+  "risk_note": "Автоматические правила не выявили признаков риска. Это не означает, что обращение безопасно: при необходимости оцените его вручную."
+}
