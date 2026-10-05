@@ -20,8 +20,10 @@ network access, and must not write into the repository:
 
 from __future__ import annotations
 
+import gc
 import os
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -166,6 +168,24 @@ def _hermetic_app_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         return real_load_dotenv(dotenv_path, *args, **kwargs)
 
     monkeypatch.setattr(env_bootstrap, "load_dotenv", load_dotenv)
+
+
+@pytest.fixture(autouse=True)
+def _release_chroma_handles():
+    """Close the files of every Chroma client a test opened.
+
+    A persistent Chroma client holds four open files until its cached system is dropped, and the
+    systems form reference cycles, so they live until a collection pass. The suite opens hundreds of
+    clients; on Windows the C runtime allows 512 open files per process, which the late part of the
+    suite reached, so any test that needed one more file (an SSL context reads the CA bundle) failed
+    with "Too many open files". Dropping the cache after each test that used Chroma keeps the process
+    far below the limit.
+    """
+    yield
+    shared = sys.modules.get("chromadb.api.shared_system_client")
+    if shared is not None and shared.SharedSystemClient._identifier_to_system:
+        shared.SharedSystemClient.clear_system_cache()
+        gc.collect()
 
 
 @pytest.fixture

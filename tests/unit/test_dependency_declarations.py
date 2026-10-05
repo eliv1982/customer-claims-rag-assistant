@@ -27,6 +27,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 IMPORT_TO_DISTRIBUTION: dict[str, str | None] = {
     "chromadb": "chromadb",
     "dotenv": "python-dotenv",
+    "httpx": "httpx",
     "langchain_core": "langchain-core",
     "langchain_openai": "langchain-openai",
     "numpy": "numpy",
@@ -39,7 +40,10 @@ IMPORT_TO_DISTRIBUTION: dict[str, str | None] = {
     "yaml": "pyyaml",
 }
 
-FIRST_PARTY = {"customer_claims_rag", "tests"}
+# Scripts may import each other (``scripts/`` is on ``sys.path`` when one is run); those are not packages.
+FIRST_PARTY = {"customer_claims_rag", "tests"} | {
+    path.stem for path in (PROJECT_ROOT / "scripts").glob("*.py")
+}
 
 
 def _normalize(name: str) -> str:
